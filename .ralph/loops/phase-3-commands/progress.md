@@ -127,6 +127,25 @@ After this loop, the CLI should be feature-complete for MVP:
 
 ---
 
+## [2026-01-18 12:02] - Categories Commands
+- Created `src/monarch_cli/commands/categories.py` with:
+  - `categories.app` Typer instance with `help='Category management'`
+  - `list` command with --format, --json flags
+  - Inline `_flatten_categories()` function to flatten nested structure
+- Flattens nested category structure (groups with children) to flat list
+- Output includes: id, name, group, icon
+- Uses `client.get_transaction_categories()` API method
+- Uses `@handle_errors` and `spinner('Fetching categories...')`
+- Added comprehensive tests in `tests/commands/test_categories.py`
+- Files changed:
+  - `src/monarch_cli/commands/categories.py` (new)
+  - `tests/commands/test_categories.py` (new)
+- **Learnings:**
+  - Category API is nested under groups, needs flattening transformation
+  - Same single-command app pattern as budgets/cashflow
+
+---
+
 ## [2026-01-18 11:55] - Transaction Commands
 - Created `src/monarch_cli/commands/transactions.py` with:
   - `transactions.app` Typer instance with `help='Transaction management'`

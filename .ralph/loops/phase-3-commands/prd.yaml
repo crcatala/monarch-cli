@@ -155,7 +155,7 @@ tasks:
       The response format is already reasonable, minimal transformation needed.
 
   - title: "Categories Commands"
-    status: pending
+    status: done
     ticket: mc-57e8
     acceptance:
       - "src/monarch_cli/commands/categories.py exists"
