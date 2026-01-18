@@ -16,6 +16,19 @@ This file tracks completed work and patterns learned during this loop.
 
 ## Completed Tasks
 
+## [2026-01-18 11:06] - Account Service Layer (mc-4c28)
+- Implemented `list_accounts()` - fetches and transforms accounts using the transformer
+- Implemented `get_account_ids()` - returns list of account ID strings
+- Implemented `refresh_accounts(account_ids=None)` - orchestrates refresh, fetches all IDs if none provided
+- Returns dict with status ('ok', 'no_accounts', 'failed'), account_count, message
+- Uses `get_authenticated_client()` from adapter and `run_async()` for all async calls
+- Files changed:
+  - `src/monarch_cli/services/accounts.py` (new)
+  - `tests/services/__init__.py` (new)
+  - `tests/services/test_accounts.py` (new - 12 tests with mocks)
+- **Learnings:** Unused mock parameters should be prefixed with `_` to satisfy linter (ARG002)
+---
+
 ## [2026-01-18 11:05] - Transaction Transformer (mc-f913)
 - Implemented `transform_transaction()` and `transform_transactions()` functions
 - Handles all required fields: id, date, amount, description, category, category_id, account, account_id, is_pending, notes

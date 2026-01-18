@@ -65,7 +65,7 @@ tasks:
       ```
 
   - title: "Account Service Layer"
-    status: pending
+    status: done
     ticket: mc-4c28
     acceptance:
       - "src/monarch_cli/services/accounts.py exists"
