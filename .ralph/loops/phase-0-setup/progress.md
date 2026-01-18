@@ -39,3 +39,14 @@ This file tracks completed work and patterns learned during this loop.
 - **Learnings:** typer[all] extra is deprecated in typer 0.21.1+, but still works as a no-op. uv sync --all-extras installs both runtime and optional dependencies.
 
 ---
+
+## [2026-01-18 08:43] - Project Directory Structure (mc-fa92)
+- Updated src/monarch_cli/__init__.py with __version__ = '0.1.0'
+- Created src/monarch_cli/main.py with Typer app including version callback
+- Created package directories: commands/, core/, services/, transformers/, output/
+- Created tests/__init__.py, tests/conftest.py (with sample fixture), tests/live/__init__.py
+- Created scripts/ directory with .gitkeep
+- Files changed: src/monarch_cli/__init__.py, src/monarch_cli/main.py, multiple __init__.py files
+- **Learnings:** Typer apps with no_args_is_help=True need at least a @app.callback() decorated function to work. Use modern Python syntax `X | None` instead of `Optional[X]` per ruff UP045.
+
+---

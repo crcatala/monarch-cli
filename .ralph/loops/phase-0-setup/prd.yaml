@@ -42,7 +42,7 @@ tasks:
       Import monarchmoneycommunity as `monarchmoney` (that's how the package exposes itself).
 
   - title: "Project Directory Structure"
-    status: pending
+    status: done
     ticket: mc-fa92
     acceptance:
       - "src/monarch_cli/__init__.py exists with __version__ = '0.1.0'"
