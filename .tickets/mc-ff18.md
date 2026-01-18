@@ -1,7 +1,7 @@
 ---
 id: mc-ff18
 status: open
-deps: [mc-3f7c]
+deps: [mc-3f7c, mc-8d99]
 links: []
 created: 2026-01-18T16:05:58Z
 type: task

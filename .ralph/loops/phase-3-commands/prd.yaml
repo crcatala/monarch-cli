@@ -1,12 +1,14 @@
 name: "Phase 3b: Core Commands"
 description: |
   Implement all MVP commands that cover 90% of user needs:
+  - Plain output format with TTY-aware defaults (prerequisite)
   - Accounts (list, refresh)
   - Transactions (list, update)
   - Budgets (list)
   - Cashflow (summary)
   - Categories (list)
-  - Update main entry point with all commands
+  - Update main entry point with all commands + CLI best practices global flags
+  - Security documentation for MONARCH_TOKEN
   - Document shell completions
 
   After this phase, the CLI is feature-complete for MVP.
@@ -17,6 +19,43 @@ issue_tracker: none
 pre_commit: "make verify"
 
 tasks:
+  - title: "Plain Output Format (Human-Friendly Default)"
+    status: pending
+    ticket: mc-8d99
+    acceptance:
+      - "OutputFormat.PLAIN added to enum in output/__init__.py"
+      - "src/monarch_cli/output/plain.py exists with format_plain() function"
+      - "Plain format uses emoji icons and labeled fields"
+      - "get_default_format() returns PLAIN for TTY, JSON when piped"
+      - "should_use_color() checks NO_COLOR, TERM=dumb, and TTY"
+      - "output() uses TTY-aware default when format=None"
+      - "Plain output has no ANSI codes when piped or NO_COLOR set"
+      - "Unit tests for plain formatter and TTY detection"
+    notes: |
+      This ensures consistency with auth commands (styled plain text default)
+      and follows CLI best practices (human-friendly in terminal, JSON when piped).
+      
+      Example plain output:
+      ```
+      🔖 Id: acc_123abc
+      📌 Name: Chase Checking
+      💰 Balance: 1234.56
+      🏦 Institution: Chase
+      
+      ──────────────────────────────────────────────────
+      
+      🔖 Id: acc_456def
+      📌 Name: Savings Account
+      ...
+      ```
+      
+      TTY behavior:
+      ```bash
+      monarch accounts list          # Plain (terminal)
+      monarch accounts list | jq .   # JSON (piped)
+      monarch accounts list --json   # JSON (explicit)
+      ```
+
   - title: "Account Commands"
     status: pending
     ticket: mc-7e2e
@@ -24,7 +63,8 @@ tasks:
       - "src/monarch_cli/commands/accounts.py exists"
       - "accounts.app is typer.Typer(help='Account management')"
       - "`monarch accounts list` shows all accounts"
-      - "list supports --format, --ndjson, --raw flags"
+      - "list supports --format, --json, --ndjson, --raw flags"
+      - "list defaults to plain format in terminal, JSON when piped"
       - "list uses spinner('Fetching accounts...')"
       - "list uses account_service.list_accounts() or raw client call if --raw"
       - "`monarch accounts refresh` triggers bank sync"
@@ -34,8 +74,10 @@ tasks:
     notes: |
       Example commands:
       ```bash
-      monarch accounts list
-      monarch accounts list --format table
+      monarch accounts list                # Plain format (default in terminal)
+      monarch accounts list --json         # JSON format
+      monarch accounts list --format table # Table format
+      monarch accounts list | jq .         # Auto-JSON when piped
       monarch accounts refresh
       monarch accounts refresh -a ACC123 -a ACC456
       ```
@@ -51,7 +93,8 @@ tasks:
     acceptance:
       - "src/monarch_cli/commands/transactions.py exists"
       - "`monarch transactions list` with filters: --limit, --offset, --start, --end, --preset, --account, --search"
-      - "list supports --format, --ndjson, --raw flags"
+      - "list supports --format, --json, --ndjson, --raw flags"
+      - "list defaults to plain format in terminal, JSON when piped"
       - "list uses spinner and transformer"
       - "Date preset uses DatePreset enum and parse_date_range()"
       - "`monarch transactions update <id>` with --amount, --description, --category flags"
@@ -79,7 +122,8 @@ tasks:
       - "Output includes: id, category, budgeted, spent (absolute value), remaining"
       - "Uses inline transformation (no separate transformer needed)"
       - "Extracts from budgets['budgetData']['budgetItems']"
-      - "Supports --format flag"
+      - "Supports --format and --json flags"
+      - "Defaults to plain format in terminal, JSON when piped"
       - "Uses @handle_errors"
     notes: |
       Budget API response structure:
@@ -103,7 +147,8 @@ tasks:
       - "Supports --start, --end, --preset date filters"
       - "Uses parse_date_range() for date handling"
       - "Passes data through with minimal transformation"
-      - "Supports --format flag"
+      - "Supports --format and --json flags"
+      - "Defaults to plain format in terminal, JSON when piped"
       - "Uses @handle_errors and spinner"
     notes: |
       client.get_cashflow_summary(start_date=, end_date=) returns the summary.
@@ -117,7 +162,8 @@ tasks:
       - "`monarch categories list` shows all transaction categories"
       - "Output includes: id, name, group, icon"
       - "Flattens nested structure (categories have groups with children)"
-      - "Supports --format flag"
+      - "Supports --format and --json flags"
+      - "Defaults to plain format in terminal, JSON when piped"
       - "Uses @handle_errors and spinner"
     notes: |
       Category API response is nested:
@@ -130,10 +176,11 @@ tasks:
       ```
       Flatten to list of categories with their group name.
 
-  - title: "Update Main Entry Point (All Commands)"
+  - title: "Update Main Entry Point & Global Flags"
     status: pending
     ticket: mc-0c0a
     acceptance:
+      # Command Registration
       - "src/monarch_cli/main.py registers all command groups"
       - "app.add_typer(auth.app, name='auth')"
       - "app.add_typer(accounts.app, name='accounts')"
@@ -143,15 +190,58 @@ tasks:
       - "app.add_typer(categories.app, name='categories')"
       - "`monarch --help` shows all command groups"
       - "Each command group's --help works"
+      # Global Flags (CLI Best Practices)
+      - "`--version` works with NO -v shortcut (version is long-only)"
+      - "`-v, --verbose` shows operational progress messages"
+      - "`--debug` shows stack traces and implies verbose"
+      - "`--json` sets default output format to JSON globally"
+      - "`--no-color` disables colored output"
+      - "NO_COLOR env var is still respected"
+      # Output Module Updates
+      - "set_debug() / is_debug() functions exist in output module"
+      - "set_default_format() / get_default_format() functions exist"
+      - "error_handler.py uses is_debug() for stack traces (not is_verbose())"
     notes: |
-      Test each command group:
+      CLI Best Practices Fix (per clig.dev):
+      
+      BEFORE (wrong):
+      - `-v` → version (should be verbose!)
+      - `-V` → verbose (non-standard)
+      
+      AFTER (correct):
+      - `--version` → version (no short flag)
+      - `-v, --verbose` → operational progress
+      - `--debug` → stack traces + implies verbose
+      - `--json` → global JSON output shortcut
+      - `--no-color` → disable colors
+      
+      Test commands:
       ```bash
-      monarch accounts --help
-      monarch transactions --help
-      monarch budgets --help
-      monarch cashflow --help
-      monarch categories --help
+      monarch --help                 # Shows all groups
+      monarch --version              # Shows version
+      monarch -v accounts list       # Verbose mode
+      monarch --debug accounts list  # Debug with stack traces
+      monarch --json accounts list   # JSON output
+      monarch --no-color auth doctor # No colors
       ```
+
+  - title: "MONARCH_TOKEN Security Documentation"
+    status: pending
+    ticket: mc-da1f
+    acceptance:
+      - "`monarch auth setup` shows Security Considerations section"
+      - "Documents keyring as most secure option"
+      - "Documents file storage as moderate security"
+      - "Documents MONARCH_TOKEN env var risks explicitly"
+      - "Provides guidance for CI/CD secret injection (GitHub Actions, GitLab CI, Docker)"
+    notes: |
+      Per CLI best practices, environment variables for secrets are a "documented risk":
+      - Visible in process listings (ps aux)
+      - May be logged by shells or process managers
+      - Can leak into child processes
+      
+      The auth setup command should educate users on secure alternatives and
+      when MONARCH_TOKEN is appropriate (CI/CD with proper secret injection).
 
   - title: "Shell Completions Documentation"
     status: pending

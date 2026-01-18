@@ -1,7 +1,7 @@
 ---
 id: mc-7e2e
 status: open
-deps: [mc-4c28]
+deps: [mc-4c28, mc-8d99]
 links: []
 created: 2026-01-18T16:05:23Z
 type: task
