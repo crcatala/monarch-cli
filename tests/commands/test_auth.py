@@ -411,28 +411,33 @@ class TestAuthLogin:
 
     Note: Login is interactive and harder to test fully.
     These tests cover error paths and non-interactive aspects.
+    getpass.getpass() must be mocked as it reads from TTY, not stdin.
     """
 
     def test_login_invalid_storage_backend(self) -> None:
         """Should error on invalid --storage value."""
-        result = runner.invoke(
-            app,
-            ["auth", "login", "-s", "invalid"],
-            input="test@example.com\npassword\n",
-        )
+        with mock.patch("monarch_cli.commands.auth.getpass.getpass", return_value="password"):
+            result = runner.invoke(
+                app,
+                ["auth", "login", "-s", "invalid"],
+                input="test@example.com\n",
+            )
         assert result.exit_code == 1
         assert "Invalid storage backend" in result.stderr
 
     def test_login_keyring_unavailable_with_keyring_flag(self) -> None:
         """Should error when --storage=keyring but keyring unavailable."""
-        with mock.patch(
-            "monarch_cli.commands.auth._is_keyring_available",
-            return_value=False,
+        with (
+            mock.patch("monarch_cli.commands.auth.getpass.getpass", return_value="password"),
+            mock.patch(
+                "monarch_cli.commands.auth._is_keyring_available",
+                return_value=False,
+            ),
         ):
             result = runner.invoke(
                 app,
                 ["auth", "login", "-s", "keyring"],
-                input="test@example.com\npassword\n",
+                input="test@example.com\n",
             )
 
         assert result.exit_code == 1
