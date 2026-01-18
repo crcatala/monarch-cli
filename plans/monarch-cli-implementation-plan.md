@@ -52,7 +52,7 @@ The MCP server is just a thin wrapper (~300 LOC) around `monarchmoney` with keyr
 - **Auth**: Dual-backend token storage - OS keyring (secure, default) or session file (portable)
 - **Output**: JSON (default), table, CSV, compact, NDJSON for streaming
 - **Config**: TOML with XDG/platformdirs support
-- **Testing**: pytest with CliRunner and VCR-style recording
+- **Testing**: pytest with CliRunner (live tests for local dev only)
 
 ---
 
@@ -388,8 +388,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.0.0",
-    "pytest-recording>=0.13.0",  # VCR-style HTTP recording
-    "respx>=0.21.0",  # HTTPX mocking
+
     "ruff>=0.4.0",
     "mypy>=1.10.0",
 ]
@@ -531,13 +530,12 @@ monarch-cli/
 │           └── progress.py      # Spinners and progress bars
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py              # Shared fixtures, VCR config
+│   ├── conftest.py              # Shared fixtures
 │   ├── test_auth.py
 │   ├── test_accounts.py
 │   ├── test_transactions.py
 │   ├── test_output.py
-│   ├── cassettes/               # VCR recorded responses
-│   └── live/                    # Real API tests (gated)
+│   └── live/                    # Real API tests (local dev only)
 │       ├── __init__.py
 │       └── test_live_api.py
 ├── pyproject.toml               # ALL config in one file
@@ -637,9 +635,9 @@ test:
 test-cov:
 	uv run pytest --cov --cov-report=term-missing
 
-# Live tests (requires MONARCH_TOKEN)
+# Live tests - LOCAL DEV ONLY (requires auth, not for CI)
 test-live:
-	uv run pytest tests/live/ -m live
+	MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live
 ```
 
 **Usage:**
@@ -760,73 +758,46 @@ def sample_accounts():
     }
 
 
-@pytest.fixture
-def vcr_config():
-    """VCR configuration for recording API responses."""
-    return {
-        "filter_headers": ["authorization", "cookie"],
-        "filter_query_parameters": ["token"],
-        "record_mode": "once",
-        "cassette_library_dir": "tests/cassettes",
-    }
 ```
 
-#### VCR/Recording Tests
+#### Live Tests (Local Development Only)
 
-For realistic tests without hitting live APIs:
+Live tests hit the real Monarch Money API. These are for **local development only** - they should NOT run in CI since they require real credentials and make actual API calls.
 
-```python
-# tests/test_accounts_recorded.py
-import pytest
+**Why not in CI?**
+- Requires real Monarch Money credentials
+- API responses vary per user (account names, balances, etc.)
+- Could hit rate limits
+- API compatibility is the responsibility of `monarchmoneycommunity` library
 
-
-@pytest.mark.vcr()
-class TestAccountsRecorded:
-    """Tests using recorded API responses."""
-
-    def test_list_accounts_structure(self, capsys):
-        """Verify account list structure matches recorded response."""
-        from typer.testing import CliRunner
-        from monarch_cli.main import app
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["accounts", "list"])
-
-        assert result.exit_code == 0
-        import json
-        accounts = json.loads(result.stdout)
-        assert isinstance(accounts, list)
-```
-
-**Recording new cassettes:**
-```bash
-# Set credentials and record
-MONARCH_TOKEN=... pytest tests/test_accounts_recorded.py --vcr-record=all
-
-# Commit cassettes (sanitized of auth tokens)
-git add tests/cassettes/
-```
-
-#### Live Tests (Gated)
+**When to use:**
+- Verifying your authenticated client works
+- Testing new commands during development
+- Debugging API response handling
 
 ```python
 # tests/live/test_live_api.py
 import os
 import pytest
 
-# Only run if explicitly enabled
+# Only run if explicitly enabled via environment variable
 pytestmark = pytest.mark.live
 
 LIVE_ENABLED = os.environ.get("MONARCH_LIVE_TESTS") == "1"
 
 
-@pytest.mark.skipif(not LIVE_ENABLED, reason="Live tests disabled")
+@pytest.mark.skipif(not LIVE_ENABLED, reason="Live tests disabled (set MONARCH_LIVE_TESTS=1)")
 class TestLiveAPI:
     """Tests against real Monarch Money API.
+    
+    ⚠️  LOCAL DEVELOPMENT ONLY - Do not run in CI!
 
-    Run with: MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live
-
-    Requires MONARCH_TOKEN environment variable.
+    Prerequisites:
+    - Authenticated via `monarch auth login`, OR
+    - MONARCH_TOKEN environment variable set
+    
+    Run with:
+        MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live
     """
 
     def test_get_accounts_returns_data(self):
@@ -873,8 +844,8 @@ jobs:
       - name: Type check
         run: uv run mypy src/
 
-      - name: Test
-        run: uv run pytest --cov --cov-report=xml
+      - name: Test (excluding live tests)
+        run: uv run pytest --cov --cov-report=xml -m "not live"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -955,7 +926,7 @@ uv publish --repository testpypi  # Publish to test PyPI
 Use the complete `pyproject.toml` from the [Python Ecosystem Conventions](#python-ecosystem-conventions) section above. Key points:
 
 - **Runtime deps:** typer, monarchmoneycommunity, keyring, rich, platformdirs, httpx, jmespath
-- **Dev deps:** pytest, pytest-asyncio, pytest-cov, pytest-recording, respx, ruff, mypy
+- **Dev deps:** pytest, pytest-asyncio, pytest-cov, ruff, mypy
 - **Tool configs:** All in pyproject.toml (ruff, mypy, pytest, coverage)
 
 > **Note:** Install `monarchmoneycommunity` from PyPI, but import as `monarchmoney`:
@@ -2798,7 +2769,7 @@ Phase 0 (Setup) ──► Phase 1 (Auth + Core Utils) ──► 🔑 USER AUTH
 ### v1.0 Definition (Phases 0-5)
 - All the above plus:
 - AI agent optimizations (quiet mode, batch operations)
-- Comprehensive tests (unit + integration with VCR)
+- Comprehensive tests (unit + live tests for local dev)
 - Full documentation
 
 ### v1.1+ (Future)
