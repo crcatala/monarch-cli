@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.commands.accounts import app
+from monarch_cli.output import set_quiet
 
 runner = CliRunner()
 
@@ -191,6 +192,46 @@ class TestAccountsList:
             assert result.exit_code == 0
             output = json.loads(result.stdout)
             assert output == []
+
+    def test_list_quiet_mode_outputs_ids_only(self, transformed_accounts: list[dict]) -> None:
+        """List with quiet mode outputs only account IDs."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_accounts",
+                return_value=transformed_accounts,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            # Set quiet mode globally (simulates --quiet flag)
+            set_quiet(True)
+            try:
+                result = runner.invoke(app, ["list"])
+
+                assert result.exit_code == 0
+                lines = result.stdout.strip().split("\n")
+                assert len(lines) == 2
+                assert lines[0] == "acc_123"
+                assert lines[1] == "acc_456"
+            finally:
+                set_quiet(False)  # Cleanup
+
+    def test_list_quiet_mode_empty_list(self) -> None:
+        """Quiet mode with empty list produces no output."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_accounts",
+                return_value=[],
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            set_quiet(True)
+            try:
+                result = runner.invoke(app, ["list"])
+
+                assert result.exit_code == 0
+                assert result.stdout.strip() == ""
+            finally:
+                set_quiet(False)
 
     def test_list_help_shows_examples(self) -> None:
         """List --help shows examples."""

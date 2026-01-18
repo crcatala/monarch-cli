@@ -10,9 +10,11 @@ import pytest
 from monarch_cli.core.exceptions import APIError, AuthenticationError, MonarchCLIError
 from monarch_cli.output import (
     OutputFormat,
+    is_quiet,
     is_verbose,
     output,
     output_error,
+    set_quiet,
     set_verbose,
 )
 
@@ -246,3 +248,120 @@ class TestVerboseFlag:
 
         set_verbose(False)
         assert is_verbose() is False
+
+
+class TestQuietFlag:
+    """Tests for quiet flag functions."""
+
+    def test_default_not_quiet(self) -> None:
+        """Should default to not quiet."""
+        set_quiet(False)  # Reset to known state
+        assert is_quiet() is False
+
+    def test_set_quiet_true(self) -> None:
+        """Should be able to enable quiet mode."""
+        set_quiet(True)
+        assert is_quiet() is True
+        set_quiet(False)  # Cleanup
+
+    def test_set_quiet_false(self) -> None:
+        """Should be able to disable quiet mode."""
+        set_quiet(True)
+        set_quiet(False)
+        assert is_quiet() is False
+
+
+class TestQuietModeOutput:
+    """Tests for quiet mode output."""
+
+    def test_quiet_list_outputs_ids_only(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode with list of dicts outputs only IDs."""
+        data = [{"id": "ACC123", "name": "Checking"}, {"id": "ACC456", "name": "Savings"}]
+        output(data, quiet=True)
+        captured = capsys.readouterr()
+
+        lines = captured.out.strip().split("\n")
+        assert lines == ["ACC123", "ACC456"]
+
+    def test_quiet_single_dict_outputs_id(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode with single dict outputs only the ID."""
+        data = {"id": "ACC123", "name": "Checking", "balance": 1234.56}
+        output(data, quiet=True)
+        captured = capsys.readouterr()
+
+        assert captured.out.strip() == "ACC123"
+
+    def test_quiet_custom_id_field(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode respects custom id_field parameter."""
+        data = [{"transaction_id": "TXN001"}, {"transaction_id": "TXN002"}]
+        output(data, quiet=True, id_field="transaction_id")
+        captured = capsys.readouterr()
+
+        lines = captured.out.strip().split("\n")
+        assert lines == ["TXN001", "TXN002"]
+
+    def test_quiet_empty_list_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode with empty list produces no output."""
+        data: list[dict[str, str]] = []
+        output(data, quiet=True)
+        captured = capsys.readouterr()
+
+        assert captured.out == ""
+
+    def test_quiet_dict_missing_id_field_no_output(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Quiet mode with dict missing id field produces no output."""
+        data = {"name": "Test", "value": 123}
+        output(data, quiet=True)
+        captured = capsys.readouterr()
+
+        assert captured.out == ""
+
+    def test_quiet_list_of_scalars(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode with list of scalars outputs each item."""
+        data = ["item1", "item2", "item3"]
+        output(data, quiet=True)
+        captured = capsys.readouterr()
+
+        lines = captured.out.strip().split("\n")
+        assert lines == ["item1", "item2", "item3"]
+
+    def test_quiet_overrides_format(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode takes precedence over format parameter."""
+        data = [{"id": "ACC123", "name": "Checking"}]
+        output(data, format=OutputFormat.JSON, quiet=True)
+        captured = capsys.readouterr()
+
+        # Should be just the ID, not JSON
+        assert captured.out.strip() == "ACC123"
+
+    def test_quiet_uses_module_flag_when_not_specified(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Quiet mode uses module flag when quiet parameter not specified."""
+        data = [{"id": "ACC123"}]
+
+        # With module flag set
+        set_quiet(True)
+        output(data)
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "ACC123"
+
+        # Reset
+        set_quiet(False)
+
+    def test_quiet_parameter_overrides_module_flag(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Explicit quiet=False overrides module quiet flag."""
+        data = [{"id": "ACC123", "name": "Test"}]
+
+        set_quiet(True)
+        output(data, quiet=False)  # Explicit False
+        captured = capsys.readouterr()
+        set_quiet(False)  # Cleanup
+
+        # Should output JSON, not just ID
+        result = json.loads(captured.out)
+        assert result == data
