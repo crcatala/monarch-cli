@@ -16,8 +16,8 @@ runner = CliRunner()
 class TestAuthStatus:
     """Tests for 'monarch auth status' command."""
 
-    def test_status_when_authenticated(self) -> None:
-        """Should return authenticated=true when token exists."""
+    def test_status_human_readable_when_authenticated(self) -> None:
+        """Should show human-readable output by default when authenticated."""
         mock_info = {
             "has_env_token": False,
             "has_keyring_token": True,
@@ -32,13 +32,12 @@ class TestAuthStatus:
             result = runner.invoke(app, ["auth", "status"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
-        assert data["authenticated"] is True
-        assert data["storage_backend"] == "keyring"
-        assert "ready" in data["message"].lower()
+        # Human-readable output goes to stderr (Rich console)
+        assert "Authenticated" in result.stderr
+        assert "keyring" in result.stderr
 
-    def test_status_when_not_authenticated(self) -> None:
-        """Should return authenticated=false when no token."""
+    def test_status_human_readable_when_not_authenticated(self) -> None:
+        """Should show human-readable prompt when not authenticated."""
         mock_info = {
             "has_env_token": False,
             "has_keyring_token": False,
@@ -53,34 +52,52 @@ class TestAuthStatus:
             result = runner.invoke(app, ["auth", "status"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
-        assert data["authenticated"] is False
-        assert data["storage_backend"] is None
-        assert "monarch auth login" in data["message"]
+        assert "Not authenticated" in result.stderr
+        assert "monarch auth login" in result.stderr
 
-    def test_status_compact_format(self) -> None:
-        """Should output compact JSON with -f compact."""
+    def test_status_json_when_authenticated(self) -> None:
+        """Should return JSON with --json flag when authenticated."""
         mock_info = {
             "has_env_token": False,
-            "has_keyring_token": False,
-            "has_file_token": True,
+            "has_keyring_token": True,
+            "has_file_token": False,
             "has_compat_token": False,
-            "active_backend": "file",
+            "active_backend": "keyring",
         }
         with mock.patch(
             "monarch_cli.commands.auth.get_storage_info",
             return_value=mock_info,
         ):
-            result = runner.invoke(app, ["auth", "status", "-f", "compact"])
+            result = runner.invoke(app, ["auth", "status", "--json"])
 
         assert result.exit_code == 0
-        # Compact = no indentation, single line
-        assert "\n" not in result.stdout.strip()
         data = json.loads(result.stdout)
         assert data["authenticated"] is True
+        assert data["storage_backend"] == "keyring"
 
-    def test_status_env_backend(self) -> None:
-        """Should report env as active backend when MONARCH_TOKEN is set."""
+    def test_status_json_when_not_authenticated(self) -> None:
+        """Should return JSON with --json flag when not authenticated."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_compat_token": False,
+            "active_backend": None,
+        }
+        with mock.patch(
+            "monarch_cli.commands.auth.get_storage_info",
+            return_value=mock_info,
+        ):
+            result = runner.invoke(app, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["authenticated"] is False
+        assert data["storage_backend"] is None
+        assert "monarch auth login" in data["message"]
+
+    def test_status_json_env_backend(self) -> None:
+        """Should report env as active backend in JSON output."""
         mock_info = {
             "has_env_token": True,
             "has_keyring_token": False,
@@ -92,7 +109,7 @@ class TestAuthStatus:
             "monarch_cli.commands.auth.get_storage_info",
             return_value=mock_info,
         ):
-            result = runner.invoke(app, ["auth", "status"])
+            result = runner.invoke(app, ["auth", "status", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.stdout)
@@ -159,8 +176,8 @@ class TestAuthLogout:
 class TestAuthPing:
     """Tests for 'monarch auth ping' command."""
 
-    def test_ping_success(self) -> None:
-        """Should return ok status when API responds."""
+    def test_ping_human_readable_success(self) -> None:
+        """Should show human-readable output by default."""
         mock_client = mock.MagicMock()
         mock_accounts = {"accounts": [{"id": "1"}, {"id": "2"}]}
 
@@ -177,12 +194,34 @@ class TestAuthPing:
             result = runner.invoke(app, ["auth", "ping"])
 
         assert result.exit_code == 0
+        # Human-readable output goes to stderr (Rich console)
+        assert "Connected" in result.stderr
+        assert "2" in result.stderr
+
+    def test_ping_json_success(self) -> None:
+        """Should return JSON with --json flag."""
+        mock_client = mock.MagicMock()
+        mock_accounts = {"accounts": [{"id": "1"}, {"id": "2"}]}
+
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_authenticated_client",
+                return_value=mock_client,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.run_async",
+                return_value=mock_accounts,
+            ),
+        ):
+            result = runner.invoke(app, ["auth", "ping", "--json"])
+
+        assert result.exit_code == 0
         data = json.loads(result.stdout)
         assert data["status"] == "ok"
         assert "2 accounts" in data["message"]
 
-    def test_ping_single_account(self) -> None:
-        """Should handle singular account in message."""
+    def test_ping_json_single_account(self) -> None:
+        """Should handle singular account in JSON message."""
         mock_client = mock.MagicMock()
         mock_accounts = {"accounts": [{"id": "1"}]}
 
@@ -196,32 +235,12 @@ class TestAuthPing:
                 return_value=mock_accounts,
             ),
         ):
-            result = runner.invoke(app, ["auth", "ping"])
+            result = runner.invoke(app, ["auth", "ping", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         assert data["status"] == "ok"
         assert "1 account" in data["message"]
-
-    def test_ping_compact_format(self) -> None:
-        """Should output compact JSON with -f compact."""
-        mock_client = mock.MagicMock()
-        mock_accounts = {"accounts": []}
-
-        with (
-            mock.patch(
-                "monarch_cli.commands.auth.get_authenticated_client",
-                return_value=mock_client,
-            ),
-            mock.patch(
-                "monarch_cli.commands.auth.run_async",
-                return_value=mock_accounts,
-            ),
-        ):
-            result = runner.invoke(app, ["auth", "ping", "-f", "compact"])
-
-        assert result.exit_code == 0
-        assert "\n" not in result.stdout.strip()
 
     def test_ping_requires_auth(self) -> None:
         """Should error when not authenticated."""
