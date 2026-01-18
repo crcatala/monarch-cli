@@ -73,3 +73,15 @@ After this loop completes:
 2. Review documentation
 3. Build and test package
 4. Publish to PyPI
+
+## [2026-01-18 13:20] - Schema Contract Tests
+- Created `tests/test_schemas.py` with comprehensive API contract documentation
+- TestAccountSchemaContract: verifies id, name, balance, type, is_active and all other fields
+- TestTransactionSchemaContract: verifies id, date, amount, description, category and all other fields
+- TestCollectionSchemaContract: verifies list returns for accounts/transactions
+- TestSchemaDocumentation: meta-tests ensuring docstrings stay in sync with schema fields
+- Extensive docstrings explain why these tests exist and what breaking them means for AI agents
+- 19 new tests added (total now 484)
+- Files changed: `tests/test_schemas.py` (new)
+- **Learnings:** Schema contract tests should be separate from transformer unit tests - they serve different purposes. Transformer tests verify behavior; schema tests document guarantees for consumers.
+---

@@ -86,7 +86,7 @@ tasks:
       ```
 
   - title: "Schema Contract Tests"
-    status: pending
+    status: done
     ticket: mc-cd12
     acceptance:
       - "tests/test_schemas.py exists"
