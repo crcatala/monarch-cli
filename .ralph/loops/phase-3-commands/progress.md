@@ -83,3 +83,23 @@ After this loop, the CLI should be feature-complete for MVP:
 - Budgets
 - Cashflow
 - Categories
+
+## [2026-01-18 11:55] - Transaction Commands
+- Created `src/monarch_cli/commands/transactions.py` with:
+  - `transactions.app` Typer instance with `help='Transaction management'`
+  - `list` command with --limit, --offset, --start, --end, --preset, --account, --search, --format, --json, --ndjson, --raw flags
+  - `update` command with --amount, --description, --category, --notes, --date, --dry-run flags
+- Date parsing uses string input with manual conversion (Typer doesn't support `datetime.date` directly)
+- `list` uses `parse_date_range()` for preset resolution and explicit date handling
+- `update` with --dry-run returns preview without calling API
+- `update` without changes shows error with exit code 1
+- Added comprehensive tests in `tests/commands/test_transactions.py`
+- Files changed:
+  - `src/monarch_cli/commands/transactions.py` (new)
+  - `tests/commands/test_transactions.py` (new)
+- **Learnings:**
+  - Typer doesn't support `datetime.date` type, only `datetime.datetime` - use `str` type and parse manually
+  - When stripping ANSI codes in tests, use `re.sub(r"\x1b\[[0-9;]*m", "", text)` for complete removal
+  - For tests that capture kwargs, need to use `**kwargs` not `**_`
+
+---

@@ -88,7 +88,7 @@ tasks:
       - Test refresh with: --help flag, unit tests with mocks, code review only
 
   - title: "Transaction Commands"
-    status: pending
+    status: done
     ticket: mc-0136
     acceptance:
       - "src/monarch_cli/commands/transactions.py exists"
