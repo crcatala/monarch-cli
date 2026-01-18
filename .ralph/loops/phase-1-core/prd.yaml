@@ -17,7 +17,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Exception Hierarchy"
-    status: pending
+    status: done
     ticket: mc-7fb9
     acceptance:
       - "src/monarch_cli/core/exceptions.py exists"
@@ -32,7 +32,7 @@ tasks:
       structured JSON that agents can parse reliably.
 
   - title: "Session Management (Dual-Backend)"
-    status: pending
+    status: done
     ticket: mc-a575
     acceptance:
       - "src/monarch_cli/core/session.py exists"
@@ -51,7 +51,7 @@ tasks:
       The compat pickle path (~/.mm/mm_session.pickle) is for library interop only.
 
   - title: "Async Utilities Module"
-    status: pending
+    status: done
     ticket: mc-dcbf
     acceptance:
       - "src/monarch_cli/core/async_utils.py exists"
@@ -65,7 +65,7 @@ tasks:
       This bridges the gap cleanly.
 
   - title: "Retry Logic with Exponential Backoff"
-    status: pending
+    status: done
     ticket: mc-79ca
     acceptance:
       - "src/monarch_cli/core/retry.py exists"
@@ -80,7 +80,7 @@ tasks:
       Example: `await with_retry(lambda: client.get_accounts())`
 
   - title: "Date Utilities and Presets"
-    status: pending
+    status: done
     ticket: mc-c0c3
     acceptance:
       - "src/monarch_cli/core/dates.py exists"
@@ -96,7 +96,7 @@ tasks:
       Use Python's match statement for clean preset handling.
 
   - title: "Adapter Module (Isolates Upstream Library)"
-    status: pending
+    status: done
     ticket: mc-7bd9
     acceptance:
       - "src/monarch_cli/core/adapter.py exists"
