@@ -86,7 +86,7 @@ tasks:
       - Use mocks/unit tests to verify refresh logic without executing
 
   - title: "Configuration System (Environment-Based)"
-    status: pending
+    status: done
     ticket: mc-7fda
     acceptance:
       - "src/monarch_cli/core/config.py exists"

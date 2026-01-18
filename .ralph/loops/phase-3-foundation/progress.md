@@ -12,9 +12,30 @@ This file tracks completed work and patterns learned during this loop.
 - Field names are snake_case, flattened from nested API structures
 - Transformers are pure functions - easy to unit test
 
+### Config Pattern
+- Use frozen dataclass for immutable config
+- Parse env vars with helper functions that gracefully handle invalid values
+- Cache global config instance with `get_config()`, provide `reset_config()` for testing
+- Follow NO_COLOR standard (any non-empty value disables color, per no-color.org)
+
 ---
 
 ## Completed Tasks
+
+## [2026-01-18 11:09] - Configuration System (mc-7fda)
+- Implemented `Config` frozen dataclass with: format, color, verbose, timeout_seconds, max_retries, confirm_destructive
+- `Config.load()` reads from environment variables with sensible defaults
+- `MONARCH_FORMAT` sets output format (json, table, csv, compact) - case insensitive
+- `MONARCH_TIMEOUT` and `MONARCH_MAX_RETRIES` parse ints with validation (positive values only)
+- `MONARCH_VERBOSE=1` enables verbose mode
+- `NO_COLOR` (any non-empty value) or `MONARCH_NO_COLOR=1` disables colors
+- `get_config()` returns cached global instance, `reset_config()` clears cache
+- Invalid env values are silently ignored (defaults used)
+- Files changed:
+  - `src/monarch_cli/core/config.py` (new)
+  - `tests/core/test_config.py` (new - 56 tests covering all scenarios)
+- **Learnings:** Follow no-color.org standard - any non-empty value for NO_COLOR disables color, not just "1"
+---
 
 ## [2026-01-18 11:06] - Account Service Layer (mc-4c28)
 - Implemented `list_accounts()` - fetches and transforms accounts using the transformer
