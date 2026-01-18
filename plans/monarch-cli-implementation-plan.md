@@ -981,9 +981,7 @@ Use the src layout from [Python Ecosystem Conventions](#project-structure-src-la
 
 ### 1.1 Async Utilities
 
-The async utility needs to run async code from sync Typer commands. Two approaches are valid:
-
-**Option A: Simple asyncio.run() (Recommended for CLI)**
+The async utility runs async code from sync Typer commands using `asyncio.run()`, which is the standard approach for CLI applications.
 
 ```python
 # src/monarch_cli/core/async_utils.py
@@ -1005,46 +1003,6 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
     except asyncio.CancelledError:
         raise RuntimeError("Operation was cancelled")
 ```
-
-**Option B: Persistent Background Loop (For Agent Runtime Compatibility)**
-
-If the CLI may be embedded in environments with existing event loops:
-
-```python
-# src/monarch_cli/core/async_utils.py
-import asyncio
-import threading
-from typing import Any, Coroutine, TypeVar
-
-T = TypeVar("T")
-_loop: asyncio.AbstractEventLoop | None = None
-_thread: threading.Thread | None = None
-
-def _ensure_loop() -> asyncio.AbstractEventLoop:
-    global _loop, _thread
-    if _loop is not None:
-        return _loop
-
-    loop = asyncio.new_event_loop()
-
-    def runner() -> None:
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
-
-    t = threading.Thread(target=runner, name="monarch-cli-async", daemon=True)
-    t.start()
-    _loop = loop
-    _thread = t
-    return loop
-
-def run_async(coro: Coroutine[Any, Any, T]) -> T:
-    """Run an async coroutine from sync Typer commands."""
-    loop = _ensure_loop()
-    fut = asyncio.run_coroutine_threadsafe(coro, loop)
-    return fut.result()
-```
-
-**Recommendation:** Start with Option A (simpler). Switch to Option B only if you encounter "event loop already running" errors in specific environments.
 
 ### 1.2 Exception Hierarchy
 
