@@ -10,13 +10,23 @@ import asyncio
 import random
 from collections.abc import Awaitable, Callable
 
+import aiohttp
+
 from .exceptions import NetworkError
 
-# Exceptions that are safe to retry - typically transient network issues
+# Exceptions that are safe to retry - typically transient network issues.
+# Includes both stdlib exceptions and aiohttp-specific exceptions since
+# monarchmoney uses aiohttp for HTTP requests.
 RETRYABLE_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    # Standard library exceptions
     ConnectionError,
     TimeoutError,
     OSError,
+    # aiohttp exceptions (monarchmoney uses aiohttp)
+    aiohttp.ClientConnectionError,
+    aiohttp.ServerConnectionError,
+    aiohttp.ServerDisconnectedError,
+    aiohttp.ServerTimeoutError,
 )
 
 
