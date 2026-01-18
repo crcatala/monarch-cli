@@ -51,7 +51,7 @@ tasks:
       The compat pickle path (~/.mm/mm_session.pickle) is for library interop only.
 
   - title: "Async Utilities Module"
-    status: pending
+    status: done
     ticket: mc-dcbf
     acceptance:
       - "src/monarch_cli/core/async_utils.py exists"

@@ -24,6 +24,16 @@ raise NotFoundError(
 # Exit codes: 1 for auth/api/network errors, 2 for validation/usage errors
 ```
 
+### Async Bridge Pattern
+```python
+from monarch_cli.core.async_utils import run_async
+
+# Execute any async coroutine synchronously
+accounts = run_async(client.get_accounts())
+
+# Handles KeyboardInterrupt and CancelledError appropriately
+```
+
 ### Session Token Pattern
 ```python
 from monarch_cli.core.session import (
@@ -55,6 +65,15 @@ delete_session_token(StorageBackend.KEYRING)  # specific
 ---
 
 ## Completed Tasks
+
+## [2026-01-18 09:11] - mc-dcbf (Async Utilities Module)
+- Created run_async[T]() generic function using PEP 695 type parameters
+- Uses asyncio.run() to execute coroutines
+- Properly propagates KeyboardInterrupt without wrapping
+- Converts asyncio.CancelledError to RuntimeError with clear message
+- Files changed: `src/monarch_cli/core/async_utils.py`
+- **Learnings:** Use PEP 695 `def func[T]()` syntax for generic type parameters (ruff UP047). Import Coroutine from collections.abc, not typing (ruff UP035).
+---
 
 ## [2026-01-18 09:09] - mc-a575 (Session Management Dual-Backend)
 - Implemented StorageBackend enum: KEYRING, FILE, FILE_COMPAT
