@@ -30,6 +30,10 @@ lint-fix:
 typecheck:
 	uv run mypy src/
 
-# Run tests with pytest
+# Run tests with pytest (excludes live tests)
 test:
-	uv run pytest
+	uv run pytest -m "not live"
+
+# Run live tests only (requires MONARCH_LIVE_TESTS=1 and valid credentials)
+test-live:
+	MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live -v

@@ -3,6 +3,7 @@ name = "monarch-cli"
 version = "0.1.0"
 description = "CLI wrapper around monarchmoneycommunity for AI agent integration with Monarch Money"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "cc-vps", email = "crcatala+vps@gmail.com" }
 ]
@@ -23,6 +24,7 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.10.0",
     "prek>=0.2.30",
+    "readme-renderer[md]>=44.0",
 ]
 
 [project.scripts]

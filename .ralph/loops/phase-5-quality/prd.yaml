@@ -18,7 +18,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Unit Tests Structure & Core Tests"
-    status: pending
+    status: done
     ticket: mc-fb38
     acceptance:
       - "tests/ directory properly structured with __init__.py files"
@@ -37,7 +37,7 @@ tasks:
       Mock environment variables with monkeypatch or unittest.mock.patch.dict.
 
   - title: "Transformer Unit Tests"
-    status: pending
+    status: done
     ticket: mc-c165
     acceptance:
       - "tests/transformers/__init__.py exists"
@@ -56,7 +56,7 @@ tasks:
       ```
 
   - title: "CLI Tests with CliRunner"
-    status: pending
+    status: done
     ticket: mc-f84a
     acceptance:
       - "tests/test_auth_cli.py tests auth commands with mocked session"
@@ -86,7 +86,7 @@ tasks:
       ```
 
   - title: "Schema Contract Tests"
-    status: pending
+    status: done
     ticket: mc-cd12
     acceptance:
       - "tests/test_schemas.py exists"
@@ -99,7 +99,7 @@ tasks:
       Document which fields are guaranteed stable.
 
   - title: "Live Tests Infrastructure (Local Dev Only)"
-    status: pending
+    status: done
     ticket: mc-3437
     acceptance:
       - "tests/live/__init__.py exists"
@@ -119,7 +119,7 @@ tasks:
       ```
 
   - title: "README Documentation"
-    status: pending
+    status: done
     ticket: mc-4d55
     acceptance:
       - "README.md is comprehensive with all sections"
@@ -143,7 +143,7 @@ tasks:
       9. Contributing
 
   - title: "CHANGELOG.md Setup"
-    status: pending
+    status: done
     ticket: mc-52c3
     acceptance:
       - "CHANGELOG.md exists in project root"
@@ -170,7 +170,7 @@ tasks:
       ```
 
   - title: "Release Readiness Checklist"
-    status: pending
+    status: done
     ticket: mc-e04c
     acceptance:
       - "LICENSE file exists with MIT license text"
