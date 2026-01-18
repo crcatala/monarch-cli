@@ -21,25 +21,55 @@ app = typer.Typer(
 def _transform_budgets(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
     """Transform raw budget API response to simplified format.
 
+    The API returns monthlyAmountsByCategory with nested monthlyAmounts arrays.
+    We extract the current month's data for each category.
+
     Args:
         raw_data: Raw API response from get_budgets()
 
     Returns:
-        List of budget items with id, category, budgeted, spent, remaining
+        List of budget items with category_id, budgeted, spent, remaining
     """
-    result = []
-    budget_items = raw_data.get("budgetData", {}).get("budgetItems", [])
+    from datetime import date
 
-    for budget in budget_items:
-        result.append(
-            {
-                "id": budget.get("id"),
-                "category": budget.get("category", {}).get("name"),
-                "budgeted": budget.get("budgetAmount"),
-                "spent": abs(budget.get("spentAmount", 0)),  # Abs for readability
-                "remaining": budget.get("remainingAmount"),
-            }
-        )
+    result = []
+    budget_data = raw_data.get("budgetData", {})
+    monthly_by_category = budget_data.get("monthlyAmountsByCategory", [])
+
+    # Get current month in YYYY-MM-01 format to match API
+    current_month = date.today().replace(day=1).isoformat()
+
+    for category_data in monthly_by_category:
+        category = category_data.get("category", {})
+        category_id = category.get("id")
+        monthly_amounts = category_data.get("monthlyAmounts", [])
+
+        # Find current month's amounts
+        current_amounts = None
+        for amounts in monthly_amounts:
+            if amounts.get("month") == current_month:
+                current_amounts = amounts
+                break
+
+        # Fall back to first month if current not found
+        if current_amounts is None and monthly_amounts:
+            current_amounts = monthly_amounts[0]
+
+        if current_amounts:
+            budgeted = current_amounts.get("plannedCashFlowAmount", 0) or 0
+            actual = current_amounts.get("actualAmount", 0) or 0
+            remaining = current_amounts.get("remainingAmount", 0) or 0
+
+            # Only include categories with budget or spending
+            if budgeted != 0 or actual != 0:
+                result.append(
+                    {
+                        "category_id": category_id,
+                        "budgeted": budgeted,
+                        "spent": abs(actual),  # Show as positive
+                        "remaining": remaining,
+                    }
+                )
 
     return result
 
