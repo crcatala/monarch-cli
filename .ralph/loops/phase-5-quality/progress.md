@@ -126,3 +126,18 @@ After this loop completes:
 - Files changed: `CHANGELOG.md` (new)
 - **Learnings:** Keep a Changelog format requires specific sections (Added, Changed, Deprecated, Removed, Fixed, Security). Group related features logically for readability.
 ---
+
+## [2026-01-18 13:28] - Release Readiness Checklist
+- Created LICENSE file with MIT license text
+- Added `license = { text = "MIT" }` field to pyproject.toml
+- Verified package name `monarch-cli` available on PyPI (404 response)
+- Added readme-renderer[md] to dev dependencies
+- Verified README renders correctly for PyPI: `python -m readme_renderer README.md`
+- Built package successfully: `uv build` creates wheel and sdist
+- Tested installation in fresh venv at /tmp/test-install
+- `/tmp/test-install/bin/monarch --version` shows `monarch-cli 0.1.0` ✓
+- All 484 tests pass, no type errors, no lint issues
+- No TODO/FIXME comments in shipped code
+- Files changed: `LICENSE` (new), `pyproject.toml`
+- **Learnings:** Use `curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/monarch-cli/json"` to check PyPI name availability (404 = available). readme-renderer requires the [md] extra for Markdown support.
+---

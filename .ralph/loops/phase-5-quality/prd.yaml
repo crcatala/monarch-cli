@@ -170,7 +170,7 @@ tasks:
       ```
 
   - title: "Release Readiness Checklist"
-    status: pending
+    status: done
     ticket: mc-e04c
     acceptance:
       - "LICENSE file exists with MIT license text"
