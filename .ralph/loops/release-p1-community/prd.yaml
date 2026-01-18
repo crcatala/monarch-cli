@@ -1,0 +1,165 @@
+name: "Release P1: Community Files & Automation"
+description: |
+  Add community-facing files and CI automation for OSS release.
+  
+  Values to use:
+  - GITHUB_OWNER: crcatala
+  - AUTHOR_NAME: Christian Catalan
+  - AUTHOR_EMAIL: crcatala@gmail.com
+  
+  PREREQUISITE: release-p0-prep loop must be complete
+  
+  Reference: plans/RELEASE-READINESS-v0.1.0.md (P1 section)
+  
+  NOTE: This loop does NOT publish anything. Publishing is a manual human step.
+
+branch: "ralph/release-p1-community"
+create_pr: true
+issue_tracker: tk
+pre_commit: "make verify"
+
+tasks:
+  - id: create-contributing
+    title: "Create CONTRIBUTING.md"
+    status: pending
+    ticket: mc-3aa3
+    acceptance:
+      - "CONTRIBUTING.md exists in repo root"
+      - "Contains Development Setup section with git clone and make setup"
+      - "Contains Development Workflow section with make commands"
+      - "Contains Running Live Tests section with warning about test account"
+      - "Contains Pull Request Process section"
+      - "Contains Code Style section mentioning Ruff and mypy"
+    notes: |
+      Use template from plans/RELEASE-READINESS-v0.1.0.md section P1-7.
+      Use GitHub URL: https://github.com/crcatala/monarch-cli
+
+  - id: create-security
+    title: "Create SECURITY.md"
+    status: pending
+    ticket: mc-5db9
+    acceptance:
+      - "SECURITY.md exists in repo root"
+      - "Contains Supported Versions table"
+      - "Contains Reporting a Vulnerability section with email contact"
+      - "Contains Security Considerations section"
+      - "Documents credential storage (keyring and file)"
+      - "Documents what is NOT stored (passwords, financial data)"
+      - "Warns about MONARCH_TOKEN exposure"
+    notes: |
+      Use template from plans/RELEASE-READINESS-v0.1.0.md section P1-8.
+      Use contact email: crcatala@gmail.com
+
+  - id: create-coc
+    title: "Create CODE_OF_CONDUCT.md"
+    status: pending
+    ticket: mc-bcb5
+    acceptance:
+      - "CODE_OF_CONDUCT.md exists in repo root"
+      - "Based on Contributor Covenant v2.1"
+      - "Contains Our Pledge section"
+      - "Contains Our Standards section with positive and negative examples"
+      - "Contains Enforcement section"
+      - "Contains Attribution linking to Contributor Covenant"
+    notes: |
+      Use template from plans/RELEASE-READINESS-v0.1.0.md section P1-9.
+      This is a standard file - use Contributor Covenant verbatim.
+
+  - id: create-issue-templates
+    title: "Create GitHub issue templates"
+    status: pending
+    ticket: mc-cbf7
+    acceptance:
+      - ".github/ISSUE_TEMPLATE/ directory exists"
+      - ".github/ISSUE_TEMPLATE/bug_report.md exists with frontmatter"
+      - "Bug report has: Description, Steps to Reproduce, Expected/Actual Behavior, Environment"
+      - ".github/ISSUE_TEMPLATE/feature_request.md exists with frontmatter"
+      - "Feature request has: Problem Statement, Proposed Solution, Alternatives"
+      - ".github/ISSUE_TEMPLATE/config.yml exists"
+      - "config.yml enables blank issues and has documentation link"
+    notes: |
+      Use templates from plans/RELEASE-READINESS-v0.1.0.md section P1-10.
+      
+      Create directory first:
+        mkdir -p .github/ISSUE_TEMPLATE
+      
+      Remember YAML frontmatter format:
+        ---
+        name: Bug Report
+        about: Report a bug
+        title: '[BUG] '
+        labels: bug
+        ---
+
+  - id: create-publish-workflow
+    title: "Create PyPI publish GitHub Actions workflow"
+    status: pending
+    ticket: mc-b9f6
+    acceptance:
+      - ".github/workflows/publish.yml exists"
+      - "Triggers on: release types: [published]"
+      - "Uses ubicloud-standard-2 or ubuntu-latest runner"
+      - "Installs uv and syncs dependencies"
+      - "Runs quality checks (ruff format, ruff check, mypy, pytest)"
+      - "Builds with uv build"
+      - "Validates with twine check"
+      - "Uses pypa/gh-action-pypi-publish@release/v1"
+      - "Has id-token: write permission for trusted publishing"
+      - "Uses environment: pypi"
+    notes: |
+      Use template from plans/RELEASE-READINESS-v0.1.0.md section P1-11.
+      
+      Trusted publishing setup (human task after merge):
+      1. Go to https://pypi.org/manage/account/publishing/
+      2. Add pending publisher for monarch-cli
+      3. Create "pypi" environment in GitHub repo settings
+
+  - id: add-prepublish-target
+    title: "Add prepublish target to Makefile"
+    status: pending
+    ticket: mc-8834
+    acceptance:
+      - "Makefile has 'prepublish' target"
+      - "prepublish depends on 'verify'"
+      - "prepublish cleans dist/ directory"
+      - "prepublish runs uv build"
+      - "prepublish runs twine check on dist/*"
+      - "prepublish validates README with readme_renderer"
+      - "'prepublish' is listed in .PHONY line"
+      - "'make prepublish' executes successfully"
+    notes: |
+      Add to end of Makefile:
+      
+      ```makefile
+      # Pre-publish verification
+      prepublish: verify
+      	rm -rf dist/
+      	uv build
+      	@echo "✓ Build successful"
+      	uv run twine check dist/*
+      	@echo "✓ Package metadata valid"
+      	uv run python -m readme_renderer README.md > /dev/null
+      	@echo "✓ README renders correctly"
+      ```
+      
+      Update .PHONY line at top to include prepublish.
+
+  - id: verify-completions
+    title: "Verify shell completions work"
+    status: pending
+    ticket: mc-0902
+    acceptance:
+      - "'monarch --show-completion bash' outputs valid bash completion script"
+      - "'monarch --show-completion zsh' outputs valid zsh completion script"  
+      - "'monarch --show-completion fish' outputs valid fish completion script"
+      - "No errors or exceptions during completion generation"
+    notes: |
+      Run each command and verify output is non-empty and contains completion code:
+      
+      ```bash
+      monarch --show-completion bash > /dev/null && echo "✓ bash completion works"
+      monarch --show-completion zsh > /dev/null && echo "✓ zsh completion works"
+      monarch --show-completion fish > /dev/null && echo "✓ fish completion works"
+      ```
+      
+      If any fail, investigate Typer configuration.

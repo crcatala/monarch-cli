@@ -1,0 +1,120 @@
+name: "Release P0: Package Metadata & Build Verification"
+description: |
+  Prepare monarch-cli package for PyPI publication.
+  
+  Values to use:
+  - GITHUB_OWNER: crcatala
+  - AUTHOR_NAME: Christian Catalan
+  - AUTHOR_EMAIL: crcatala@gmail.com
+  
+  Reference: plans/RELEASE-READINESS-v0.1.0.md (P0 section)
+  
+  NOTE: This loop does NOT publish anything. Publishing is a manual human step.
+
+branch: "ralph/release-p0-prep"
+create_pr: true
+issue_tracker: tk
+pre_commit: "make verify"
+
+tasks:
+  - id: fix-urls
+    title: "Fix placeholder URLs in README and CHANGELOG"
+    status: pending
+    ticket: mc-27a3
+    acceptance:
+      - "README.md line ~372 has correct GitHub clone URL (not 'yourusername')"
+      - "CHANGELOG.md lines 83-84 have correct GitHub URLs (not 'yourusername')"
+      - "grep -rn 'yourusername' . --include='*.md' returns no results"
+    notes: |
+      Replace "yourusername" with "crcatala" in both files:
+      - README.md: git clone https://github.com/crcatala/monarch-cli.git
+      - CHANGELOG.md: [Unreleased] and [0.1.0] comparison URLs
+
+  - id: update-author
+    title: "Update author information in pyproject.toml and LICENSE"
+    status: pending
+    ticket: mc-a5b0
+    acceptance:
+      - "pyproject.toml authors field has correct name and email"
+      - "LICENSE copyright line has correct author name"
+      - "Author is not 'cc-vps' (unless maintainer chose to keep it)"
+    notes: |
+      Update pyproject.toml:
+        authors = [{ name = "Christian Catalan", email = "crcatala@gmail.com" }]
+      Update LICENSE line 3:
+        Copyright (c) 2026 Christian Catalan
+
+  - id: add-pypi-metadata
+    title: "Add PyPI classifiers, keywords, and project URLs to pyproject.toml"
+    status: pending
+    ticket: mc-2042
+    acceptance:
+      - "pyproject.toml has classifiers array with 10+ classifiers"
+      - "Includes: Development Status, Environment, License, Python versions, Topic, Typing"
+      - "pyproject.toml has keywords array with relevant terms"
+      - "pyproject.toml has [project.urls] section"
+      - "URLs include Homepage, Documentation, Repository, Issues, Changelog"
+    notes: |
+      Add after requires-python, before dependencies:
+      
+      classifiers = [
+          "Development Status :: 4 - Beta",
+          "Environment :: Console",
+          "Intended Audience :: Developers",
+          "Intended Audience :: End Users/Desktop",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Topic :: Office/Business :: Financial",
+          "Topic :: Utilities",
+          "Typing :: Typed",
+      ]
+      keywords = ["monarch", "money", "finance", "cli", "personal-finance", "budgeting"]
+      
+      [project.urls]
+      Homepage = "https://github.com/crcatala/monarch-cli"
+      Documentation = "https://github.com/crcatala/monarch-cli#readme"
+      Repository = "https://github.com/crcatala/monarch-cli"
+      Issues = "https://github.com/crcatala/monarch-cli/issues"
+      Changelog = "https://github.com/crcatala/monarch-cli/blob/main/CHANGELOG.md"
+
+  - id: add-twine
+    title: "Add twine to dev dependencies"
+    status: pending
+    ticket: mc-a77b
+    acceptance:
+      - "pyproject.toml [project.optional-dependencies] dev list includes twine>=5.0.0"
+      - "uv.lock is updated (run 'uv sync --all-extras')"
+      - "'uv run twine --version' executes successfully"
+    notes: |
+      Add to pyproject.toml dev dependencies:
+        "twine>=5.0.0",
+      
+      Then run:
+        uv sync --all-extras
+
+  - id: verify-build
+    title: "Verify build artifacts and entry point"
+    status: pending
+    ticket: mc-c802
+    acceptance:
+      - "'rm -rf dist/ && uv build' succeeds"
+      - "'unzip -l dist/*.whl' shows all source files"
+      - "Wheel METADATA contains license info"
+      - "'pip install dist/*.whl --force-reinstall' succeeds"
+      - "'monarch --version' shows 0.1.0"
+      - "'monarch --help' shows all commands"
+      - "'monarch auth --help' shows auth subcommands"
+    notes: |
+      Full verification sequence:
+      ```bash
+      rm -rf dist/
+      uv build
+      unzip -l dist/*.whl
+      unzip -p dist/*.whl 'monarch_cli-*/METADATA' | head -30
+      pip install dist/*.whl --force-reinstall
+      monarch --version
+      monarch --help
+      ```
