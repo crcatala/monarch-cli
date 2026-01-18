@@ -16,7 +16,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Full Output Formatters"
-    status: pending
+    status: done
     ticket: mc-299b
     acceptance:
       - "src/monarch_cli/output/__init__.py expanded with full implementation"
@@ -41,7 +41,7 @@ tasks:
       ```
 
   - title: "Progress Indicators"
-    status: pending
+    status: done
     ticket: mc-3f7c
     acceptance:
       - "src/monarch_cli/output/progress.py exists"
