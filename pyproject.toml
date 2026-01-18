@@ -45,6 +45,7 @@ dev = [
 
 [project.scripts]
 monarch = "monarch_cli.main:app"
+monarch-cli = "monarch_cli.main:app"
 
 [project.urls]
 Homepage = "https://github.com/crcatala/monarch-cli"
