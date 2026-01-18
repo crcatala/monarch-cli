@@ -42,7 +42,7 @@ tasks:
       ```
 
   - title: "Transaction Transformer"
-    status: pending
+    status: done
     ticket: mc-f913
     acceptance:
       - "src/monarch_cli/transformers/transactions.py exists"

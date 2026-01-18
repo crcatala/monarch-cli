@@ -16,6 +16,18 @@ This file tracks completed work and patterns learned during this loop.
 
 ## Completed Tasks
 
+## [2026-01-18 11:05] - Transaction Transformer (mc-f913)
+- Implemented `transform_transaction()` and `transform_transactions()` functions
+- Handles all required fields: id, date, amount, description, category, category_id, account, account_id, is_pending, notes
+- `description` prefers `merchant.name`, falls back to `plaidName` (also handles empty string/None merchant name)
+- `transform_transactions()` processes `raw['allTransactions']['results']` list
+- Gracefully handles missing/None nested fields at all levels
+- Files changed:
+  - `src/monarch_cli/transformers/transactions.py` (new)
+  - `tests/transformers/test_transactions.py` (new)
+- **Learnings:** Use `raw.get("key") or {}` for nested dict access when the key might be None (not just missing)
+---
+
 ## [2026-01-18 11:03] - Account Transformer (mc-78e5)
 - Implemented `transform_account()` and `transform_accounts()` functions
 - Handles all required fields: id, name, type, subtype, balance, institution, is_active, is_manual, last_updated
