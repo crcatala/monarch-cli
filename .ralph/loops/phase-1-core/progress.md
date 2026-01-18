@@ -83,9 +83,46 @@ result = run_async(with_retry(
 # This allows fresh coroutine creation for each retry attempt
 ```
 
+### Date Utilities Pattern
+```python
+from datetime import date
+from monarch_cli.core.dates import DatePreset, resolve_preset, parse_date_range
+
+# Resolve a preset to concrete dates
+start, end = resolve_preset(DatePreset.THIS_MONTH)
+# Returns (date(2026, 1, 1), date(2026, 1, 18))
+
+# Parse to ISO format strings (for API calls)
+start_str, end_str = parse_date_range(DatePreset.LAST_30_DAYS)
+# Returns ('2025-12-19', '2026-01-18')
+
+# Explicit dates take precedence over preset
+start_str, end_str = parse_date_range(
+    preset=DatePreset.THIS_MONTH,
+    start=date(2026, 1, 10),  # Overrides preset start
+)
+# Returns ('2026-01-10', '2026-01-18')
+
+# ALL preset returns no filter
+start_str, end_str = parse_date_range(DatePreset.ALL)
+# Returns (None, None)
+```
+
 ---
 
 ## Completed Tasks
+
+## [2026-01-18 09:13] - mc-c0c3 (Date Utilities and Presets)
+- Created DatePreset StrEnum with all 12 presets: TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, THIS_MONTH, LAST_MONTH, LAST_30_DAYS, LAST_90_DAYS, THIS_YEAR, LAST_YEAR, YTD, ALL
+- Implemented resolve_preset() with Python match statement for clean handling
+- THIS_WEEK starts on Monday (weekday() == 0)
+- YTD is alias for THIS_YEAR (handled via `case DatePreset.THIS_YEAR | DatePreset.YTD`)
+- ALL returns (None, None) for no date filtering
+- Implemented parse_date_range() returning ISO format strings
+- Explicit start/end dates take precedence over preset
+- Files changed: `src/monarch_cli/core/dates.py`
+- **Learnings:** StrEnum provides nice string values for CLI args. Python match with `|` pattern works well for aliases.
+---
 
 ## [2026-01-18 09:12] - mc-79ca (Retry Logic with Exponential Backoff)
 - Created with_retry[T]() async function using PEP 695 type parameters

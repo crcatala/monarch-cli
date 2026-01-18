@@ -80,7 +80,7 @@ tasks:
       Example: `await with_retry(lambda: client.get_accounts())`
 
   - title: "Date Utilities and Presets"
-    status: pending
+    status: done
     ticket: mc-c0c3
     acceptance:
       - "src/monarch_cli/core/dates.py exists"
