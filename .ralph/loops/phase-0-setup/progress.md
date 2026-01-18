@@ -50,3 +50,12 @@ This file tracks completed work and patterns learned during this loop.
 - **Learnings:** Typer apps with no_args_is_help=True need at least a @app.callback() decorated function to work. Use modern Python syntax `X | None` instead of `Optional[X]` per ruff UP045.
 
 ---
+
+## [2026-01-18 08:44] - Dev Tooling & Verification Scripts (mc-9441)
+- Created Makefile with targets: verify, format, format-check, lint, typecheck, test
+- Added tests/test_placeholder.py so pytest runs with 1 test (pytest exits code 5 on 0 tests)
+- All verification commands pass: format-check, lint, typecheck, test
+- Files changed: Makefile, tests/test_placeholder.py
+- **Learnings:** pytest exits with code 5 when no tests are collected, causing make target to fail. Add a placeholder test for new projects.
+
+---

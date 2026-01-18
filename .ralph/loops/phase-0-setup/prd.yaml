@@ -68,7 +68,7 @@ tasks:
       ```
 
   - title: "Dev Tooling & Verification Scripts"
-    status: pending
+    status: done
     ticket: mc-9441
     acceptance:
       - "Makefile exists with targets: verify, format, format-check, lint, typecheck, test"
