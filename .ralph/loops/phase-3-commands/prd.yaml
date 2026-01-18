@@ -114,7 +114,7 @@ tasks:
       - Verify update logic through code review, not live execution
 
   - title: "Budget Commands"
-    status: pending
+    status: done
     ticket: mc-ff18
     acceptance:
       - "src/monarch_cli/commands/budgets.py exists"

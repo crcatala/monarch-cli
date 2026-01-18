@@ -24,6 +24,13 @@ Plain format automatically strips ANSI color codes when:
 - `TERM=dumb`
 - stdout is not a TTY (piped/redirected)
 
+### Single-Command Typer Apps
+When a `typer.Typer()` has only ONE command registered:
+- The app "becomes" that command directly (no subcommand needed)
+- Tests call `runner.invoke(app, ['--json'])` not `runner.invoke(app, ['list', '--json'])`
+- `no_args_is_help=True` has no effect - the single command runs directly
+- When integrated into main.py with `add_typer(app, name='budgets')`, it becomes `monarch budgets --json`
+
 ---
 
 ## Completed Tasks
@@ -83,6 +90,25 @@ After this loop, the CLI should be feature-complete for MVP:
 - Budgets
 - Cashflow
 - Categories
+
+## [2026-01-18 11:54] - Budget Commands
+- Created `src/monarch_cli/commands/budgets.py` with:
+  - `budgets.app` Typer instance with `help='Budget management'`
+  - `list` command with --format, --json flags
+  - Inline `_transform_budgets()` function for simple transformation
+- Output includes: id, category, budgeted, spent (absolute value), remaining
+- Spent amounts converted to positive using `abs()` for readability
+- Extracts from `budgets['budgetData']['budgetItems']`
+- Added comprehensive tests in `tests/commands/test_budgets.py`
+- Files changed:
+  - `src/monarch_cli/commands/budgets.py` (new)
+  - `tests/commands/test_budgets.py` (new)
+- **Learnings:**
+  - When a Typer app has only ONE command, the app becomes that command directly (no subcommands)
+  - Tests must call `runner.invoke(app, ['--json'])` not `runner.invoke(app, ['list', '--json'])`
+  - `no_args_is_help=True` has no effect with a single-command app
+
+---
 
 ## [2026-01-18 11:55] - Transaction Commands
 - Created `src/monarch_cli/commands/transactions.py` with:
