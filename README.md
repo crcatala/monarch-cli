@@ -412,7 +412,7 @@ Releases are a two-step process:
    uv run twine upload dist/*
    ```
 
-The release script automatically extracts notes from `CHANGELOG.md` for the current version.
+See [docs/RELEASING.md](docs/RELEASING.md) for full instructions including TestPyPI setup and troubleshooting.
 
 ## Contributing
 
