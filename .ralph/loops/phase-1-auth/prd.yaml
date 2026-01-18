@@ -30,7 +30,7 @@ tasks:
       For now, just JSON output is needed to get auth commands working.
 
   - title: "Error Handler Decorator"
-    status: pending
+    status: done
     ticket: mc-e3e1
     acceptance:
       - "src/monarch_cli/core/error_handler.py exists"

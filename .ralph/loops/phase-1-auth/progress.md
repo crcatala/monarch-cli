@@ -18,6 +18,18 @@ This file tracks completed work and patterns learned during this loop.
 - **Learnings:** Console uses stderr to keep stdout clean for data output
 ---
 
+## [2026-01-18 09:43] - mc-e3e1: Error Handler Decorator
+- Created @handle_errors decorator for consistent CLI error handling
+- Catches KeyboardInterrupt, prints "Interrupted." to stderr, exits 130
+- Catches MonarchCLIError, outputs via output_error(), exits with error's exit_code
+- Catches unexpected Exception, wraps in MonarchCLIError, exits 1
+- Shows full traceback when is_verbose() is True
+- Uses typer.Exit() for testability with CliRunner
+- Preserves function signature with functools.wraps
+- Files changed: `src/monarch_cli/core/error_handler.py`
+- **Learnings:** Ruff UP047 (new-style type params) conflicts with mypy for Callable+ParamSpec - use noqa: UP047 for decorator signatures
+---
+
 ## Patterns & Decisions
 
 (recorded as tasks complete)
