@@ -32,7 +32,7 @@ tasks:
 
   - id: update-author
     title: "Update author information in pyproject.toml and LICENSE"
-    status: pending
+    status: done
     ticket: mc-a5b0
     acceptance:
       - "pyproject.toml authors field has correct name and email"
