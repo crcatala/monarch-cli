@@ -53,7 +53,7 @@ tasks:
       - "Includes: Development Status, Environment, License, Python versions, Topic, Typing"
       - "pyproject.toml has keywords array with relevant terms"
       - "pyproject.toml has [project.urls] section"
-      - "URLs include Homepage, Repository, Issues, Changelog"
+      - "URLs include Homepage, Documentation, Repository, Issues, Changelog"
     notes: |
       Add after requires-python, before dependencies:
       
