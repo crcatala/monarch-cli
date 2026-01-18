@@ -4,13 +4,15 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A command-line interface for [Monarch Money](https://www.monarchmoney.com/) personal finance management, designed for AI agent integration and automation workflows.
+A command-line interface for [Monarch Money](https://www.monarchmoney.com/), a personal finance platform that helps you track spending, manage budgets, and monitor your net worth across all your accounts in one place.
+
+> **Disclaimer:** This is an unofficial, community-maintained project and is not affiliated with, endorsed by, or connected to Monarch Money in any way.
 
 ## Features
 
 - 🔐 **Secure authentication** with session persistence (keyring or file storage)
 - 📊 **Multiple output formats** (plain, JSON, table, CSV, NDJSON) for flexible processing
-- 🤖 **AI agent friendly** - structured JSON output auto-detected when piped
+- 🔧 **Scriptable** - structured JSON output auto-detected when piped
 - 📅 **Smart date presets** (`--preset this-month`, `--preset ytd`)
 - ✏️ **Transaction updates** with dry-run preview support
 - 🔄 **Account refresh** to sync latest data from institutions
@@ -232,9 +234,9 @@ Session credentials are resolved in this order:
 2. System keyring (if available)
 3. Session file (`~/.config/monarch-cli/session.json`)
 
-## AI Agent Integration
+## Scripting & Automation
 
-Monarch CLI is designed for AI agent workflows. When output is piped (non-TTY), it automatically outputs JSON:
+Monarch CLI is designed for scripting and automation. When output is piped (non-TTY), it automatically outputs JSON:
 
 ```bash
 # Auto-JSON when piped
@@ -250,7 +252,7 @@ monarch accounts list --quiet
 # ACC789012
 ```
 
-### Example: Claude/GPT Integration
+### Example: Python Integration
 
 ```python
 import subprocess
@@ -276,7 +278,7 @@ print(f"Found {len(transactions)} transactions")
 
 ### Stable Schema Fields
 
-These output fields are guaranteed stable for AI agents:
+These output fields are guaranteed stable across versions:
 
 **Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
 
@@ -394,6 +396,23 @@ Git hooks are managed with [prek](https://github.com/j178/prek):
 ```bash
 uv run prek install  # Install hooks
 ```
+
+### Releasing
+
+Releases are a two-step process:
+
+1. **Create GitHub Release** (tags, changelog, artifacts):
+   ```bash
+   make release-dry  # Preview first
+   make release      # Create release
+   ```
+
+2. **Publish to PyPI** (separate step):
+   ```bash
+   uv run twine upload dist/*
+   ```
+
+The release script automatically extracts notes from `CHANGELOG.md` for the current version.
 
 ## Contributing
 
