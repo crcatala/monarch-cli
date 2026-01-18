@@ -26,7 +26,7 @@ tasks:
       The src-layout prevents import ambiguity and is required for proper editable installs.
 
   - title: "pyproject.toml Configuration"
-    status: pending
+    status: done
     ticket: mc-6a5b
     acceptance:
       - "pyproject.toml has complete [project] metadata (name=monarch-cli, version=0.1.0, description, requires-python>=3.12)"
