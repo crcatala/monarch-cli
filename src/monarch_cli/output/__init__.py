@@ -41,6 +41,9 @@ _stdout_console = Console()
 # Module-level verbose flag
 _verbose = False
 
+# Module-level debug flag (implies verbose)
+_debug = False
+
 # Module-level default format override (set by --json global flag)
 _default_format_override: OutputFormat | None = None
 
@@ -53,7 +56,21 @@ def set_verbose(v: bool) -> None:
 
 def is_verbose() -> bool:
     """Check if verbose output is enabled."""
-    return _verbose
+    return _verbose or _debug  # Debug implies verbose
+
+
+def set_debug(d: bool) -> None:
+    """Set the debug output flag.
+
+    Debug mode shows stack traces on errors and implies verbose.
+    """
+    global _debug
+    _debug = d
+
+
+def is_debug() -> bool:
+    """Check if debug output is enabled."""
+    return _debug
 
 
 def is_interactive() -> bool:
@@ -215,6 +232,8 @@ __all__ = [
     "console",
     "set_verbose",
     "is_verbose",
+    "set_debug",
+    "is_debug",
     "is_interactive",
     "set_default_format",
     "get_default_format",

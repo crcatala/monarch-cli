@@ -165,3 +165,27 @@ After this loop, the CLI should be feature-complete for MVP:
   - For tests that capture kwargs, need to use `**kwargs` not `**_`
 
 ---
+
+## [2026-01-18 12:04] - Update Main Entry Point & Global Flags
+- Registered all command groups in main.py: auth, accounts, transactions, budgets, cashflow, categories
+- Fixed global flags per CLI best practices (clig.dev):
+  - `--version` (no short flag) for version
+  - `-v, --verbose` for operational progress messages
+  - `--debug` for stack traces (implies verbose)
+  - `--json` for global JSON output override
+  - `--no-color` for disabling colored output
+- Added `set_debug()` / `is_debug()` functions to output module
+- Added `set_color_enabled()` function to plain.py for `--no-color` flag
+- Updated error_handler.py to use `is_debug()` for stack traces (not `is_verbose()`)
+- Updated existing tests to use `is_debug` mock
+- Files changed:
+  - `src/monarch_cli/main.py`
+  - `src/monarch_cli/output/__init__.py`
+  - `src/monarch_cli/output/plain.py`
+  - `src/monarch_cli/core/error_handler.py`
+  - `tests/core/test_error_handler.py`
+- **Learnings:**
+  - Debug implies verbose: `is_verbose()` returns `_verbose or _debug`
+  - `--no-color` flag works via module-level override in plain.py
+
+---

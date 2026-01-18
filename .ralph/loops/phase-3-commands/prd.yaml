@@ -177,7 +177,7 @@ tasks:
       Flatten to list of categories with their group name.
 
   - title: "Update Main Entry Point & Global Flags"
-    status: pending
+    status: done
     ticket: mc-0c0a
     acceptance:
       # Command Registration

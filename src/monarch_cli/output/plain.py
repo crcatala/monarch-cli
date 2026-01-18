@@ -10,17 +10,35 @@ import os
 import sys
 from typing import Any
 
+# Module-level color override (set by --no-color flag)
+_color_enabled: bool | None = None
+
+
+def set_color_enabled(enabled: bool | None) -> None:
+    """Override color detection.
+
+    Args:
+        enabled: True to force color, False to disable, None for auto-detect.
+    """
+    global _color_enabled
+    _color_enabled = enabled
+
 
 def should_use_color() -> bool:
     """Check if colored output should be used.
 
     Returns False when:
+    - set_color_enabled(False) was called (--no-color flag)
     - NO_COLOR environment variable is set (any value)
     - TERM=dumb
     - stdout is not a TTY (piped/redirected)
 
     See: https://no-color.org/
     """
+    # Explicit override from --no-color flag takes precedence
+    if _color_enabled is not None:
+        return _color_enabled
+
     # NO_COLOR takes precedence (any value means no color)
     if os.environ.get("NO_COLOR") is not None:
         return False
