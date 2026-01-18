@@ -110,6 +110,23 @@ After this loop, the CLI should be feature-complete for MVP:
 
 ---
 
+## [2026-01-18 11:59] - Cashflow Commands
+- Created `src/monarch_cli/commands/cashflow.py` with:
+  - `cashflow.app` Typer instance with `help='Cashflow analysis'`
+  - `summary` command with --start, --end, --preset, --format, --json flags
+- Uses `parse_date_range()` for date handling (same pattern as transactions)
+- Passes data through with minimal transformation (API response is reasonable as-is)
+- Uses `@handle_errors` and `spinner('Calculating cashflow...')`
+- Added comprehensive tests in `tests/commands/test_cashflow.py`
+- Files changed:
+  - `src/monarch_cli/commands/cashflow.py` (new)
+  - `tests/commands/test_cashflow.py` (new)
+- **Learnings:**
+  - Single-command apps: tests must NOT include the command name (e.g., `['--json']` not `['summary', '--json']`)
+  - TABLE and CSV formats fall back to JSON for dict data (only work with list[dict])
+
+---
+
 ## [2026-01-18 11:55] - Transaction Commands
 - Created `src/monarch_cli/commands/transactions.py` with:
   - `transactions.app` Typer instance with `help='Transaction management'`

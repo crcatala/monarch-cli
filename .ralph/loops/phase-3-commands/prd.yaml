@@ -139,7 +139,7 @@ tasks:
       Note: spentAmount is negative, so use abs() for display.
 
   - title: "Cashflow Commands"
-    status: pending
+    status: done
     ticket: mc-a185
     acceptance:
       - "src/monarch_cli/commands/cashflow.py exists"
