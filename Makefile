@@ -1,4 +1,4 @@
-.PHONY: verify format format-check lint typecheck test
+.PHONY: verify format format-check lint lint-fix typecheck test
 
 # Run all verification steps
 verify: format-check lint typecheck test
@@ -11,8 +11,12 @@ format:
 format-check:
 	uv run ruff format --check .
 
-# Lint and auto-fix issues
+# Lint code (no auto-fix, for CI/verify)
 lint:
+	uv run ruff check .
+
+# Lint and auto-fix issues
+lint-fix:
 	uv run ruff check . --fix
 
 # Type checking with mypy
