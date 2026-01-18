@@ -44,6 +44,9 @@ _verbose = False
 # Module-level debug flag (implies verbose)
 _debug = False
 
+# Module-level quiet flag (for ID-only output)
+_quiet = False
+
 # Module-level default format override (set by --json global flag)
 _default_format_override: OutputFormat | None = None
 
@@ -71,6 +74,20 @@ def set_debug(d: bool) -> None:
 def is_debug() -> bool:
     """Check if debug output is enabled."""
     return _debug
+
+
+def set_quiet(q: bool) -> None:
+    """Set the quiet output flag.
+
+    Quiet mode outputs only IDs, one per line. Designed for AI agent consumption.
+    """
+    global _quiet
+    _quiet = q
+
+
+def is_quiet() -> bool:
+    """Check if quiet output is enabled."""
+    return _quiet
 
 
 def is_interactive() -> bool:
@@ -165,6 +182,8 @@ def output(
     data: Any,
     format: OutputFormat | None = None,
     raw: bool = False,
+    quiet: bool | None = None,
+    id_field: str = "id",
 ) -> None:
     """Output data in specified format.
 
@@ -173,11 +192,29 @@ def output(
         format: Output format. If None, uses TTY-aware default:
                 PLAIN for terminal, JSON when piped.
         raw: If True, print data as-is (pass-through).
+        quiet: If True, output only IDs (one per line). If None, uses module flag.
+        id_field: Field name to extract when in quiet mode (default: "id").
 
     Note:
         TABLE and CSV only work with list[dict] data.
         For non-list data, these formats fall back to JSON.
+        Quiet mode takes precedence over format.
     """
+    # Determine if quiet mode is active
+    quiet_mode = quiet if quiet is not None else _quiet
+
+    # Handle quiet mode - output only IDs
+    if quiet_mode:
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and id_field in item:
+                    print(item[id_field])
+                else:
+                    print(item)
+        elif isinstance(data, dict) and id_field in data:
+            print(data[id_field])
+        return
+
     # Raw pass-through
     if raw:
         print(data)
@@ -234,6 +271,8 @@ __all__ = [
     "is_verbose",
     "set_debug",
     "is_debug",
+    "set_quiet",
+    "is_quiet",
     "is_interactive",
     "set_default_format",
     "get_default_format",

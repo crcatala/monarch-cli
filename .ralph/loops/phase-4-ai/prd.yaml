@@ -13,7 +13,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Quiet Mode (--quiet Flag)"
-    status: pending
+    status: done
     ticket: mc-804c
     acceptance:
       - "output() function updated to accept quiet=True and id_field='id' parameters"
@@ -38,7 +38,7 @@ tasks:
       ```
 
   - title: "Batch Operations (transactions batch-update)"
-    status: pending
+    status: done
     ticket: mc-6397
     acceptance:
       - "`monarch transactions batch-update` command added"

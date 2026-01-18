@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import sys
 from datetime import date
 from typing import Annotated, Any
 
@@ -303,3 +305,157 @@ def update(
             "changes": changes,
         }
     )
+
+
+@app.command("batch-update")
+@handle_errors
+def batch_update(
+    transaction_ids: Annotated[
+        list[str] | None,
+        typer.Argument(help="Transaction IDs to update"),
+    ] = None,
+    stdin: Annotated[
+        bool,
+        typer.Option(
+            "--stdin",
+            help="Read transaction IDs from stdin (one per line)",
+        ),
+    ] = False,
+    category: Annotated[
+        str | None,
+        typer.Option(
+            "-c",
+            "--category",
+            help="Category ID to assign to all transactions",
+        ),
+    ] = None,
+    notes: Annotated[
+        str | None,
+        typer.Option(
+            "-n",
+            "--notes",
+            help="Notes to set on all transactions",
+        ),
+    ] = None,
+    max_concurrency: Annotated[
+        int,
+        typer.Option(
+            "--max-concurrency",
+            help="Maximum number of parallel API calls",
+        ),
+    ] = 4,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Preview changes without applying them",
+        ),
+    ] = False,
+) -> None:
+    """Batch update multiple transactions at once.
+
+    Apply the same changes to multiple transactions efficiently using
+    parallel API calls. Transaction IDs can be passed as arguments or
+    piped via stdin.
+
+    Examples:
+        # Update specific transactions
+        monarch transactions batch-update TXN001 TXN002 --category CAT123
+
+        # Pipe IDs from a search
+        monarch transactions list --search "Coffee" --quiet | \\
+            monarch transactions batch-update --stdin --category CAT456
+
+        # Preview changes first
+        monarch transactions batch-update TXN001 TXN002 --category CAT123 --dry-run
+
+        # Set notes on multiple transactions
+        monarch transactions batch-update --stdin --notes "Q1 Expenses" < ids.txt
+    """
+    # Collect transaction IDs
+    ids: list[str] = []
+
+    if transaction_ids:
+        ids.extend(transaction_ids)
+
+    if stdin:
+        for line in sys.stdin:
+            line = line.strip()
+            if line:  # Skip empty lines
+                ids.append(line)
+
+    # Validate we have IDs to process
+    if not ids:
+        output(
+            {
+                "status": "error",
+                "message": "No transaction IDs provided. Pass IDs as arguments or use --stdin.",
+            }
+        )
+        raise typer.Exit(1)
+
+    # Validate we have at least one change
+    changes: dict[str, Any] = {}
+    if category is not None:
+        changes["category_id"] = category
+    if notes is not None:
+        changes["notes"] = notes
+
+    if not changes:
+        output(
+            {
+                "status": "error",
+                "message": "No changes specified. Use --category/-c or --notes/-n.",
+            }
+        )
+        raise typer.Exit(1)
+
+    # Dry run mode - just show what would happen
+    if dry_run:
+        output(
+            {
+                "status": "dry_run",
+                "transaction_count": len(ids),
+                "transaction_ids": ids,
+                "changes": changes,
+                "message": f"Would update {len(ids)} transaction(s) (dry run mode)",
+            }
+        )
+        return
+
+    # Execute batch update
+    async def do_batch_update() -> dict[str, Any]:
+        """Execute parallel batch updates with concurrency control."""
+        client = get_authenticated_client()
+        semaphore = asyncio.Semaphore(max_concurrency)
+        results: list[dict[str, Any]] = []
+
+        async def update_one(txn_id: str) -> dict[str, Any]:
+            """Update a single transaction with semaphore control."""
+            async with semaphore:
+                try:
+                    await client.update_transaction(transaction_id=txn_id, **changes)
+                    return {"id": txn_id, "status": "success"}
+                except Exception as e:
+                    return {"id": txn_id, "status": "error", "error": str(e)}
+
+        # Run all updates concurrently
+        tasks = [update_one(txn_id) for txn_id in ids]
+        results = await asyncio.gather(*tasks)
+
+        # Summarize results
+        successes = [r for r in results if r["status"] == "success"]
+        failures = [r for r in results if r["status"] == "error"]
+
+        return {
+            "status": "completed",
+            "success_count": len(successes),
+            "failure_count": len(failures),
+            "changes": changes,
+            "failures": failures if failures else None,
+        }
+
+    with spinner(f"Updating {len(ids)} transaction(s)..."):
+        result = run_async(do_batch_update())
+
+    output(result)

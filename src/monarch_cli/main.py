@@ -4,7 +4,7 @@ import typer
 
 from monarch_cli import __version__
 from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
-from monarch_cli.output import OutputFormat, set_debug, set_default_format, set_verbose
+from monarch_cli.output import OutputFormat, set_debug, set_default_format, set_quiet, set_verbose
 from monarch_cli.output.plain import set_color_enabled
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
@@ -51,6 +51,12 @@ def main(
         "--json",
         help="Output in JSON format (overrides TTY detection).",
     ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Output only IDs, one per line (for AI agent consumption).",
+    ),
     no_color: bool = typer.Option(
         False,
         "--no-color",
@@ -64,6 +70,8 @@ def main(
         set_debug(True)
     if json_output:
         set_default_format(OutputFormat.JSON)
+    if quiet:
+        set_quiet(True)
     if no_color:
         set_color_enabled(False)
 
