@@ -114,3 +114,15 @@ After this loop completes:
 - Files changed: `README.md`
 - **Learnings:** The CLI has rich help output via Typer; use `monarch <command> --help` to extract full option details. Auto-JSON detection when piped is key for AI agent workflows.
 ---
+
+## [2026-01-18 13:26] - CHANGELOG.md Setup
+- Created comprehensive CHANGELOG.md following Keep a Changelog format
+- [Unreleased] section with placeholder for future changes
+- [0.1.0] section documenting all MVP features
+- Grouped features by category: Auth, Account, Transaction, Budget, Cashflow, Category commands
+- Documented output formats, AI agent integration, developer experience, configuration
+- Added Security section noting secure token storage
+- Added comparison URLs at bottom (GitHub format)
+- Files changed: `CHANGELOG.md` (new)
+- **Learnings:** Keep a Changelog format requires specific sections (Added, Changed, Deprecated, Removed, Fixed, Security). Group related features logically for readability.
+---
