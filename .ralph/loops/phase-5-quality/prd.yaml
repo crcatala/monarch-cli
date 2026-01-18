@@ -18,7 +18,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Unit Tests Structure & Core Tests"
-    status: pending
+    status: done
     ticket: mc-fb38
     acceptance:
       - "tests/ directory properly structured with __init__.py files"
