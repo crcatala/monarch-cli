@@ -1,5 +1,18 @@
 # Phase 3 Foundation Guardrails
 
+## ⚠️ CRITICAL: No Write Operations During Testing
+
+**The local machine has personal Monarch Money credentials. Do NOT execute any write or mutating operations against the live API.**
+
+- ✅ Read operations (list accounts, fetch transactions) are OK for live testing
+- ❌ `refresh_accounts()` - do NOT call against live API during testing
+- ❌ Any operation that modifies user data
+
+**For testing write operations:**
+- Use mocks/stubs in unit tests
+- Verify code logic without executing against live API
+- The `--dry-run` pattern should preview changes without applying
+
 ## Transformer Rules
 
 1. **Stable output schema**: Once a field is added, it cannot be removed without deprecation

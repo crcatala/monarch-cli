@@ -1,5 +1,26 @@
 # Phase 3 Commands Guardrails
 
+## ⚠️ CRITICAL: No Write Operations During Testing
+
+**The local machine has personal Monarch Money credentials. Do NOT execute any write or mutating operations against the live API.**
+
+Safe to test live:
+- ✅ `monarch accounts list`
+- ✅ `monarch transactions list`
+- ✅ `monarch budgets list`
+- ✅ `monarch cashflow summary`
+- ✅ `monarch categories list`
+
+Do NOT test live:
+- ❌ `monarch accounts refresh` - triggers bank sync
+- ❌ `monarch transactions update` - modifies transaction data
+
+**For testing write commands:**
+- Use mocks in unit tests
+- Test `--dry-run` flag to verify logic without applying changes
+- Verify code compiles and type-checks correctly
+- Test with `--help` to verify CLI structure
+
 ## Command Structure Pattern
 
 Every command follows this pattern:

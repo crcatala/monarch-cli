@@ -40,6 +40,11 @@ tasks:
       monarch accounts refresh -a ACC123 -a ACC456
       ```
 
+      ⚠️ TESTING RESTRICTION: The local machine has personal Monarch credentials.
+      - ✅ `monarch accounts list` can be tested live
+      - ❌ `monarch accounts refresh` must NOT be run against live API
+      - Test refresh with: --help flag, unit tests with mocks, code review only
+
   - title: "Transaction Commands"
     status: pending
     ticket: mc-0136
@@ -58,6 +63,12 @@ tasks:
       - limit, offset, start_date, end_date, search, account_ids
 
       For update, the library method is update_transaction(transaction_id=, **kwargs)
+
+      ⚠️ TESTING RESTRICTION: The local machine has personal Monarch credentials.
+      - ✅ `monarch transactions list` can be tested live
+      - ❌ `monarch transactions update` must NOT be run against live API (mutates data!)
+      - Test update with: --help flag, --dry-run only, unit tests with mocks
+      - Verify update logic through code review, not live execution
 
   - title: "Budget Commands"
     status: pending

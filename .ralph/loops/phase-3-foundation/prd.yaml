@@ -80,6 +80,11 @@ tasks:
       Service layer is for operations that need orchestration (like refresh which
       may need to fetch account IDs first). Simple fetch operations can stay in commands.
 
+      ⚠️ TESTING RESTRICTION: The local machine has personal Monarch credentials.
+      - ✅ list_accounts() can be tested against live API
+      - ❌ refresh_accounts() must NOT be called against live API
+      - Use mocks/unit tests to verify refresh logic without executing
+
   - title: "Configuration System (Environment-Based)"
     status: pending
     ticket: mc-7fda
