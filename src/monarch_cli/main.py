@@ -4,6 +4,7 @@ import typer
 
 from monarch_cli import __version__
 from monarch_cli.commands import auth
+from monarch_cli.output import set_verbose
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
 
@@ -28,8 +29,16 @@ def main(
         is_eager=True,
         help="Show version and exit.",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-V",
+        help="Show detailed error tracebacks for debugging.",
+    ),
 ) -> None:
     """CLI for Monarch Money - AI-agent friendly financial data access."""
+    if verbose:
+        set_verbose(True)
 
 
 if __name__ == "__main__":

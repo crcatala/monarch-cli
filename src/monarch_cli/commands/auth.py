@@ -29,10 +29,16 @@ app = typer.Typer(
 
 
 def _is_keyring_available() -> bool:
-    """Check if a real keyring backend is available."""
+    """Check if a real keyring backend is available.
+
+    The keyring library falls back to keyring.backends.fail.Keyring when
+    no working backend is found (e.g., headless Linux without Secret Service).
+    We detect this by checking the module name for "fail".
+
+    See: https://github.com/jaraco/keyring#api-interface
+    """
     try:
         backend = keyring.get_keyring()
-        # keyring.backends.fail.Keyring is the fallback when no backend works
         return "fail" not in type(backend).__module__
     except Exception:
         return False
@@ -60,9 +66,7 @@ def _prompt_storage_backend() -> StorageBackend:
             return StorageBackend.FILE
         return StorageBackend.KEYRING
     else:
-        console.print("  [yellow]Note: Keyring not available in this environment[/yellow]")
-        console.print("  1. [green]file[/green] - JSON file in config directory")
-        typer.prompt("Press Enter to continue", default="")
+        console.print("  [yellow]Keyring not available, using file storage[/yellow]")
         return StorageBackend.FILE
 
 
@@ -81,6 +85,10 @@ def login(
 
     Prompts for email and password interactively. If MFA is enabled on your
     account, you'll be prompted for a code from your authenticator app.
+
+    Note: This command uses interactive prompts and styled console output
+    rather than structured JSON errors, as it's designed for human use.
+    For programmatic auth status checking, use 'monarch auth status'.
 
     Examples:
         monarch auth login              # Interactive login
@@ -162,7 +170,7 @@ def login(
 @app.command()
 @handle_errors
 def status(
-    format: Annotated[
+    fmt: Annotated[
         OutputFormat,
         typer.Option(
             "-f",
@@ -192,7 +200,7 @@ def status(
             else "Not authenticated. Run 'monarch auth login' to authenticate."
         ),
     }
-    output(result, format)
+    output(result, fmt)
 
 
 @app.command()
@@ -310,7 +318,7 @@ def doctor() -> None:
 @app.command()
 @handle_errors
 def ping(
-    format: Annotated[
+    fmt: Annotated[
         OutputFormat,
         typer.Option(
             "-f",
@@ -328,10 +336,7 @@ def ping(
         monarch auth ping
         monarch auth ping -f compact
     """
-    try:
-        client = get_authenticated_client()
-    except AuthenticationError:
-        raise
+    client = get_authenticated_client()
 
     try:
         accounts_data = run_async(client.get_accounts())
@@ -340,7 +345,7 @@ def ping(
             "status": "ok",
             "message": f"Connected successfully. {len(accounts)} accounts available.",
         }
-        output(result, format)
+        output(result, fmt)
     except Exception as e:
         raise APIError(f"API request failed: {e}") from e
 
