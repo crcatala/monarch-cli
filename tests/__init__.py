@@ -1,0 +1,1 @@
+"""Monarch CLI test suite."""
