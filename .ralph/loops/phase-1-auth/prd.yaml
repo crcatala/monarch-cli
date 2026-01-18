@@ -15,7 +15,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Minimal Output Helpers (Bootstrap)"
-    status: pending
+    status: done
     ticket: mc-3eba
     acceptance:
       - "src/monarch_cli/output/__init__.py has bootstrap implementation"
@@ -30,7 +30,7 @@ tasks:
       For now, just JSON output is needed to get auth commands working.
 
   - title: "Error Handler Decorator"
-    status: pending
+    status: done
     ticket: mc-e3e1
     acceptance:
       - "src/monarch_cli/core/error_handler.py exists"
@@ -45,7 +45,7 @@ tasks:
       Exit codes: 0=success, 1=error, 2=usage error, 130=interrupted
 
   - title: "Main Entry Point (Auth Only)"
-    status: pending
+    status: done
     ticket: mc-5655
     acceptance:
       - "src/monarch_cli/main.py updated with full Typer app"
@@ -68,7 +68,7 @@ tasks:
       ```
 
   - title: "Auth Commands Implementation"
-    status: pending
+    status: done
     ticket: mc-73e3
     acceptance:
       - "src/monarch_cli/commands/auth.py exists"
