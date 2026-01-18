@@ -9,13 +9,17 @@ import contextlib
 import json
 import os
 import pickle
+import sys
 import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import keyring
+import keyring.errors
 import platformdirs
+
+from .exceptions import ErrorCode, MonarchCLIError
 
 if TYPE_CHECKING:
     from typing import Any
@@ -26,6 +30,22 @@ KEYRING_USERNAME = "monarch-token"
 
 # Legacy compat path (for monarchmoney library interop)
 COMPAT_SESSION_PATH = Path.home() / ".mm" / "mm_session.pickle"
+
+
+class KeyringUnavailableError(MonarchCLIError):
+    """Keyring backend is not available."""
+
+    def __init__(
+        self,
+        message: str = "Keyring unavailable. Use --backend=file or set MONARCH_TOKEN env var.",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            code=ErrorCode.AUTH_FAILED,
+            details=details,
+            exit_code=1,
+        )
 
 
 class StorageBackend(str, Enum):
@@ -61,16 +81,41 @@ def get_session_path() -> Path:
     return get_config_dir() / "session.json"
 
 
+def _set_file_permissions(fd: int) -> None:
+    """Set secure file permissions (0600) if supported by the platform.
+
+    Args:
+        fd: File descriptor to set permissions on.
+    """
+    # os.fchmod is Unix-only; skip on Windows
+    if sys.platform != "win32":
+        os.fchmod(fd, 0o600)
+
+
 def _save_to_keyring(token: str) -> None:
-    """Save token to OS keyring."""
-    keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
+    """Save token to OS keyring.
+
+    Raises:
+        KeyringUnavailableError: If no keyring backend is available.
+    """
+    try:
+        keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
+    except keyring.errors.NoKeyringError as e:
+        raise KeyringUnavailableError(
+            details={"original_error": str(e)}
+        ) from e
+    except keyring.errors.KeyringError as e:
+        raise KeyringUnavailableError(
+            message=f"Keyring error: {e}. Use --backend=file or set MONARCH_TOKEN env var.",
+            details={"original_error": str(e)},
+        ) from e
 
 
 def _save_to_file(token: str) -> None:
     """Save token to JSON file with secure atomic write.
 
     Uses temp file + rename for atomicity. Sets 0600 permissions
-    before writing content for security.
+    before writing content for security (Unix only).
     """
     session_path = get_session_path()
     session_path.parent.mkdir(parents=True, exist_ok=True)
@@ -79,7 +124,7 @@ def _save_to_file(token: str) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=session_path.parent, suffix=".tmp")
     tmp_path_obj = Path(tmp_path)
     try:
-        os.fchmod(fd, 0o600)  # Set perms before writing
+        _set_file_permissions(fd)  # Set perms before writing (Unix only)
         with os.fdopen(fd, "w") as f:
             json.dump({"token": token}, f)
         os.replace(tmp_path, session_path)  # Atomic replace
@@ -97,7 +142,7 @@ def _save_to_compat(token: str) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=COMPAT_SESSION_PATH.parent, suffix=".tmp")
     tmp_path_obj = Path(tmp_path)
     try:
-        os.fchmod(fd, 0o600)
+        _set_file_permissions(fd)  # Set perms before writing (Unix only)
         with os.fdopen(fd, "wb") as f:
             # The library expects {"token": token} structure
             pickle.dump({"token": token}, f)
@@ -114,6 +159,9 @@ def save_session_token(token: str, backend: StorageBackend) -> None:
     Args:
         token: The authentication token to store.
         backend: Where to store the token.
+
+    Raises:
+        KeyringUnavailableError: If keyring backend is requested but unavailable.
     """
     match backend:
         case StorageBackend.KEYRING:
@@ -145,7 +193,10 @@ def _get_from_file() -> str | None:
         return None
     try:
         with session_path.open() as f:
-            data: dict[str, Any] = json.load(f)
+            data = json.load(f)
+        # Handle corrupted/unexpected data types gracefully
+        if not isinstance(data, dict):
+            return None
         token = data.get("token")
         return token if isinstance(token, str) else None
     except (json.JSONDecodeError, OSError):
@@ -158,10 +209,13 @@ def _get_from_compat() -> str | None:
         return None
     try:
         with COMPAT_SESSION_PATH.open("rb") as f:
-            data: dict[str, Any] = pickle.load(f)  # noqa: S301 - Required for library compat
+            data = pickle.load(f)  # noqa: S301 - Required for library compat
+        # Handle corrupted/unexpected data types gracefully
+        if not isinstance(data, dict):
+            return None
         token = data.get("token")
         return token if isinstance(token, str) else None
-    except (pickle.UnpicklingError, OSError):
+    except (pickle.UnpicklingError, OSError, AttributeError, TypeError):
         return None
 
 
@@ -198,8 +252,11 @@ def get_session_token() -> str | None:
 
 
 def _delete_from_keyring() -> None:
-    """Delete token from OS keyring."""
-    with contextlib.suppress(keyring.errors.PasswordDeleteError):
+    """Delete token from OS keyring.
+
+    Silently ignores errors if keyring is unavailable or token doesn't exist.
+    """
+    with contextlib.suppress(keyring.errors.KeyringError, Exception):
         keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
 
 
