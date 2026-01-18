@@ -6,7 +6,6 @@ Supports multiple output formats:
 - COMPACT (single-line JSON)
 - TABLE (Rich table for human reading)
 - CSV (spreadsheet export)
-- NDJSON (streaming, one JSON object per line)
 """
 
 import csv
@@ -110,7 +109,6 @@ def print_csv(items: list[dict[str, Any]]) -> None:
 def output(
     data: Any,
     format: OutputFormat = OutputFormat.JSON,
-    ndjson: bool = False,
     raw: bool = False,
 ) -> None:
     """Output data in specified format.
@@ -118,7 +116,6 @@ def output(
     Args:
         data: Data to output.
         format: Output format (JSON, TABLE, CSV, COMPACT).
-        ndjson: If True and data is a list, print each item as single-line JSON.
         raw: If True, print data as-is (pass-through).
 
     Note:
@@ -128,12 +125,6 @@ def output(
     # Raw pass-through
     if raw:
         print(data)
-        return
-
-    # NDJSON streaming for lists
-    if ndjson and isinstance(data, list):
-        for item in data:
-            print(json.dumps(item, default=str))
         return
 
     # Format-specific output
