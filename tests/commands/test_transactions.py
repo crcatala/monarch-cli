@@ -8,9 +8,34 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from monarch_cli.commands.transactions import app
+from monarch_cli.commands.transactions import _parse_date, app
 
 runner = CliRunner()
+
+
+class TestParseDateHelper:
+    """Tests for the date parsing helper."""
+
+    def test_parse_valid_date(self) -> None:
+        """Parse valid date string."""
+        from datetime import date
+
+        result = _parse_date("2024-06-15")
+        assert result == date(2024, 6, 15)
+
+    def test_parse_none_returns_none(self) -> None:
+        """Parse None returns None."""
+        result = _parse_date(None)
+        assert result is None
+
+    def test_parse_invalid_date_raises(self) -> None:
+        """Parse invalid date raises typer.BadParameter."""
+        import typer
+
+        with pytest.raises(typer.BadParameter) as exc_info:
+            _parse_date("not-a-date")
+        assert "Invalid date format" in str(exc_info.value)
+        assert "YYYY-MM-DD" in str(exc_info.value)
 
 
 @pytest.fixture

@@ -54,9 +54,13 @@ class TestParseDateHelper:
         assert result is None
 
     def test_parse_invalid_date_raises(self) -> None:
-        """Parse invalid date raises ValueError."""
-        with pytest.raises(ValueError):
+        """Parse invalid date raises typer.BadParameter."""
+        import typer
+
+        with pytest.raises(typer.BadParameter) as exc_info:
             _parse_date("not-a-date")
+        assert "Invalid date format" in str(exc_info.value)
+        assert "YYYY-MM-DD" in str(exc_info.value)
 
 
 class TestCashflowSummary:

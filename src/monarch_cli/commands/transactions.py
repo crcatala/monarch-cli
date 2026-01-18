@@ -22,10 +22,25 @@ app = typer.Typer(
 
 
 def _parse_date(date_str: str | None) -> date | None:
-    """Parse a date string in YYYY-MM-DD format."""
+    """Parse a date string in YYYY-MM-DD format.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format, or None.
+
+    Returns:
+        Parsed date object, or None if input was None.
+
+    Raises:
+        typer.BadParameter: If date string is not valid YYYY-MM-DD format.
+    """
     if date_str is None:
         return None
-    return date.fromisoformat(date_str)
+    try:
+        return date.fromisoformat(date_str)
+    except ValueError as e:
+        raise typer.BadParameter(
+            f"Invalid date format: '{date_str}'. Use YYYY-MM-DD format."
+        ) from e
 
 
 @app.command("list")

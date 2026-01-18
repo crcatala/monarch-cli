@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Any
 
 import typer
@@ -30,8 +31,6 @@ def _transform_budgets(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
     Returns:
         List of budget items with category_id, budgeted, spent, remaining
     """
-    from datetime import date
-
     result = []
     budget_data = raw_data.get("budgetData", {})
     monthly_by_category = budget_data.get("monthlyAmountsByCategory", [])

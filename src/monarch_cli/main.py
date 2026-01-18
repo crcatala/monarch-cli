@@ -30,6 +30,7 @@ def main(
     version: bool | None = typer.Option(  # noqa: ARG001
         None,
         "--version",
+        "-v",
         callback=version_callback,
         is_eager=True,
         help="Show version and exit.",
@@ -37,7 +38,7 @@ def main(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        "-v",
+        "-V",
         help="Show operational progress messages.",
     ),
     debug: bool = typer.Option(
