@@ -1,0 +1,197 @@
+name: "Phase 5: Testing & Documentation"
+description: |
+  Complete the project with comprehensive testing and documentation:
+  - Unit tests for core modules and transformers
+  - CLI tests with CliRunner
+  - Schema contract tests for output stability
+  - Live test infrastructure (local dev only)
+  - README documentation
+  - CHANGELOG setup
+  - Release readiness checklist
+  
+  This ensures quality and prepares for PyPI publication.
+
+branch: "ralph/phase-5-quality"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Unit Tests Structure & Core Tests"
+    status: pending
+    ticket: mc-fb38
+    acceptance:
+      - "tests/ directory properly structured with __init__.py files"
+      - "tests/conftest.py has shared fixtures (mock_monarch_client, sample_accounts, sample_transactions)"
+      - "tests/test_async_utils.py tests run_async() function"
+      - "tests/test_exceptions.py tests exception to_dict() method"
+      - "tests/test_dates.py tests all DatePreset resolutions"
+      - "tests/test_config.py tests Config.load() with mocked env vars"
+      - "tests/test_session.py tests session storage (with temp directories)"
+      - "tests/test_output.py tests output formatters"
+      - "All tests pass: `make test`"
+      - "Coverage report shows core modules covered"
+    notes: |
+      Focus on pure functions first (dates, transformers). They're easiest to test.
+      Use pytest fixtures for common test data.
+      Mock environment variables with monkeypatch or unittest.mock.patch.dict.
+
+  - title: "Transformer Unit Tests"
+    status: pending
+    ticket: mc-c165
+    acceptance:
+      - "tests/transformers/__init__.py exists"
+      - "tests/transformers/test_accounts.py tests transform_account and transform_accounts"
+      - "tests/transformers/test_transactions.py tests transform_transaction and transform_transactions"
+      - "Tests verify all expected fields are present"
+      - "Tests verify handling of missing nested data"
+      - "Tests verify snake_case output"
+    notes: |
+      Example test:
+      ```python
+      def test_transform_account_handles_missing_institution():
+          raw = {"id": "123", "displayName": "Test"}  # No institution
+          result = transform_account(raw)
+          assert result["institution"] is None
+      ```
+
+  - title: "CLI Tests with CliRunner"
+    status: pending
+    ticket: mc-f84a
+    acceptance:
+      - "tests/test_auth_cli.py tests auth commands with mocked session"
+      - "tests/test_accounts_cli.py tests accounts list/refresh with mocked service"
+      - "tests/test_transactions_cli.py tests transactions list/update"
+      - "tests/test_budgets_cli.py tests budgets list"
+      - "tests/test_cashflow_cli.py tests cashflow summary"
+      - "tests/test_categories_cli.py tests categories list"
+      - "Tests use typer.testing.CliRunner"
+      - "Tests mock the service/client layer, not the whole command"
+      - "Tests verify exit codes and output format"
+    notes: |
+      Pattern:
+      ```python
+      from typer.testing import CliRunner
+      from unittest.mock import patch
+      from monarch_cli.main import app
+      
+      runner = CliRunner()
+      
+      def test_accounts_list():
+          with patch("monarch_cli.services.accounts.list_accounts") as mock:
+              mock.return_value = [{"id": "ACC1", "name": "Test"}]
+              result = runner.invoke(app, ["accounts", "list"])
+          assert result.exit_code == 0
+          assert "ACC1" in result.stdout
+      ```
+
+  - title: "Schema Contract Tests"
+    status: pending
+    ticket: mc-cd12
+    acceptance:
+      - "tests/test_schemas.py exists"
+      - "Tests verify account output has required fields: id, name, balance, type, is_active"
+      - "Tests verify transaction output has required fields: id, date, amount, description, category"
+      - "Tests are clearly documented as API contracts for AI agents"
+      - "Breaking these tests = breaking change for agents"
+    notes: |
+      These tests protect AI agents from unexpected schema changes.
+      Document which fields are guaranteed stable.
+
+  - title: "Live Tests Infrastructure (Local Dev Only)"
+    status: pending
+    ticket: mc-3437
+    acceptance:
+      - "tests/live/__init__.py exists"
+      - "tests/live/test_live_api.py exists with @pytest.mark.live decorator"
+      - "Tests are skipped unless MONARCH_LIVE_TESTS=1"
+      - "Test docstring clearly states LOCAL DEV ONLY"
+      - "At least one test that fetches real accounts (verifies auth works)"
+      - "pytest.ini_options has 'live' marker registered"
+      - "`make test` excludes live tests by default"
+      - "`make test-live` runs only live tests"
+    notes: |
+      Live tests are NOT for CI. They verify the code works with real API.
+      Add to Makefile:
+      ```makefile
+      test-live:
+          MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live -v
+      ```
+
+  - title: "README Documentation"
+    status: pending
+    ticket: mc-4d55
+    acceptance:
+      - "README.md is comprehensive with all sections"
+      - "Installation section covers pip, uv, pipx"
+      - "Quick Start shows login and first commands"
+      - "Command Reference documents all commands with examples"
+      - "AI Agent Integration section shows how to use with Claude/GPT"
+      - "Configuration section documents all environment variables"
+      - "Shell Completions section (from earlier task)"
+      - "Troubleshooting section mentions `monarch auth doctor`"
+    notes: |
+      Good README structure:
+      1. One-line description + badges
+      2. Installation (multiple methods)
+      3. Quick Start (auth + first command)
+      4. Command Reference (all commands)
+      5. Configuration (env vars)
+      6. AI Agent Integration
+      7. Shell Completions
+      8. Troubleshooting
+      9. Contributing
+
+  - title: "CHANGELOG.md Setup"
+    status: pending
+    ticket: mc-52c3
+    acceptance:
+      - "CHANGELOG.md exists in project root"
+      - "Follows Keep a Changelog format"
+      - "Has [Unreleased] section at top"
+      - "Has version section [0.1.0] with initial features"
+      - "Lists all MVP features under Added section"
+      - "Mentions what's planned in Unreleased"
+    notes: |
+      Keep a Changelog format:
+      ```markdown
+      # Changelog
+      
+      ## [Unreleased]
+      ### Added
+      - (future features)
+      
+      ## [0.1.0] - 2026-01-XX
+      ### Added
+      - Initial release
+      - Auth commands (login, logout, status, doctor, ping)
+      - Account commands (list, refresh)
+      ...
+      ```
+
+  - title: "Release Readiness Checklist"
+    status: pending
+    ticket: mc-e04c
+    acceptance:
+      - "LICENSE file exists with MIT license text"
+      - "pyproject.toml license field matches LICENSE file"
+      - "Package name checked/reserved on PyPI"
+      - "`uv build` creates wheel and sdist successfully"
+      - "`uv run monarch --version` shows correct version"
+      - "README renders correctly (check with `python -m readme_renderer README.md`)"
+      - "All tests pass including type checks"
+      - "No TODO/FIXME comments in shipped code"
+    notes: |
+      Final verification before publish:
+      ```bash
+      # Build
+      uv build
+      
+      # Check contents
+      tar -tvf dist/monarch_cli-0.1.0.tar.gz
+      
+      # Test install in fresh venv
+      uv venv /tmp/test-install
+      uv pip install dist/monarch_cli-0.1.0-py3-none-any.whl --python /tmp/test-install
+      /tmp/test-install/bin/monarch --version
+      ```

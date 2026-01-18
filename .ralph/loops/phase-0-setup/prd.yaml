@@ -1,0 +1,84 @@
+name: "Phase 0: Project Setup"
+description: |
+  Initialize the Monarch CLI project repository with proper Python tooling and structure.
+  This is the foundation - nothing else can start until this is complete.
+  
+  Monarch CLI is a Python CLI wrapper around `monarchmoneycommunity` for AI agent integration
+  with Monarch Money financial data.
+
+branch: "ralph/phase-0-setup"
+create_pr: false
+issue_tracker: none
+pre_commit: "uv run ruff check . && uv run ruff format --check ."
+
+tasks:
+  - title: "Repository Initialization"
+    status: pending
+    ticket: mc-99cb
+    acceptance:
+      - "Repository initialized with `uv init`"
+      - "Python 3.12+ set as minimum version in pyproject.toml"
+      - "Comprehensive .gitignore includes: __pycache__, .venv, dist/, build/, *.egg-info, .pytest_cache/, .mypy_cache/, .coverage, .DS_Store, .vscode/, .idea/"
+      - "Initial README.md exists with project title and brief description"
+      - "Git repo initialized with initial commit"
+    notes: |
+      Use `uv init --lib` for library/application structure.
+      The src-layout prevents import ambiguity and is required for proper editable installs.
+
+  - title: "pyproject.toml Configuration"
+    status: pending
+    ticket: mc-6a5b
+    acceptance:
+      - "pyproject.toml has complete [project] metadata (name=monarch-cli, version=0.1.0, description, requires-python>=3.12)"
+      - "Runtime dependencies: typer[all]>=0.9.0, monarchmoneycommunity>=1.0.0, keyring>=24.0.0, rich>=13.0.0, platformdirs>=4.0.0, httpx>=0.27.0"
+      - "Dev dependencies in [project.optional-dependencies] dev: pytest>=8.0.0, pytest-asyncio>=0.23.0, pytest-cov>=4.0.0, ruff>=0.4.0, mypy>=1.10.0"
+      - "Entry point defined: [project.scripts] monarch = 'monarch_cli.main:app'"
+      - "[tool.ruff] configured with target-version='py312', line-length=100, select includes E,W,F,I,B,C4,UP,ARG,SIM"
+      - "[tool.mypy] configured with python_version='3.12', strict=true"
+      - "[tool.pytest.ini_options] configured with testpaths=['tests'], asyncio_mode='auto'"
+      - "`uv sync` succeeds without errors"
+    notes: |
+      See plans/monarch-cli-implementation-plan.md for complete pyproject.toml reference.
+      Import monarchmoneycommunity as `monarchmoney` (that's how the package exposes itself).
+
+  - title: "Project Directory Structure"
+    status: pending
+    ticket: mc-fa92
+    acceptance:
+      - "src/monarch_cli/__init__.py exists with __version__ = '0.1.0'"
+      - "src/monarch_cli/py.typed exists (empty marker file for type hints)"
+      - "src/monarch_cli/main.py exists with minimal Typer app stub"
+      - "src/monarch_cli/commands/__init__.py exists (empty)"
+      - "src/monarch_cli/core/__init__.py exists (empty)"
+      - "src/monarch_cli/services/__init__.py exists (empty)"
+      - "src/monarch_cli/transformers/__init__.py exists (empty)"
+      - "src/monarch_cli/output/__init__.py exists (empty)"
+      - "tests/__init__.py exists"
+      - "tests/conftest.py exists (can be minimal)"
+      - "tests/live/__init__.py exists"
+      - "scripts/ directory exists"
+      - "`uv run monarch --help` shows help text (even if minimal)"
+    notes: |
+      main.py should have a minimal Typer app:
+      ```python
+      import typer
+      app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
+      if __name__ == "__main__":
+          app()
+      ```
+
+  - title: "Dev Tooling & Verification Scripts"
+    status: pending
+    ticket: mc-9441
+    acceptance:
+      - "Makefile exists with targets: verify, format, format-check, lint, typecheck, test"
+      - "`make format` runs `uv run ruff format .`"
+      - "`make lint` runs `uv run ruff check . --fix`"
+      - "`make typecheck` runs `uv run mypy src/`"
+      - "`make test` runs `uv run pytest`"
+      - "`make verify` runs format-check, lint, typecheck, test in sequence"
+      - "All verification commands pass (format-check, lint, typecheck)"
+      - "pytest runs successfully (0 tests is OK at this stage)"
+    notes: |
+      The Makefile is simpler than the parallel runner for now. We can add run-parallel.py later if needed.
+      Make sure mypy passes on the stub files (they may need minimal type hints).

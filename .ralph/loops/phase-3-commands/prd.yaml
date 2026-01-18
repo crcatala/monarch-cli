@@ -1,0 +1,160 @@
+name: "Phase 3b: Core Commands"
+description: |
+  Implement all MVP commands that cover 90% of user needs:
+  - Accounts (list, refresh)
+  - Transactions (list, update)
+  - Budgets (list)
+  - Cashflow (summary)
+  - Categories (list)
+  - Update main entry point with all commands
+  - Document shell completions
+  
+  After this phase, the CLI is feature-complete for MVP.
+
+branch: "ralph/phase-3-commands"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Account Commands"
+    status: pending
+    ticket: mc-7e2e
+    acceptance:
+      - "src/monarch_cli/commands/accounts.py exists"
+      - "accounts.app is typer.Typer(help='Account management')"
+      - "`monarch accounts list` shows all accounts"
+      - "list supports --format, --ndjson, --raw flags"
+      - "list uses spinner('Fetching accounts...')"
+      - "list uses account_service.list_accounts() or raw client call if --raw"
+      - "`monarch accounts refresh` triggers bank sync"
+      - "refresh supports --account/-a flag (repeatable) for specific accounts"
+      - "refresh uses account_service.refresh_accounts()"
+      - "Both commands use @handle_errors decorator"
+    notes: |
+      Example commands:
+      ```bash
+      monarch accounts list
+      monarch accounts list --format table
+      monarch accounts refresh
+      monarch accounts refresh -a ACC123 -a ACC456
+      ```
+
+  - title: "Transaction Commands"
+    status: pending
+    ticket: mc-0136
+    acceptance:
+      - "src/monarch_cli/commands/transactions.py exists"
+      - "`monarch transactions list` with filters: --limit, --offset, --start, --end, --preset, --account, --search"
+      - "list supports --format, --ndjson, --raw flags"
+      - "list uses spinner and transformer"
+      - "Date preset uses DatePreset enum and parse_date_range()"
+      - "`monarch transactions update <id>` with --amount, --description, --category flags"
+      - "update supports --dry-run flag that shows changes without applying"
+      - "update outputs {status: 'updated', transaction_id, changes}"
+      - "Both commands use @handle_errors"
+    notes: |
+      The transactions list command calls client.get_transactions() with these params:
+      - limit, offset, start_date, end_date, search, account_ids
+      
+      For update, the library method is update_transaction(transaction_id=, **kwargs)
+
+  - title: "Budget Commands"
+    status: pending
+    ticket: mc-ff18
+    acceptance:
+      - "src/monarch_cli/commands/budgets.py exists"
+      - "`monarch budgets list` shows budget status"
+      - "Output includes: id, category, budgeted, spent (absolute value), remaining"
+      - "Uses inline transformation (no separate transformer needed)"
+      - "Extracts from budgets['budgetData']['budgetItems']"
+      - "Supports --format flag"
+      - "Uses @handle_errors"
+    notes: |
+      Budget API response structure:
+      ```python
+      {
+        "budgetData": {
+          "budgetItems": [
+            {"id": "...", "category": {"name": "..."}, "budgetAmount": 500, "spentAmount": -350, "remainingAmount": 150}
+          ]
+        }
+      }
+      ```
+      Note: spentAmount is negative, so use abs() for display.
+
+  - title: "Cashflow Commands"
+    status: pending
+    ticket: mc-a185
+    acceptance:
+      - "src/monarch_cli/commands/cashflow.py exists"
+      - "`monarch cashflow summary` shows income/expense totals"
+      - "Supports --start, --end, --preset date filters"
+      - "Uses parse_date_range() for date handling"
+      - "Passes data through with minimal transformation"
+      - "Supports --format flag"
+      - "Uses @handle_errors and spinner"
+    notes: |
+      client.get_cashflow_summary(start_date=, end_date=) returns the summary.
+      The response format is already reasonable, minimal transformation needed.
+
+  - title: "Categories Commands"
+    status: pending
+    ticket: mc-57e8
+    acceptance:
+      - "src/monarch_cli/commands/categories.py exists"
+      - "`monarch categories list` shows all transaction categories"
+      - "Output includes: id, name, group, icon"
+      - "Flattens nested structure (categories have groups with children)"
+      - "Supports --format flag"
+      - "Uses @handle_errors and spinner"
+    notes: |
+      Category API response is nested:
+      ```python
+      {
+        "categories": [
+          {"name": "Food", "children": [{"id": "...", "name": "Groceries", ...}]}
+        ]
+      }
+      ```
+      Flatten to list of categories with their group name.
+
+  - title: "Update Main Entry Point (All Commands)"
+    status: pending
+    ticket: mc-0c0a
+    acceptance:
+      - "src/monarch_cli/main.py registers all command groups"
+      - "app.add_typer(auth.app, name='auth')"
+      - "app.add_typer(accounts.app, name='accounts')"
+      - "app.add_typer(transactions.app, name='transactions')"
+      - "app.add_typer(budgets.app, name='budgets')"
+      - "app.add_typer(cashflow.app, name='cashflow')"
+      - "app.add_typer(categories.app, name='categories')"
+      - "`monarch --help` shows all command groups"
+      - "Each command group's --help works"
+    notes: |
+      Test each command group:
+      ```bash
+      monarch accounts --help
+      monarch transactions --help
+      monarch budgets --help
+      monarch cashflow --help
+      monarch categories --help
+      ```
+
+  - title: "Shell Completions Documentation"
+    status: pending
+    ticket: mc-f917
+    acceptance:
+      - "README.md has Shell Completions section"
+      - "Documents `monarch --install-completion bash`"
+      - "Documents `monarch --install-completion zsh`"
+      - "Documents `monarch --install-completion fish`"
+      - "Mentions need to restart shell or source config"
+    notes: |
+      Typer provides built-in completion support. No code needed, just documentation.
+      
+      Test that completions install works:
+      ```bash
+      monarch --install-completion bash
+      ```

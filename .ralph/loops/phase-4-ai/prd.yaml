@@ -1,0 +1,72 @@
+name: "Phase 4: AI Agent Optimization"
+description: |
+  Add features specifically for AI agent consumption:
+  - Quiet mode (--quiet) for minimal output (IDs only)
+  - Batch operations for efficient bulk updates
+  
+  These make the CLI more efficient for automated workflows.
+
+branch: "ralph/phase-4-ai"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Quiet Mode (--quiet Flag)"
+    status: pending
+    ticket: mc-804c
+    acceptance:
+      - "output() function updated to accept quiet=True and id_field='id' parameters"
+      - "When quiet=True, only prints ID values, one per line"
+      - "For list[dict], prints each item's id_field value"
+      - "For single dict, prints the id_field value"
+      - "Commands updated to accept --quiet/-q global option"
+      - "Account, transaction, category list commands support --quiet"
+      - "Example: `monarch accounts list --quiet` outputs just account IDs"
+    notes: |
+      Use case: AI agent needs to get IDs for further operations
+      ```bash
+      # Get all account IDs
+      monarch accounts list --quiet
+      # Output:
+      # ACC123
+      # ACC456
+      # ACC789
+      
+      # Use with xargs
+      monarch accounts list --quiet | xargs -I {} monarch accounts refresh -a {}
+      ```
+
+  - title: "Batch Operations (transactions batch-update)"
+    status: pending
+    ticket: mc-6397
+    acceptance:
+      - "`monarch transactions batch-update` command added"
+      - "Accepts transaction IDs as arguments or via --stdin flag"
+      - "Supports --category/-c to set category for all transactions"
+      - "Supports --notes/-n to set notes for all transactions"
+      - "Supports --max-concurrency (default 4) to limit parallel API calls"
+      - "Supports --dry-run to preview changes"
+      - "Outputs summary with success_count, failure_count, and any errors"
+      - "Uses asyncio.Semaphore for concurrency control"
+      - "Gracefully handles partial failures (continues with remaining)"
+    notes: |
+      Usage:
+      ```bash
+      # Via arguments
+      monarch transactions batch-update TXN001 TXN002 TXN003 --category CAT123
+      
+      # Via stdin (piped from search)
+      monarch transactions list --search "Coffee" --quiet | \
+        monarch transactions batch-update --stdin --category CAT456
+      
+      # Dry run first
+      monarch transactions batch-update --stdin --category CAT123 --dry-run < ids.txt
+      ```
+      
+      Implementation uses asyncio for parallel updates:
+      ```python
+      async def update_batch(ids, semaphore, **kwargs):
+          async with semaphore:
+              await client.update_transaction(id, **kwargs)
+      ```
