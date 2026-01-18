@@ -15,7 +15,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Account Transformer"
-    status: pending
+    status: done
     ticket: mc-78e5
     acceptance:
       - "src/monarch_cli/transformers/accounts.py exists"
