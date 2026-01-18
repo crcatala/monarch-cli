@@ -25,6 +25,21 @@ This file tracks completed work and patterns learned during this loop.
 
 ## Completed Tasks
 
+## [2026-01-18 13:18] - CLI Tests with CliRunner
+- Verified 127 CLI tests already in place covering all commands
+- test_auth.py: 32 tests (status, logout, ping, doctor, setup, login)
+- test_accounts.py: 15 tests (list, refresh, output formats)
+- test_transactions.py: 34 tests (list, update, batch-update)
+- test_budgets.py: 16 tests (list, transform)
+- test_cashflow.py: 16 tests (summary, date parsing)
+- test_categories.py: 14 tests (list, transform)
+- All tests use typer.testing.CliRunner
+- All tests mock service layer (not whole commands)
+- All tests verify exit codes and output format
+- Files changed: none (tests already complete)
+- **Learnings:** CLI tests are in tests/commands/test_*.py (not tests/test_*_cli.py). Pattern: mock service functions like `monarch_cli.commands.accounts.list_accounts`, check `result.exit_code == 0`, parse JSON with `json.loads(result.stdout)`.
+---
+
 ## [2026-01-18 13:17] - Transformer Unit Tests
 - Verified comprehensive transformer tests already in place (53 tests)
 - test_accounts.py: 19 tests covering transform_account, transform_accounts, and schema contracts

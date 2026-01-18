@@ -56,7 +56,7 @@ tasks:
       ```
 
   - title: "CLI Tests with CliRunner"
-    status: pending
+    status: done
     ticket: mc-f84a
     acceptance:
       - "tests/test_auth_cli.py tests auth commands with mocked session"
