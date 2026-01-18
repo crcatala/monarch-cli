@@ -15,7 +15,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Minimal Output Helpers (Bootstrap)"
-    status: pending
+    status: done
     ticket: mc-3eba
     acceptance:
       - "src/monarch_cli/output/__init__.py has bootstrap implementation"

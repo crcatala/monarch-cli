@@ -101,9 +101,7 @@ def _save_to_keyring(token: str) -> None:
     try:
         keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
     except keyring.errors.NoKeyringError as e:
-        raise KeyringUnavailableError(
-            details={"original_error": str(e)}
-        ) from e
+        raise KeyringUnavailableError(details={"original_error": str(e)}) from e
     except keyring.errors.KeyringError as e:
         raise KeyringUnavailableError(
             message=f"Keyring error: {e}. Use --backend=file or set MONARCH_TOKEN env var.",
