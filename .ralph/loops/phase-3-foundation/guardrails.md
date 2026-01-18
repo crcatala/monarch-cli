@@ -13,6 +13,29 @@
 - Verify code logic without executing against live API
 - The `--dry-run` pattern should preview changes without applying
 
+## Rate Limit / Throttling Guidelines
+
+When testing against the live API:
+- Add a **1-2 second delay** between API calls to avoid rate limits
+- Use `time.sleep(1)` between consecutive live tests
+- Avoid rapid-fire requests that could trigger suspicious activity detection
+- Batch related checks into single test functions where possible
+
+```python
+import time
+
+def test_multiple_endpoints():
+    # Test accounts
+    accounts = run_async(client.get_accounts())
+    assert "accounts" in accounts
+    
+    time.sleep(1)  # Throttle between calls
+    
+    # Test transactions
+    txns = run_async(client.get_transactions(limit=5))
+    assert "allTransactions" in txns
+```
+
 ## Transformer Rules
 
 1. **Stable output schema**: Once a field is added, it cannot be removed without deprecation

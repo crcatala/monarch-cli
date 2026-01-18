@@ -21,6 +21,25 @@ Do NOT test live:
 - Verify code compiles and type-checks correctly
 - Test with `--help` to verify CLI structure
 
+## Rate Limit / Throttling Guidelines
+
+When manually testing read commands against the live API:
+- Add a **1-2 second delay** between API calls to avoid rate limits
+- Don't run rapid-fire commands in quick succession
+- Test one command, wait, then test the next
+- Avoid loops or scripts that hammer the API
+
+```bash
+# Good: Manual testing with natural pauses
+monarch accounts list
+# ... review output ...
+monarch transactions list --limit 5
+# ... review output ...
+
+# Bad: Rapid-fire testing
+for i in {1..10}; do monarch accounts list; done
+```
+
 ## Command Structure Pattern
 
 Every command follows this pattern:
