@@ -68,7 +68,7 @@ tasks:
       ```
 
   - title: "Auth Commands Implementation"
-    status: pending
+    status: done
     ticket: mc-73e3
     acceptance:
       - "src/monarch_cli/commands/auth.py exists"

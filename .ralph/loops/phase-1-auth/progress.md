@@ -41,9 +41,28 @@ This file tracks completed work and patterns learned during this loop.
 - **Learnings:** Typer sub-apps are registered with app.add_typer(sub_app, name='subcommand')
 ---
 
+## [2026-01-18 09:46] - mc-73e3: Auth Commands Implementation
+- Implemented all 6 auth commands with full functionality
+- `login`: Prompts for email/password with getpass, handles MFA, saves to chosen backend, shows account count
+- `status`: Returns JSON with authenticated, storage_backend, message fields
+- `logout`: Clears tokens from all or specific backend, resets cached client
+- `doctor`: Checks keyring availability, shows all token storage locations, tests API if authenticated
+- `ping`: Tests API connectivity, returns {status: "ok", message: ...}
+- `setup`: Shows formatted setup instructions with examples
+- Added helper functions: _is_keyring_available(), _get_keyring_backend_name(), _prompt_storage_backend()
+- Files changed: `src/monarch_cli/commands/auth.py`
+- **Learnings:** Check keyring backend with `"fail" not in type(backend).__module__` to detect unavailable keyring
+---
+
 ## Patterns & Decisions
 
-(recorded as tasks complete)
+### Keyring Availability Check
+```python
+def _is_keyring_available() -> bool:
+    backend = keyring.get_keyring()
+    return "fail" not in type(backend).__module__
+```
+The `keyring.backends.fail.Keyring` is the fallback when no real backend works.
 
 ## Issues Encountered
 
