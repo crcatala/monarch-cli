@@ -1,6 +1,6 @@
 ---
 id: mc-a23d
-status: open
+status: closed
 deps: [mc-96b1]
 links: []
 created: 2026-01-18T16:00:10Z

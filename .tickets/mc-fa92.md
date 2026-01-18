@@ -1,6 +1,6 @@
 ---
 id: mc-fa92
-status: open
+status: closed
 deps: [mc-6a5b]
 links: []
 created: 2026-01-18T15:59:30Z

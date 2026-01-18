@@ -1,6 +1,6 @@
 ---
 id: mc-6a5b
-status: open
+status: closed
 deps: [mc-99cb]
 links: []
 created: 2026-01-18T15:59:14Z

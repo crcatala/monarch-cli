@@ -1,6 +1,6 @@
 ---
 id: mc-c0c3
-status: open
+status: closed
 deps: [mc-9441]
 links: []
 created: 2026-01-18T16:02:10Z
