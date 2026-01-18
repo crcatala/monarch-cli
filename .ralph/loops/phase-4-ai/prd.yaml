@@ -3,11 +3,11 @@ description: |
   Add features specifically for AI agent consumption:
   - Quiet mode (--quiet) for minimal output (IDs only)
   - Batch operations for efficient bulk updates
-  
+
   These make the CLI more efficient for automated workflows.
 
 branch: "ralph/phase-4-ai"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -32,7 +32,7 @@ tasks:
       # ACC123
       # ACC456
       # ACC789
-      
+
       # Use with xargs
       monarch accounts list --quiet | xargs -I {} monarch accounts refresh -a {}
       ```
@@ -55,15 +55,15 @@ tasks:
       ```bash
       # Via arguments
       monarch transactions batch-update TXN001 TXN002 TXN003 --category CAT123
-      
+
       # Via stdin (piped from search)
       monarch transactions list --search "Coffee" --quiet | \
         monarch transactions batch-update --stdin --category CAT456
-      
+
       # Dry run first
       monarch transactions batch-update --stdin --category CAT123 --dry-run < ids.txt
       ```
-      
+
       Implementation uses asyncio for parallel updates:
       ```python
       async def update_batch(ids, semaphore, **kwargs):

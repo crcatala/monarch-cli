@@ -5,11 +5,11 @@ description: |
   - Error handler decorator
   - Main CLI entry point
   - Auth commands (login, status, logout, doctor, ping, setup)
-  
+
   After this phase, users can authenticate and we can live-test everything going forward.
 
 branch: "ralph/phase-1-auth"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -61,7 +61,7 @@ tasks:
           if value:
               print(f"monarch {__version__}")
               raise typer.Exit()
-      
+
       @app.callback()
       def main(version: bool = typer.Option(None, "--version", callback=version_callback, is_eager=True)):
           pass
@@ -90,5 +90,5 @@ tasks:
       - Clear prompts with [bold] headers
       - Green checkmarks for success
       - Helpful error messages
-      
+
       After this task, run `monarch auth login` to authenticate for live testing.

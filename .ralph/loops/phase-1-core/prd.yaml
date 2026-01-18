@@ -7,11 +7,11 @@ description: |
   - Retry logic with exponential backoff
   - Date utilities and presets
   - Adapter to isolate upstream library details
-  
+
   These must be solid before auth commands or any features are built.
 
 branch: "ralph/phase-1-core"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -110,6 +110,6 @@ tasks:
     notes: |
       The adapter pattern protects us from upstream library changes. If the library
       changes how tokens work, we only update this file.
-      
+
       The library uses 'Token' prefix (not 'Bearer') and handles this internally
       when token= is passed to constructor.

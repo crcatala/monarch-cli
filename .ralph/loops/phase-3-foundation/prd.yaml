@@ -5,11 +5,11 @@ description: |
   - Transaction transformer
   - Account service layer (business logic)
   - Configuration system (environment-based)
-  
+
   These provide stable output schemas for AI agents and isolate business logic.
 
 branch: "ralph/phase-3-foundation"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -31,7 +31,7 @@ tasks:
     notes: |
       The transformer creates a stable contract for AI agents. Raw API responses have
       nested structures and camelCase - we normalize to flat snake_case.
-      
+
       Example raw:
       ```python
       {"id": "123", "displayName": "Checking", "type": {"display": "Checking"}, ...}
@@ -97,5 +97,5 @@ tasks:
     notes: |
       TOML config file support is deferred to v1.1. Environment variables are
       sufficient for MVP and work well with CI/automation.
-      
+
       Precedence: CLI flags > env vars > defaults

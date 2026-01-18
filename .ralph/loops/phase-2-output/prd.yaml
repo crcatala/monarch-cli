@@ -6,11 +6,11 @@ description: |
   - CSV for spreadsheet export
   - NDJSON for streaming
   - Progress indicators (spinners)
-  
+
   This enables all the output format flags (--format, --ndjson) that commands will use.
 
 branch: "ralph/phase-2-output"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -33,7 +33,7 @@ tasks:
       - "is_interactive() checks sys.stdout.isatty()"
     notes: |
       Table and CSV only work with list[dict] data. For non-list data, fall back to JSON.
-      
+
       Example usage:
       ```python
       output(accounts, format=OutputFormat.TABLE)
@@ -57,5 +57,5 @@ tasks:
       with spinner("Fetching accounts..."):
           accounts = run_async(client.get_accounts())
       ```
-      
+
       In non-TTY (piped), this just prints "Fetching accounts..." and continues.

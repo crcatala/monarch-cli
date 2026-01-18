@@ -8,11 +8,11 @@ description: |
   - README documentation
   - CHANGELOG setup
   - Release readiness checklist
-  
+
   This ensures quality and prepares for PyPI publication.
 
 branch: "ralph/phase-5-quality"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "make verify"
 
@@ -74,9 +74,9 @@ tasks:
       from typer.testing import CliRunner
       from unittest.mock import patch
       from monarch_cli.main import app
-      
+
       runner = CliRunner()
-      
+
       def test_accounts_list():
           with patch("monarch_cli.services.accounts.list_accounts") as mock:
               mock.return_value = [{"id": "ACC1", "name": "Test"}]
@@ -156,11 +156,11 @@ tasks:
       Keep a Changelog format:
       ```markdown
       # Changelog
-      
+
       ## [Unreleased]
       ### Added
       - (future features)
-      
+
       ## [0.1.0] - 2026-01-XX
       ### Added
       - Initial release
@@ -186,10 +186,10 @@ tasks:
       ```bash
       # Build
       uv build
-      
+
       # Check contents
       tar -tvf dist/monarch_cli-0.1.0.tar.gz
-      
+
       # Test install in fresh venv
       uv venv /tmp/test-install
       uv pip install dist/monarch_cli-0.1.0-py3-none-any.whl --python /tmp/test-install

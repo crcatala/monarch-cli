@@ -2,12 +2,12 @@ name: "Phase 0: Project Setup"
 description: |
   Initialize the Monarch CLI project repository with proper Python tooling and structure.
   This is the foundation - nothing else can start until this is complete.
-  
+
   Monarch CLI is a Python CLI wrapper around `monarchmoneycommunity` for AI agent integration
   with Monarch Money financial data.
 
 branch: "ralph/phase-0-setup"
-create_pr: false
+create_pr: true
 issue_tracker: none
 pre_commit: "uv run ruff check . && uv run ruff format --check ."
 
