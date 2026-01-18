@@ -1,0 +1,61 @@
+name: "Phase 2: Output System"
+description: |
+  Expand the output system with full formatting support:
+  - JSON (pretty and compact)
+  - Rich tables for human reading
+  - CSV for spreadsheet export
+  - NDJSON for streaming
+  - Progress indicators (spinners)
+  
+  This enables all the output format flags (--format, --ndjson) that commands will use.
+
+branch: "ralph/phase-2-output"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Full Output Formatters"
+    status: pending
+    ticket: mc-299b
+    acceptance:
+      - "src/monarch_cli/output/__init__.py expanded with full implementation"
+      - "output() function supports format parameter (JSON, TABLE, CSV, COMPACT)"
+      - "output() function supports ndjson=True for streaming list items"
+      - "output() function supports raw=True for pass-through"
+      - "JSON format: indent=2, uses default=str for non-serializable types"
+      - "COMPACT format: single-line JSON"
+      - "TABLE format: Rich Table with columns from dict keys"
+      - "CSV format: csv.DictWriter output to stdout"
+      - "NDJSON: prints each list item as single-line JSON"
+      - "print_table(items) handles empty list gracefully with '[dim]No results[/dim]'"
+      - "print_csv(items) handles empty list gracefully"
+      - "is_interactive() checks sys.stdout.isatty()"
+    notes: |
+      Table and CSV only work with list[dict] data. For non-list data, fall back to JSON.
+      
+      Example usage:
+      ```python
+      output(accounts, format=OutputFormat.TABLE)
+      output(transactions, format=OutputFormat.JSON, ndjson=True)
+      ```
+
+  - title: "Progress Indicators"
+    status: pending
+    ticket: mc-3f7c
+    acceptance:
+      - "src/monarch_cli/output/progress.py exists"
+      - "spinner(message) context manager shows Rich spinner during operations"
+      - "Spinner outputs to stderr (not stdout) to preserve piping"
+      - "is_interactive() checks sys.stderr.isatty()"
+      - "If not interactive, just prints message to stderr without spinner"
+      - "Uses transient=True so spinner disappears after completion"
+      - "Shows elapsed time with TimeElapsedColumn"
+    notes: |
+      Usage pattern:
+      ```python
+      with spinner("Fetching accounts..."):
+          accounts = run_async(client.get_accounts())
+      ```
+      
+      In non-TTY (piped), this just prints "Fetching accounts..." and continues.

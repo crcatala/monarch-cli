@@ -1,0 +1,94 @@
+name: "Phase 1b: Auth Commands"
+description: |
+  Build the authentication system on top of core utilities:
+  - Minimal output helpers (bootstrap for auth commands)
+  - Error handler decorator
+  - Main CLI entry point
+  - Auth commands (login, status, logout, doctor, ping, setup)
+  
+  After this phase, users can authenticate and we can live-test everything going forward.
+
+branch: "ralph/phase-1-auth"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Minimal Output Helpers (Bootstrap)"
+    status: pending
+    ticket: mc-3eba
+    acceptance:
+      - "src/monarch_cli/output/__init__.py has bootstrap implementation"
+      - "OutputFormat enum: JSON, TABLE, CSV, COMPACT"
+      - "output(data, format) function that prints JSON (indent=2) for now"
+      - "output_error(error: MonarchCLIError) prints error.to_dict() to stderr"
+      - "set_verbose(bool) and is_verbose() functions for verbose flag tracking"
+      - "Console instance from rich for styled output"
+      - "Imports work: `from monarch_cli.output import output, output_error, OutputFormat`"
+    notes: |
+      This is a BOOTSTRAP version. Phase 2 will expand with table/CSV/NDJSON support.
+      For now, just JSON output is needed to get auth commands working.
+
+  - title: "Error Handler Decorator"
+    status: pending
+    ticket: mc-e3e1
+    acceptance:
+      - "src/monarch_cli/core/error_handler.py exists"
+      - "@handle_errors decorator catches MonarchCLIError and outputs via output_error()"
+      - "Catches KeyboardInterrupt, prints 'Interrupted.' to stderr, exits 130"
+      - "Catches unexpected Exception, outputs as MonarchCLIError with 'Unexpected error' message"
+      - "If is_verbose(), prints full traceback for unexpected errors"
+      - "Uses typer.Exit() not sys.exit() for testability with CliRunner"
+      - "Decorator preserves function signature (uses functools.wraps)"
+    notes: |
+      This decorator goes on all command functions to ensure consistent error output.
+      Exit codes: 0=success, 1=error, 2=usage error, 130=interrupted
+
+  - title: "Main Entry Point (Auth Only)"
+    status: pending
+    ticket: mc-5655
+    acceptance:
+      - "src/monarch_cli/main.py updated with full Typer app"
+      - "app = typer.Typer(name='monarch', help='...', no_args_is_help=True)"
+      - "Auth command group registered: app.add_typer(auth.app, name='auth')"
+      - "`uv run monarch --help` shows auth subcommand"
+      - "`uv run monarch auth --help` shows auth commands"
+      - "`uv run monarch --version` shows version (need version callback)"
+    notes: |
+      For --version support with Typer:
+      ```python
+      def version_callback(value: bool):
+          if value:
+              print(f"monarch {__version__}")
+              raise typer.Exit()
+      
+      @app.callback()
+      def main(version: bool = typer.Option(None, "--version", callback=version_callback, is_eager=True)):
+          pass
+      ```
+
+  - title: "Auth Commands Implementation"
+    status: pending
+    ticket: mc-73e3
+    acceptance:
+      - "src/monarch_cli/commands/auth.py exists"
+      - "auth.app is a typer.Typer(help='Authentication management')"
+      - "`monarch auth login` prompts for email/password, handles MFA, saves token"
+      - "Login asks user to choose storage backend (keyring or file) interactively"
+      - "Login has --storage flag to skip interactive choice"
+      - "Login catches RequireMFAException and prompts for MFA code"
+      - "Login shows account count on success"
+      - "`monarch auth status` outputs JSON with authenticated, storage_backend, message"
+      - "`monarch auth logout` clears tokens, has optional --storage flag"
+      - "`monarch auth doctor` checks keyring availability, shows storage info, tests API if authenticated"
+      - "`monarch auth ping` tests API connectivity, outputs {status: 'ok'}"
+      - "`monarch auth setup` prints setup instructions"
+      - "All commands except login/setup use @handle_errors decorator"
+      - "Password input uses getpass (not visible)"
+    notes: |
+      This is the first user-facing feature! Make the UX good:
+      - Clear prompts with [bold] headers
+      - Green checkmarks for success
+      - Helpful error messages
+      
+      After this task, run `monarch auth login` to authenticate for live testing.

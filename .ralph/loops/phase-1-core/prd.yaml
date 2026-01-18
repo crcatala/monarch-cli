@@ -1,0 +1,115 @@
+name: "Phase 1a: Core Utilities"
+description: |
+  Implement the core infrastructure modules that all other code depends on:
+  - Exception hierarchy for consistent error handling
+  - Session management with dual-backend token storage
+  - Async utilities for bridging async library to sync CLI
+  - Retry logic with exponential backoff
+  - Date utilities and presets
+  - Adapter to isolate upstream library details
+  
+  These must be solid before auth commands or any features are built.
+
+branch: "ralph/phase-1-core"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Exception Hierarchy"
+    status: pending
+    ticket: mc-7fb9
+    acceptance:
+      - "src/monarch_cli/core/exceptions.py exists"
+      - "ErrorCode enum defined with: AUTH_REQUIRED, AUTH_EXPIRED, AUTH_FAILED, NOT_FOUND, INVALID_INPUT, API_ERROR, RATE_LIMITED, NETWORK_ERROR, TIMEOUT, UPSTREAM_UNAVAILABLE, UNKNOWN"
+      - "MonarchCLIError base class with: message, code, details, exit_code attributes"
+      - "MonarchCLIError.to_dict() returns JSON-serializable dict with error=True, code, message, details"
+      - "Specific exceptions: AuthenticationError, AuthExpiredError, NotFoundError, ValidationError, APIError, RateLimitError, NetworkError"
+      - "Each exception has appropriate default message and error code"
+      - "mypy passes with strict type checking"
+    notes: |
+      These error codes are designed for AI agent consumption. The to_dict() method outputs
+      structured JSON that agents can parse reliably.
+
+  - title: "Session Management (Dual-Backend)"
+    status: pending
+    ticket: mc-a575
+    acceptance:
+      - "src/monarch_cli/core/session.py exists"
+      - "StorageBackend enum: KEYRING, FILE, FILE_COMPAT"
+      - "get_config_dir() returns Path using platformdirs, respects MONARCH_CONFIG_DIR env"
+      - "get_session_path() returns config_dir/session.json, respects MONARCH_SESSION_PATH env"
+      - "save_session_token(token, backend) saves to keyring or JSON file with 0600 permissions"
+      - "get_session_token() checks in order: MONARCH_TOKEN env, keyring, JSON file, compat pickle"
+      - "delete_session_token(backend=None) clears from specified backend or all"
+      - "has_valid_session() returns bool"
+      - "get_storage_info() returns dict with has_env_token, has_keyring_token, has_file_token, active_backend"
+      - "JSON file uses atomic write (tempfile + rename) for safety"
+      - "Keyring uses service='com.monarch-cli', username='monarch-token'"
+    notes: |
+      Security: Never log or print tokens. File storage uses 0600 permissions.
+      The compat pickle path (~/.mm/mm_session.pickle) is for library interop only.
+
+  - title: "Async Utilities Module"
+    status: pending
+    ticket: mc-dcbf
+    acceptance:
+      - "src/monarch_cli/core/async_utils.py exists"
+      - "run_async(coro) function that executes async coroutine using asyncio.run()"
+      - "Properly propagates KeyboardInterrupt"
+      - "Converts asyncio.CancelledError to RuntimeError with clear message"
+      - "Generic TypeVar T for proper return type inference"
+      - "mypy passes with strict checking"
+    notes: |
+      The monarchmoneycommunity library is fully async. Typer commands are sync.
+      This bridges the gap cleanly.
+
+  - title: "Retry Logic with Exponential Backoff"
+    status: pending
+    ticket: mc-79ca
+    acceptance:
+      - "src/monarch_cli/core/retry.py exists"
+      - "RETRYABLE_EXCEPTIONS tuple includes ConnectionError, TimeoutError, OSError"
+      - "with_retry(coro_factory, max_retries=3, base_delay=1.0, max_delay=30.0, jitter=True) async function"
+      - "Implements exponential backoff: delay = min(base_delay * 2^attempt, max_delay)"
+      - "Jitter adds randomness (0.75 to 1.25 multiplier) to prevent thundering herd"
+      - "Raises NetworkError after max_retries exceeded"
+      - "coro_factory is a callable that returns a new coroutine (not the coroutine itself)"
+    notes: |
+      The coro_factory pattern is important - we need a fresh coroutine for each retry attempt.
+      Example: `await with_retry(lambda: client.get_accounts())`
+
+  - title: "Date Utilities and Presets"
+    status: pending
+    ticket: mc-c0c3
+    acceptance:
+      - "src/monarch_cli/core/dates.py exists"
+      - "DatePreset enum with: TODAY, YESTERDAY, THIS_WEEK, LAST_WEEK, THIS_MONTH, LAST_MONTH, LAST_30_DAYS, LAST_90_DAYS, THIS_YEAR, LAST_YEAR, YTD, ALL"
+      - "resolve_preset(preset) returns tuple[date | None, date | None] for start/end"
+      - "THIS_WEEK starts on Monday"
+      - "YTD is alias for THIS_YEAR"
+      - "ALL returns (None, None)"
+      - "parse_date_range(preset, start, end) returns tuple[str | None, str | None] as ISO format"
+      - "Explicit start/end dates take precedence over preset"
+    notes: |
+      These presets match common financial reporting periods.
+      Use Python's match statement for clean preset handling.
+
+  - title: "Adapter Module (Isolates Upstream Library)"
+    status: pending
+    ticket: mc-7bd9
+    acceptance:
+      - "src/monarch_cli/core/adapter.py exists"
+      - "get_authenticated_client() returns MonarchMoney instance with token from session"
+      - "Uses MonarchMoney(token=stored_token) constructor, not private attribute manipulation"
+      - "Raises AuthenticationError if no token available"
+      - "Caches client instance in module-level _client variable"
+      - "extract_token_from_client(client) returns token using client.token property"
+      - "reset_client() clears cached client (for logout)"
+      - "All monarchmoney imports are in this file only (isolation)"
+    notes: |
+      The adapter pattern protects us from upstream library changes. If the library
+      changes how tokens work, we only update this file.
+      
+      The library uses 'Token' prefix (not 'Bearer') and handles this internally
+      when token= is passed to constructor.

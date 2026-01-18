@@ -1,0 +1,101 @@
+name: "Phase 3a: Data Foundation"
+description: |
+  Build the data layer that commands will use:
+  - Account transformer (API response → stable CLI format)
+  - Transaction transformer
+  - Account service layer (business logic)
+  - Configuration system (environment-based)
+  
+  These provide stable output schemas for AI agents and isolate business logic.
+
+branch: "ralph/phase-3-foundation"
+create_pr: false
+issue_tracker: none
+pre_commit: "make verify"
+
+tasks:
+  - title: "Account Transformer"
+    status: pending
+    ticket: mc-78e5
+    acceptance:
+      - "src/monarch_cli/transformers/accounts.py exists"
+      - "transform_account(raw) extracts: id, name, type, subtype, balance, institution, is_active, is_manual, last_updated"
+      - "name comes from displayName"
+      - "type comes from type.display"
+      - "balance comes from currentBalance"
+      - "institution comes from institution.name"
+      - "is_active is inverse of isHidden"
+      - "transform_accounts(raw) processes raw['accounts'] list"
+      - "Handles missing nested fields gracefully (returns None, not KeyError)"
+      - "All fields use snake_case (Python convention)"
+    notes: |
+      The transformer creates a stable contract for AI agents. Raw API responses have
+      nested structures and camelCase - we normalize to flat snake_case.
+      
+      Example raw:
+      ```python
+      {"id": "123", "displayName": "Checking", "type": {"display": "Checking"}, ...}
+      ```
+      Example transformed:
+      ```python
+      {"id": "123", "name": "Checking", "type": "Checking", ...}
+      ```
+
+  - title: "Transaction Transformer"
+    status: pending
+    ticket: mc-f913
+    acceptance:
+      - "src/monarch_cli/transformers/transactions.py exists"
+      - "transform_transaction(raw) extracts: id, date, amount, description, category, category_id, account, account_id, is_pending, notes"
+      - "description prefers merchant.name, falls back to plaidName"
+      - "category comes from category.name"
+      - "account comes from account.displayName"
+      - "transform_transactions(raw) processes raw['allTransactions']['results'] list"
+      - "Handles missing nested fields gracefully"
+    notes: |
+      Transaction API response structure:
+      ```python
+      {
+        "allTransactions": {
+          "results": [
+            {"id": "...", "date": "2024-01-15", "amount": -50.00, "merchant": {"name": "..."}, ...}
+          ]
+        }
+      }
+      ```
+
+  - title: "Account Service Layer"
+    status: pending
+    ticket: mc-4c28
+    acceptance:
+      - "src/monarch_cli/services/accounts.py exists"
+      - "list_accounts() returns transformed accounts using transformer"
+      - "get_account_ids() returns list of account ID strings"
+      - "refresh_accounts(account_ids=None) requests refresh, fetches all IDs if none provided"
+      - "refresh_accounts returns dict with status, account_count, message"
+      - "If no accounts found, returns status='no_accounts'"
+      - "Uses get_authenticated_client() from adapter"
+      - "Uses run_async() for all async calls"
+    notes: |
+      Service layer is for operations that need orchestration (like refresh which
+      may need to fetch account IDs first). Simple fetch operations can stay in commands.
+
+  - title: "Configuration System (Environment-Based)"
+    status: pending
+    ticket: mc-7fda
+    acceptance:
+      - "src/monarch_cli/core/config.py exists"
+      - "Config dataclass with: format, color, verbose, timeout_seconds, max_retries, confirm_destructive"
+      - "Config.load() class method reads from environment variables"
+      - "MONARCH_FORMAT sets default format (json, table, csv, compact)"
+      - "MONARCH_TIMEOUT sets timeout in seconds (default 30)"
+      - "MONARCH_MAX_RETRIES sets retry count (default 3)"
+      - "MONARCH_VERBOSE=1 enables verbose mode"
+      - "NO_COLOR or MONARCH_NO_COLOR=1 disables colors"
+      - "get_config() returns cached global Config instance"
+      - "Invalid env values are ignored (use defaults)"
+    notes: |
+      TOML config file support is deferred to v1.1. Environment variables are
+      sufficient for MVP and work well with CI/automation.
+      
+      Precedence: CLI flags > env vars > defaults
