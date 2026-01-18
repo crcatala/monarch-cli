@@ -3,9 +3,11 @@
 # Setup development environment (run once after cloning)
 setup:
 	uv sync --all-extras
-	@# Ensure hooks run from .git/hooks (overrides any global core.hooksPath)
+	@# Clear any existing local core.hooksPath and hide global, so prek can install
+	git config --local --unset-all core.hooksPath 2>/dev/null || true
+	GIT_CONFIG_GLOBAL=/dev/null uv run prek install
+	@# Override any global core.hooksPath with local setting
 	git config --local core.hooksPath .git/hooks
-	uv run prek install
 
 # Run all verification steps
 verify: format-check lint typecheck test
