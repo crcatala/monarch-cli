@@ -1,6 +1,6 @@
 ---
 id: mc-a77b
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-01-18T22:27:36Z

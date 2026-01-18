@@ -80,5 +80,5 @@ Initial release of Monarch CLI - a command-line interface for Monarch Money.
 - No credentials stored after authentication
 - Token refresh handled automatically
 
-[Unreleased]: https://github.com/yourusername/monarch-cli/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/yourusername/monarch-cli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/crcatala/monarch-cli/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/crcatala/monarch-cli/releases/tag/v0.1.0

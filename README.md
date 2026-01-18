@@ -369,7 +369,7 @@ monarch --debug accounts list
 ### Setup
 
 ```bash
-git clone https://github.com/yourusername/monarch-cli.git
+git clone https://github.com/crcatala/monarch-cli.git
 cd monarch-cli
 
 # Install with dev dependencies
