@@ -241,6 +241,123 @@ Examples:
 
 ---
 
+## Design Decisions & Clarifications
+
+This section documents key decisions made during planning to avoid ambiguity during implementation.
+
+### Service Layer vs Direct Client Calls
+
+**Decision:** Use direct client calls for simple operations; use service layer only when there's meaningful business logic.
+
+| Pattern | When to Use | Example |
+|---------|-------------|---------|
+| **Direct client call** | Simple fetch + transform | `transactions list`, `categories list` |
+| **Service layer** | Multi-step logic, orchestration | `accounts refresh` (fetches IDs, then refreshes) |
+
+Commands that do a single API call followed by transformation should call the client directly in the command handler. This keeps the codebase simpler and avoids unnecessary abstraction layers.
+
+### Token Handling
+
+**Decision:** Use the library's constructor `token=` parameter instead of manipulating private attributes.
+
+```python
+# ✅ Good: Use constructor parameter
+client = MonarchMoney(token=stored_token)
+
+# ❌ Avoid: Private attribute manipulation
+client._headers["Authorization"] = f"Token {token}"
+```
+
+The `monarchmoneycommunity` library:
+- Uses `Token` prefix (not `Bearer`)
+- Exposes `client.token` property for reading the token
+- Handles header setup internally when `token=` is passed to constructor
+
+### Transformer Placement
+
+**Decision:** Transformers are optional per-domain. Simple domains can use inline transformation.
+
+| Domain | Separate Transformer? | Rationale |
+|--------|----------------------|-----------|
+| `accounts` | Yes | Complex nested structure, reused |
+| `transactions` | Yes | Complex, many fields, reused |
+| `budgets` | No | Inline is sufficient |
+| `cashflow` | No | Pass-through with minimal changes |
+| `categories` | No | Simple flatten operation |
+
+### Error Mapping from Upstream
+
+The `monarchmoneycommunity` library raises these exceptions:
+
+| Upstream Exception | Our Exception | When |
+|-------------------|---------------|------|
+| `RequireMFAException` | (handled in login flow) | MFA required |
+| `LoginFailedException` | `AuthenticationError` | Bad credentials |
+| `RequestFailedException` | `APIError` | API returned error |
+| `aiohttp.ClientError` | `NetworkError` | Connection issues |
+| `asyncio.TimeoutError` | `NetworkError` | Request timeout |
+
+### Retry Integration
+
+**Decision:** Apply retry logic in the adapter's `get_authenticated_client()` or wrap individual API calls as needed.
+
+For MVP, retry is optional. The error handler catches network errors and provides clear messages. Retry with backoff can be added in v1.1 for improved reliability.
+
+### Output Consistency
+
+- **`output_error()`**: Structured JSON errors to stderr (for AI agents)
+- **`error()`**: Removed — use `output_error()` + `raise typer.Exit()` instead
+- All commands use `@handle_errors` decorator for consistent exception handling
+
+### Global Options Not Wired to Config
+
+For MVP, global options like `--format` use Typer defaults directly. The `Config` class exists for environment variable support but doesn't override Typer option defaults.
+
+```python
+# Config provides env var support
+MONARCH_FORMAT=table monarch accounts list  # Works
+
+# But explicit flags always win
+MONARCH_FORMAT=table monarch accounts list -f json  # Outputs JSON
+```
+
+### Package `__init__.py` Files
+
+All `__init__.py` files should be minimal. Use explicit imports from submodules:
+
+```python
+# src/monarch_cli/__init__.py
+"""Monarch CLI - AI agent friendly access to Monarch Money."""
+__version__ = "0.1.0"
+
+# src/monarch_cli/commands/__init__.py
+# Empty file - commands are imported explicitly in main.py
+
+# src/monarch_cli/core/__init__.py
+# Empty file - modules imported directly
+
+# src/monarch_cli/transformers/__init__.py
+# Empty file - modules imported directly
+
+# src/monarch_cli/output/__init__.py
+# Contains output functions (see Phase 2)
+
+# src/monarch_cli/services/__init__.py
+# Empty file - modules imported directly
+```
+
+### Signal Handling
+
+Typer handles SIGINT (Ctrl-C) automatically with proper cleanup. No custom signal handling is needed for MVP. The `handle_errors` decorator catches `KeyboardInterrupt` if needed:
+
+```python
+except KeyboardInterrupt:
+    print("\nInterrupted.", file=sys.stderr)
+    raise typer.Exit(130)
+```
+
+---
+
 ## Source Code Analysis
 
 ### Auth Pattern (Dual Storage Support)
@@ -1101,17 +1218,11 @@ class NetworkError(MonarchCLIError):
 """Decorator for consistent error handling across commands."""
 
 import functools
+import sys
 import typer
 from typing import Callable, TypeVar, ParamSpec
 
-from .exceptions import (
-    MonarchCLIError,
-    AuthenticationError,
-    AuthExpiredError,
-    APIError,
-    NetworkError,
-    RateLimitError,
-)
+from .exceptions import MonarchCLIError
 from ..output import output_error, is_verbose
 
 P = ParamSpec("P")
@@ -1128,6 +1239,9 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
             return func(*args, **kwargs)
+        except KeyboardInterrupt:
+            print("\nInterrupted.", file=sys.stderr)
+            raise typer.Exit(130)
         except MonarchCLIError as e:
             output_error(e)
             raise typer.Exit(e.exit_code)
@@ -1322,10 +1436,11 @@ def has_valid_session() -> bool:
 
 ```python
 # src/monarch_cli/core/adapter.py
-"""Adapter to isolate monarchmoneycommunity private details.
+"""Adapter to isolate monarchmoneycommunity details.
 
-All access to private attributes (_headers, _token) is confined here.
-This protects against upstream library changes.
+The library's constructor accepts a `token=` parameter, which correctly sets
+both `_token` and `_headers["Authorization"]` with the proper "Token" prefix.
+This avoids direct private attribute manipulation.
 """
 
 from monarchmoney import MonarchMoney
@@ -1336,7 +1451,11 @@ _client: MonarchMoney | None = None
 
 
 def get_authenticated_client() -> MonarchMoney:
-    """Get authenticated MonarchMoney client."""
+    """Get authenticated MonarchMoney client.
+    
+    Uses the library's constructor `token=` parameter for clean initialization.
+    The library handles setting _headers["Authorization"] = "Token {token}".
+    """
     global _client
     if _client is not None:
         return _client
@@ -1345,15 +1464,17 @@ def get_authenticated_client() -> MonarchMoney:
     if not token:
         raise AuthenticationError()
 
-    _client = MonarchMoney()
-    # Private attribute access isolated here
-    _client._headers["Authorization"] = f"Bearer {token}"
+    # Pass token via constructor - cleanest approach, no private attr access
+    _client = MonarchMoney(token=token)
     return _client
 
 
 def extract_token_from_client(client: MonarchMoney) -> str | None:
-    """Extract token from client after login. Private access isolated here."""
-    return getattr(client, "_token", None)
+    """Extract token from client after login.
+    
+    The library exposes a `token` property, so we use that instead of _token.
+    """
+    return client.token
 
 
 def reset_client() -> None:
@@ -1540,11 +1661,6 @@ def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
 def output_error(error: MonarchCLIError) -> None:
     """Output structured error for AI agents to stderr."""
     print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
-
-def error(message: str, exit_code: int = 1) -> None:
-    """Print error and exit."""
-    console.print(f"[red]Error:[/red] {message}", file=sys.stderr)
-    sys.exit(exit_code)
 ```
 
 > **Note:** This is a minimal bootstrap version for Phase 1. Phase 2 expands this with table/CSV/NDJSON support.
@@ -1897,11 +2013,6 @@ def output_error(error: MonarchCLIError) -> None:
     Errors go to stderr to preserve clean stdout for piping.
     """
     print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
-
-def error(message: str, exit_code: int = 1) -> None:
-    """Print error and exit."""
-    console.print(f"[red]Error:[/red] {message}", file=sys.stderr)
-    sys.exit(exit_code)
 ```
 
 ### 2.2 Progress Indicators
@@ -2042,13 +2153,35 @@ def list_accounts() -> list[dict]:
     return transform_accounts(raw)
 
 
-def refresh_accounts() -> dict:
-    """Request account refresh from financial institutions."""
+def get_account_ids() -> list[str]:
+    """Get all account IDs (needed for refresh)."""
     client = get_authenticated_client()
-    run_async(client.request_accounts_refresh())
+    raw = run_async(client.get_accounts())
+    return [acc["id"] for acc in raw.get("accounts", [])]
+
+
+def refresh_accounts(account_ids: list[str] | None = None) -> dict:
+    """Request account refresh from financial institutions.
+    
+    Note: The upstream library requires account_ids. If not provided,
+    we fetch all account IDs first.
+    """
+    client = get_authenticated_client()
+    
+    if account_ids is None:
+        account_ids = get_account_ids()
+    
+    if not account_ids:
+        return {
+            "status": "no_accounts",
+            "message": "No accounts found to refresh."
+        }
+    
+    run_async(client.request_accounts_refresh(account_ids))
     return {
         "status": "refresh_requested",
-        "message": "Account refresh requested. Balances will update shortly."
+        "account_count": len(account_ids),
+        "message": f"Refresh requested for {len(account_ids)} accounts. Balances will update shortly."
     }
 ```
 
@@ -2094,10 +2227,20 @@ def list_accounts(
 
 @app.command()
 @handle_errors
-def refresh():
-    """Trigger account refresh from financial institutions."""
+def refresh(
+    account_id: Optional[list[str]] = typer.Option(
+        None, "--account", "-a", help="Specific account ID(s) to refresh. Default: all accounts."
+    ),
+):
+    """Trigger account refresh from financial institutions.
+    
+    Examples:
+        monarch accounts refresh                    # Refresh all accounts
+        monarch accounts refresh -a ACC123          # Refresh specific account
+        monarch accounts refresh -a ACC1 -a ACC2    # Refresh multiple accounts
+    """
     with spinner("Requesting account refresh..."):
-        result = account_service.refresh_accounts()
+        result = account_service.refresh_accounts(account_id)
     output(result)
 ```
 
@@ -2161,8 +2304,8 @@ def list_transactions(
             offset=offset,
             start_date=resolved_start,
             end_date=resolved_end,
-            search=search,
-            account_ids=[account_id] if account_id else None,
+            search=search or "",
+            account_ids=[account_id] if account_id else [],
         ))
 
     if not raw:
@@ -2718,13 +2861,13 @@ Phase 0 (Setup) ──► Phase 1 (Auth + Core Utils) ──► 🔑 USER AUTH
 
 ---
 
-## Open Questions
+## Open Questions (Resolved)
 
-1. **Package name**: Is `monarch-cli` available on PyPI? Alternatives: `monarch-money-cli`, `mmcli`
+1. **Package name**: ✅ Check PyPI availability before publish. Prefer `monarch-cli`, fallback to `monarch-money-cli`.
 
-2. **Rate limiting**: Does Monarch Money API have rate limits we need to handle?
+2. **Rate limiting**: ✅ Not explicitly documented by Monarch. Implement conservative retry with backoff in v1.1 if issues arise.
 
-3. **Keyring service ID**: Use `com.monarch-cli` or stay compatible with MCP server's `com.mcp.monarch-mcp-server`?
+3. **Keyring service ID**: ✅ Use `com.monarch-cli` (our own namespace). Don't try to share tokens with MCP server - different auth patterns.
 
 ---
 
