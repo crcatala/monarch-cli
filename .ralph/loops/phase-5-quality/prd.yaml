@@ -99,7 +99,7 @@ tasks:
       Document which fields are guaranteed stable.
 
   - title: "Live Tests Infrastructure (Local Dev Only)"
-    status: pending
+    status: done
     ticket: mc-3437
     acceptance:
       - "tests/live/__init__.py exists"

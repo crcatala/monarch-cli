@@ -85,3 +85,16 @@ After this loop completes:
 - Files changed: `tests/test_schemas.py` (new)
 - **Learnings:** Schema contract tests should be separate from transformer unit tests - they serve different purposes. Transformer tests verify behavior; schema tests document guarantees for consumers.
 ---
+
+## [2026-01-18 13:22] - Live Tests Infrastructure (Local Dev Only)
+- Created `tests/live/test_live_api.py` with @pytest.mark.live decorator
+- 5 live tests: account fetching (2), transaction fetching (2), auth validation (1)
+- All tests clearly documented as LOCAL DEV ONLY
+- Tests skip unless MONARCH_LIVE_TESTS=1 environment variable set
+- Fixture `live_client` creates real MonarchMoney client from stored session
+- Updated Makefile: `make test` now excludes live tests with `-m "not live"`
+- Added `make test-live` target for running only live tests
+- pytest marker 'live' was already registered in pyproject.toml
+- Files changed: `tests/live/test_live_api.py` (new), `Makefile`
+- **Learnings:** Live tests use `get_session_token()` from `monarch_cli.core.session` (not `get_session`). Tests properly fail with 401 when session is invalid/expired - this is expected behavior for dev environment without credentials.
+---
