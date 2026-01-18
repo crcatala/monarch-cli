@@ -28,6 +28,26 @@ Plain format automatically strips ANSI color codes when:
 
 ## Completed Tasks
 
+## [2026-01-18 11:46] - Account Commands
+- Created `src/monarch_cli/commands/accounts.py` with:
+  - `accounts.app` Typer instance with `help='Account management'`
+  - `list` command with --format, --json, --ndjson, --raw flags
+  - `refresh` command with repeatable --account/-a flag
+- Both commands use `@handle_errors` decorator and `spinner()` context manager
+- `list` defaults to plain format in terminal, JSON when piped
+- `list` uses `list_accounts()` service or raw client call with --raw
+- `refresh` uses `refresh_accounts()` service
+- Added comprehensive tests in `tests/commands/test_accounts.py`
+- Files changed:
+  - `src/monarch_cli/commands/accounts.py` (new)
+  - `tests/commands/test_accounts.py` (new)
+- **Learnings:**
+  - Typer's `no_args_is_help=True` results in exit code 2, not 0
+  - Rich table output may truncate columns, check for table chars rather than specific values
+  - When testing help text with assertions, strip ANSI codes or use case-insensitive search
+
+---
+
 ## [2026-01-18 11:42] - Plain Output Format (Human-Friendly Default)
 - Added `OutputFormat.PLAIN` to enum in `output/__init__.py`
 - Created `src/monarch_cli/output/plain.py` with:

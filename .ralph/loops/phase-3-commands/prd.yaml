@@ -57,7 +57,7 @@ tasks:
       ```
 
   - title: "Account Commands"
-    status: pending
+    status: done
     ticket: mc-7e2e
     acceptance:
       - "src/monarch_cli/commands/accounts.py exists"
