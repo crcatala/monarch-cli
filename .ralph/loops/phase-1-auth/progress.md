@@ -30,6 +30,17 @@ This file tracks completed work and patterns learned during this loop.
 - **Learnings:** Ruff UP047 (new-style type params) conflicts with mypy for Callable+ParamSpec - use noqa: UP047 for decorator signatures
 ---
 
+## [2026-01-18 09:45] - mc-5655: Main Entry Point (Auth Only)
+- Updated main.py to import and register auth command group
+- Created stub auth.py with placeholder commands (login, status, logout, doctor, ping, setup)
+- Auth app is a sub-Typer with no_args_is_help=True
+- `monarch --help` shows auth subcommand
+- `monarch auth --help` shows all 6 auth commands  
+- `monarch --version` shows "monarch-cli 0.1.0"
+- Files changed: `src/monarch_cli/main.py`, `src/monarch_cli/commands/auth.py`
+- **Learnings:** Typer sub-apps are registered with app.add_typer(sub_app, name='subcommand')
+---
+
 ## Patterns & Decisions
 
 (recorded as tasks complete)

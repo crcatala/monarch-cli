@@ -45,7 +45,7 @@ tasks:
       Exit codes: 0=success, 1=error, 2=usage error, 130=interrupted
 
   - title: "Main Entry Point (Auth Only)"
-    status: pending
+    status: done
     ticket: mc-5655
     acceptance:
       - "src/monarch_cli/main.py updated with full Typer app"

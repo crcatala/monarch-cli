@@ -3,8 +3,12 @@
 import typer
 
 from monarch_cli import __version__
+from monarch_cli.commands import auth
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
+
+# Register command groups
+app.add_typer(auth.app, name="auth")
 
 
 def version_callback(value: bool) -> None:
