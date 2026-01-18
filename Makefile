@@ -1,4 +1,11 @@
-.PHONY: verify format format-check lint lint-fix typecheck test
+.PHONY: setup verify format format-check lint lint-fix typecheck test
+
+# Setup development environment (run once after cloning)
+setup:
+	uv sync --all-extras
+	@# Ensure hooks run from .git/hooks (overrides any global core.hooksPath)
+	git config --local core.hooksPath .git/hooks
+	uv run prek install
 
 # Run all verification steps
 verify: format-check lint typecheck test
