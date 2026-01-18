@@ -18,41 +18,43 @@ app = typer.Typer(
 )
 
 
-def _flatten_categories(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Flatten nested category response to list of categories.
+def _transform_categories(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Transform category response to simplified list.
 
-    The API returns categories nested under groups:
+    The API returns categories with nested group objects:
     {
         "categories": [
-            {"name": "Food", "children": [{"id": "...", "name": "Groceries", "icon": "..."}]}
+            {
+                "id": "...",
+                "name": "Groceries",
+                "icon": "...",
+                "group": {"id": "...", "name": "Food", "type": "expense"}
+            }
         ]
     }
 
-    This flattens to:
+    This transforms to:
     [{"id": "...", "name": "Groceries", "group": "Food", "icon": "..."}]
 
     Args:
         raw_data: Raw API response from get_transaction_categories()
 
     Returns:
-        Flat list of categories with id, name, group, icon
+        List of categories with id, name, group, icon
     """
     result = []
     categories = raw_data.get("categories", [])
 
-    for group in categories:
-        group_name = group.get("name")
-        children = group.get("children", [])
-
-        for category in children:
-            result.append(
-                {
-                    "id": category.get("id"),
-                    "name": category.get("name"),
-                    "group": group_name,
-                    "icon": category.get("icon"),
-                }
-            )
+    for category in categories:
+        group = category.get("group", {})
+        result.append(
+            {
+                "id": category.get("id"),
+                "name": category.get("name"),
+                "group": group.get("name") if group else None,
+                "icon": category.get("icon"),
+            }
+        )
 
     return result
 
@@ -97,7 +99,7 @@ def list_cmd(
         client = get_authenticated_client()
         raw_data: dict[str, Any] = run_async(client.get_transaction_categories())
 
-        # Flatten nested structure
-        data = _flatten_categories(raw_data)
+        # Transform to simplified structure
+        data = _transform_categories(raw_data)
 
     output(data, output_format)

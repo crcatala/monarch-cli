@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from monarch_cli.commands.categories import _flatten_categories, app
+from monarch_cli.commands.categories import _transform_categories, app
 
 runner = CliRunner()
 
@@ -22,37 +22,52 @@ def mock_authenticated_client() -> MagicMock:
 
 @pytest.fixture
 def sample_categories_response() -> dict:
-    """Sample categories API response with nested structure."""
+    """Sample categories API response with nested group objects."""
     return {
         "categories": [
             {
-                "name": "Food & Dining",
-                "children": [
-                    {"id": "cat_001", "name": "Groceries", "icon": "🛒"},
-                    {"id": "cat_002", "name": "Restaurants", "icon": "🍽️"},
-                    {"id": "cat_003", "name": "Coffee Shops", "icon": "☕"},
-                ],
+                "id": "cat_001",
+                "name": "Groceries",
+                "icon": "🛒",
+                "group": {"id": "grp_001", "name": "Food & Dining", "type": "expense"},
             },
             {
-                "name": "Transportation",
-                "children": [
-                    {"id": "cat_004", "name": "Gas", "icon": "⛽"},
-                    {"id": "cat_005", "name": "Public Transit", "icon": "🚇"},
-                ],
+                "id": "cat_002",
+                "name": "Restaurants",
+                "icon": "🍽️",
+                "group": {"id": "grp_001", "name": "Food & Dining", "type": "expense"},
             },
             {
-                "name": "Entertainment",
-                "children": [
-                    {"id": "cat_006", "name": "Movies", "icon": "🎬"},
-                ],
+                "id": "cat_003",
+                "name": "Coffee Shops",
+                "icon": "☕",
+                "group": {"id": "grp_001", "name": "Food & Dining", "type": "expense"},
+            },
+            {
+                "id": "cat_004",
+                "name": "Gas",
+                "icon": "⛽",
+                "group": {"id": "grp_002", "name": "Transportation", "type": "expense"},
+            },
+            {
+                "id": "cat_005",
+                "name": "Public Transit",
+                "icon": "🚇",
+                "group": {"id": "grp_002", "name": "Transportation", "type": "expense"},
+            },
+            {
+                "id": "cat_006",
+                "name": "Movies",
+                "icon": "🎬",
+                "group": {"id": "grp_003", "name": "Entertainment", "type": "expense"},
             },
         ]
     }
 
 
 @pytest.fixture
-def expected_flattened_categories() -> list[dict]:
-    """Expected flattened category data."""
+def expected_transformed_categories() -> list[dict]:
+    """Expected transformed category data."""
     return [
         {"id": "cat_001", "name": "Groceries", "group": "Food & Dining", "icon": "🛒"},
         {"id": "cat_002", "name": "Restaurants", "group": "Food & Dining", "icon": "🍽️"},
@@ -63,19 +78,14 @@ def expected_flattened_categories() -> list[dict]:
     ]
 
 
-class TestFlattenCategories:
-    """Tests for the category flattening function."""
+class TestTransformCategories:
+    """Tests for the category transformation function."""
 
-    def test_flatten_creates_flat_list(self, sample_categories_response: dict) -> None:
-        """Flatten converts nested structure to flat list."""
-        result = _flatten_categories(sample_categories_response)
+    def test_transform_extracts_group_name(self, sample_categories_response: dict) -> None:
+        """Transform extracts group name from nested group object."""
+        result = _transform_categories(sample_categories_response)
 
         assert len(result) == 6
-
-    def test_flatten_includes_group_name(self, sample_categories_response: dict) -> None:
-        """Flatten adds group name from parent category."""
-        result = _flatten_categories(sample_categories_response)
-
         # Check Food & Dining group
         food_cats = [c for c in result if c["group"] == "Food & Dining"]
         assert len(food_cats) == 3
@@ -85,61 +95,58 @@ class TestFlattenCategories:
         transport_cats = [c for c in result if c["group"] == "Transportation"]
         assert len(transport_cats) == 2
 
-    def test_flatten_preserves_all_fields(
-        self, sample_categories_response: dict, expected_flattened_categories: list[dict]
+    def test_transform_preserves_all_fields(
+        self, sample_categories_response: dict, expected_transformed_categories: list[dict]
     ) -> None:
-        """Flatten includes id, name, group, icon."""
-        result = _flatten_categories(sample_categories_response)
+        """Transform includes id, name, group, icon."""
+        result = _transform_categories(sample_categories_response)
 
         for i, item in enumerate(result):
-            assert item["id"] == expected_flattened_categories[i]["id"]
-            assert item["name"] == expected_flattened_categories[i]["name"]
-            assert item["group"] == expected_flattened_categories[i]["group"]
-            assert item["icon"] == expected_flattened_categories[i]["icon"]
+            assert item["id"] == expected_transformed_categories[i]["id"]
+            assert item["name"] == expected_transformed_categories[i]["name"]
+            assert item["group"] == expected_transformed_categories[i]["group"]
+            assert item["icon"] == expected_transformed_categories[i]["icon"]
 
-    def test_flatten_handles_empty_response(self) -> None:
-        """Flatten handles empty category data."""
-        result = _flatten_categories({})
+    def test_transform_handles_empty_response(self) -> None:
+        """Transform handles empty category data."""
+        result = _transform_categories({})
         assert result == []
 
-        result = _flatten_categories({"categories": []})
+        result = _transform_categories({"categories": []})
         assert result == []
 
-    def test_flatten_handles_empty_children(self) -> None:
-        """Flatten handles groups with no children."""
+    def test_transform_handles_missing_group(self) -> None:
+        """Transform handles categories with missing group."""
         response = {
             "categories": [
-                {"name": "Empty Group", "children": []},
+                {"id": "cat_1", "name": "No Group", "icon": "🔖"},
+            ]
+        }
+        result = _transform_categories(response)
+
+        assert len(result) == 1
+        assert result[0]["id"] == "cat_1"
+        assert result[0]["name"] == "No Group"
+        assert result[0]["group"] is None
+
+    def test_transform_handles_missing_icon(self) -> None:
+        """Transform handles categories with missing icon."""
+        response = {
+            "categories": [
                 {
-                    "name": "Has Children",
-                    "children": [{"id": "cat_1", "name": "Test", "icon": "🔖"}],
+                    "id": "cat_1",
+                    "name": "No Icon",
+                    "group": {"id": "grp_1", "name": "Test Group"},
                 },
             ]
         }
-        result = _flatten_categories(response)
-
-        assert len(result) == 1
-        assert result[0]["name"] == "Test"
-        assert result[0]["group"] == "Has Children"
-
-    def test_flatten_handles_missing_icon(self) -> None:
-        """Flatten handles categories with missing icon."""
-        response = {
-            "categories": [
-                {
-                    "name": "Test Group",
-                    "children": [
-                        {"id": "cat_1", "name": "No Icon"},
-                    ],
-                }
-            ]
-        }
-        result = _flatten_categories(response)
+        result = _transform_categories(response)
 
         assert len(result) == 1
         assert result[0]["id"] == "cat_1"
         assert result[0]["name"] == "No Icon"
         assert result[0]["icon"] is None
+        assert result[0]["group"] == "Test Group"
 
 
 class TestCategoriesList:
