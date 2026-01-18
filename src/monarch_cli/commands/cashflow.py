@@ -13,6 +13,7 @@ from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ..transformers.cashflow import transform_cashflow_summary
 
 app = typer.Typer(
     help="Cashflow analysis",
@@ -103,4 +104,6 @@ def summary(
             )
         )
 
-    output(data, output_format)
+    # Transform to flat structure for display
+    transformed = transform_cashflow_summary(data)
+    output(transformed, output_format)

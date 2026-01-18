@@ -36,7 +36,7 @@ def list_cmd(
         typer.Option(
             "-l",
             "--limit",
-            help="Maximum number of transactions to return",
+            help="Maximum number of transactions to return (API default: 100)",
         ),
     ] = 100,
     offset: Annotated[

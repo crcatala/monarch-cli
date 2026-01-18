@@ -23,12 +23,20 @@ def mock_authenticated_client() -> MagicMock:
 
 @pytest.fixture
 def sample_cashflow_response() -> dict:
-    """Sample cashflow summary API response."""
+    """Sample cashflow summary API response (nested structure from API)."""
     return {
-        "sumIncome": 5000.00,
-        "sumExpense": -3500.00,
-        "savings": 1500.00,
-        "savingsRate": 30.0,
+        "summary": [
+            {
+                "summary": {
+                    "sumIncome": 5000.00,
+                    "sumExpense": -3500.00,
+                    "savings": 1500.00,
+                    "savingsRate": 30.0,
+                    "__typename": "TransactionsSummary",
+                },
+                "__typename": "AggregateData",
+            }
+        ]
     }
 
 
@@ -54,12 +62,12 @@ class TestParseDateHelper:
 class TestCashflowSummary:
     """Tests for the cashflow summary command."""
 
-    def test_summary_returns_cashflow_data(
+    def test_summary_returns_transformed_cashflow_data(
         self,
         mock_authenticated_client: MagicMock,
         sample_cashflow_response: dict,
     ) -> None:
-        """Summary command returns cashflow data."""
+        """Summary command returns transformed cashflow data."""
 
         async def async_cashflow(**_kwargs):
             return sample_cashflow_response
@@ -77,17 +85,18 @@ class TestCashflowSummary:
 
             assert result.exit_code == 0
             data = json.loads(result.stdout)
-            assert data["sumIncome"] == 5000.00
-            assert data["sumExpense"] == -3500.00
+            # Transformed output uses snake_case and positive expenses
+            assert data["income"] == 5000.00
+            assert data["expenses"] == 3500.00  # Converted to positive
             assert data["savings"] == 1500.00
-            assert data["savingsRate"] == 30.0
+            assert data["savings_rate"] == 30.0
 
-    def test_summary_default_format_is_plain_in_tty(
+    def test_summary_plain_format_shows_formatted_output(
         self,
         mock_authenticated_client: MagicMock,
         sample_cashflow_response: dict,
     ) -> None:
-        """Summary defaults to plain format in TTY."""
+        """Summary with --format plain shows human-readable output."""
 
         async def async_cashflow(**_kwargs):
             return sample_cashflow_response
@@ -100,13 +109,14 @@ class TestCashflowSummary:
                 return_value=mock_authenticated_client,
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
-            patch("sys.stdout.isatty", return_value=True),
         ):
-            result = runner.invoke(app, [])
+            result = runner.invoke(app, ["--format", "plain"])
 
             assert result.exit_code == 0
-            # Plain format uses emoji or field names
-            assert "5000" in result.stdout or "Income" in result.stdout
+            # Plain format uses emoji icons and field names
+            assert "📈" in result.stdout  # Income emoji
+            assert "📉" in result.stdout  # Expenses emoji
+            assert "5,000" in result.stdout or "5000" in result.stdout
 
     def test_summary_with_preset(
         self,
@@ -202,7 +212,7 @@ class TestCashflowSummary:
         mock_authenticated_client: MagicMock,
         sample_cashflow_response: dict,
     ) -> None:
-        """Summary with --json outputs JSON."""
+        """Summary with --json outputs transformed JSON."""
 
         async def async_cashflow(**_kwargs):
             return sample_cashflow_response
@@ -221,7 +231,11 @@ class TestCashflowSummary:
             assert result.exit_code == 0
             output = json.loads(result.stdout)
             assert isinstance(output, dict)
-            assert "sumIncome" in output
+            # Transformed output uses snake_case keys
+            assert "income" in output
+            assert "expenses" in output
+            assert "savings" in output
+            assert "savings_rate" in output
 
     def test_summary_table_format(
         self,
@@ -248,14 +262,15 @@ class TestCashflowSummary:
             # Table format falls back to JSON for non-list data (dicts)
             # This is expected behavior - cashflow summary is a dict, not list
             output = json.loads(result.stdout)
-            assert "sumIncome" in output
+            # Transformed output uses snake_case keys
+            assert "income" in output
 
     def test_summary_csv_format(
         self,
         mock_authenticated_client: MagicMock,
         sample_cashflow_response: dict,
     ) -> None:
-        """Summary with --format csv outputs CSV."""
+        """Summary with --format csv falls back to JSON for dict data."""
 
         async def async_cashflow(**_kwargs):
             return sample_cashflow_response
@@ -272,10 +287,10 @@ class TestCashflowSummary:
             result = runner.invoke(app, ["--format", "csv"])
 
             assert result.exit_code == 0
-            lines = result.stdout.strip().split("\n")
-            assert len(lines) >= 1  # At least header
-            # CSV has field names
-            assert "sumIncome" in result.stdout or "sum_income" in result.stdout
+            # CSV format falls back to JSON for non-list data (dicts)
+            output = json.loads(result.stdout)
+            # Transformed output uses snake_case keys
+            assert "income" in output
 
     def test_summary_help_shows_examples(self) -> None:
         """Summary --help shows examples."""
