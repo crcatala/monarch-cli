@@ -19,9 +19,25 @@ Create minimal output helpers for Phase 1 auth commands. Full output system come
 
 ## Scope (Bootstrap Version)
 For Phase 1, we only need basic output for auth commands:
-- JSON output (default)
+- Human-readable output via Rich console (default)
+- JSON output via `--json` flag
 - Error output to stderr
 - Verbose flag tracking
+
+## Design Philosophy
+
+**Human-readable by default, JSON opt-in.** Auth commands output styled text by default, with `--json` flag for scripts/AI agents:
+
+```bash
+# Default: Human-readable
+monarch auth status
+# ✓ Authenticated
+#   Backend: file
+
+# Opt-in: JSON
+monarch auth status --json
+# {"authenticated": true, "storage_backend": "file", ...}
+```
 
 ## Implementation
 ```python
@@ -39,7 +55,9 @@ class OutputFormat(str, Enum):
     CSV = "csv"
     COMPACT = "compact"
 
-console = Console()
+# Rich console for styled output (uses stderr to keep stdout clean)
+console = Console(stderr=True)
+
 _verbose = False
 
 def set_verbose(v: bool) -> None:
@@ -50,7 +68,7 @@ def is_verbose() -> bool:
     return _verbose
 
 def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
-    """Output data in specified format. Table/CSV support added in Phase 2."""
+    """Output data as JSON to stdout. Used when --json flag is passed."""
     if format == OutputFormat.COMPACT:
         print(json.dumps(data, default=str))
     else:
@@ -61,24 +79,36 @@ def output_error(error: MonarchCLIError) -> None:
     print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
 ```
 
+## Command Pattern
+Auth commands use Rich console for human output, `output()` for JSON:
+
+```python
+@app.command()
+def status(json_output: bool = typer.Option(False, "--json")) -> None:
+    if json_output:
+        output({"authenticated": True, ...}, OutputFormat.JSON)
+    else:
+        console.print("[green]✓ Authenticated[/green]")
+        console.print(f"  Backend: {backend}")
+```
+
 ## Why Bootstrap First?
 - Auth commands need output immediately
 - Full output system (table, CSV, NDJSON) requires more work
 - Phase 2 will expand this with full formatter support
 
 ## Rich Console
-The rich console is initialized for use by auth commands that display interactive content (login prompts, doctor output). The console uses stderr to keep stdout clean for data.
+The Rich console uses stderr to keep stdout clean for data piping. Human-readable output goes to stderr, JSON data goes to stdout.
 
 ## Note on OutputFormat
 The enum includes all formats for forward compatibility, but only JSON and COMPACT work in Phase 1. Phase 2 implements TABLE and CSV.
 
 ## Acceptance Criteria
 
-- [ ] OutputFormat enum with all values
-- [ ] output() function for basic JSON output
-- [ ] output_error() outputs to stderr
-- [ ] Verbose flag getter/setter
-- [ ] Rich console available for interactive output
-- [ ] COMPACT format outputs single-line JSON
-- [ ] JSON format outputs indented JSON
-
+- [x] OutputFormat enum with all values
+- [x] output() function for JSON output (when --json passed)
+- [x] output_error() outputs to stderr
+- [x] Verbose flag getter/setter
+- [x] Rich console available for interactive output
+- [x] Human-readable output as default for auth commands
+- [x] JSON output via --json flag
