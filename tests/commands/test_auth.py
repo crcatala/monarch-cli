@@ -16,8 +16,8 @@ runner = CliRunner()
 class TestAuthStatus:
     """Tests for 'monarch auth status' command."""
 
-    def test_status_human_readable_when_authenticated(self) -> None:
-        """Should show human-readable output by default when authenticated."""
+    def test_status_human_readable_when_authenticated_keyring(self) -> None:
+        """Should show human-readable output with keyring backend."""
         mock_info = {
             "has_env_token": False,
             "has_keyring_token": True,
@@ -35,6 +35,46 @@ class TestAuthStatus:
         # Human-readable output goes to stderr (Rich console)
         assert "Authenticated" in result.stderr
         assert "keyring" in result.stderr
+
+    def test_status_human_readable_shows_file_path(self) -> None:
+        """Should show file path when using file backend."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": True,
+            "has_compat_token": False,
+            "active_backend": "file",
+        }
+        with mock.patch(
+            "monarch_cli.commands.auth.get_storage_info",
+            return_value=mock_info,
+        ):
+            result = runner.invoke(app, ["auth", "status"])
+
+        assert result.exit_code == 0
+        assert "Authenticated" in result.stderr
+        assert "file" in result.stderr
+        assert "session.json" in result.stderr  # Part of the path
+
+    def test_status_human_readable_shows_env_var(self) -> None:
+        """Should show MONARCH_TOKEN when using env backend."""
+        mock_info = {
+            "has_env_token": True,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_compat_token": False,
+            "active_backend": "env",
+        }
+        with mock.patch(
+            "monarch_cli.commands.auth.get_storage_info",
+            return_value=mock_info,
+        ):
+            result = runner.invoke(app, ["auth", "status"])
+
+        assert result.exit_code == 0
+        assert "Authenticated" in result.stderr
+        assert "env" in result.stderr
+        assert "MONARCH_TOKEN" in result.stderr
 
     def test_status_human_readable_when_not_authenticated(self) -> None:
         """Should show human-readable prompt when not authenticated."""

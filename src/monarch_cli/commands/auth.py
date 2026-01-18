@@ -202,7 +202,13 @@ def status(
         # Human-readable output
         if is_authenticated:
             console.print("[green]✓ Authenticated[/green]")
-            console.print(f"  Backend: {storage_info['active_backend']}")
+            backend = storage_info["active_backend"]
+            if backend == "file":
+                console.print(f"  Backend: {backend} ({get_session_path()})")
+            elif backend == "env":
+                console.print(f"  Backend: {backend} (MONARCH_TOKEN)")
+            else:
+                console.print(f"  Backend: {backend}")
         else:
             console.print("[yellow]✗ Not authenticated[/yellow]")
             console.print()
