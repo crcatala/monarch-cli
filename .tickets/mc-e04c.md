@@ -117,3 +117,26 @@ uv publish  # Will prompt for PyPI credentials/token
 - [ ] TestPyPI upload successful
 - [ ] Version tag created
 
+
+## Notes
+
+**2026-01-18T16:17:37Z**
+
+## 🔴 HUMAN CHECKPOINT - Release Decision
+
+This ticket requires human intervention for:
+
+1. **PyPI Token** - Agent cannot publish without credentials
+2. **Name Availability** - Human decides fallback if monarch-cli taken
+3. **Go/No-Go** - Final approval to publish publicly
+
+**Agent can prepare everything**:
+- Build package
+- Test install in clean venv
+- Upload to TestPyPI (if token provided)
+- Generate release notes
+
+**Human must**:
+- Provide PyPI token (or set PYPI_TOKEN env var)
+- Make final publish decision
+- Create GitHub release

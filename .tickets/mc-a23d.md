@@ -65,3 +65,24 @@ This epic covers the entire core infrastructure layer:
 - [ ] MONARCH_TOKEN env var works for CI/automation
 - [ ] All auth errors have proper error codes
 
+
+## Notes
+
+**2026-01-18T16:17:30Z**
+
+## 🔴 HUMAN CHECKPOINT AT END OF EPIC
+
+After Epic 1 is complete, human intervention required:
+
+1. **Run auth login** - provide credentials interactively
+2. **Verify token works** - check `monarch auth ping`
+3. **Sanity check data** - verify `monarch accounts list` shows real accounts
+
+This is the ONLY blocking human checkpoint until PyPI publishing.
+
+After authentication, agents can:
+- Live-test all subsequent features
+- Verify transforms against real API responses
+- Run integration tests
+
+**Recommendation**: Complete this checkpoint immediately after Phase 1 to unblock all subsequent work.
