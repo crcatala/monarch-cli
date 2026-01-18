@@ -20,7 +20,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Plain Output Format (Human-Friendly Default)"
-    status: pending
+    status: done
     ticket: mc-8d99
     acceptance:
       - "OutputFormat.PLAIN added to enum in output/__init__.py"
