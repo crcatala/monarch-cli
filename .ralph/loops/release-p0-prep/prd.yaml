@@ -97,7 +97,7 @@ tasks:
 
   - id: verify-build
     title: "Verify build artifacts and entry point"
-    status: pending
+    status: done
     ticket: mc-c802
     acceptance:
       - "'rm -rf dist/ && uv build' succeeds"

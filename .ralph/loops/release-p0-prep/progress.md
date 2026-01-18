@@ -34,3 +34,15 @@
 - Files changed: pyproject.toml, uv.lock
 - **Learnings:** None - straightforward dependency addition
 ---
+
+## [2026-01-18 15:13] - verify-build (mc-c802)
+- Verified complete build-to-install cycle for PyPI package
+- Clean build with `uv build` creates wheel and sdist successfully
+- Wheel contains all 39 expected files (monarch_cli modules, py.typed, dist-info)
+- METADATA contains license (MIT), classifiers, keywords, project URLs
+- `pip install dist/*.whl --force-reinstall` installs cleanly
+- `monarch --version` shows 0.1.0, `--help` shows all 6 commands
+- `monarch auth --help` shows all 6 auth subcommands
+- Files changed: None (verification only task)
+- **Learnings:** Build artifacts in dist/ are not tracked by git; pip install --force-reinstall is needed to replace an existing installation
+---
