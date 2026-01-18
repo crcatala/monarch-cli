@@ -51,7 +51,7 @@ The MCP server is just a thin wrapper (~300 LOC) around `monarchmoney` with keyr
 - **API Client**: `monarchmoneycommunity` library (imported as `monarchmoney`)
 - **Auth**: Dual-backend token storage - OS keyring (secure, default) or session file (portable)
 - **Output**: JSON (default), table, CSV, compact, NDJSON for streaming
-- **Config**: TOML with XDG/platformdirs support
+- **Config**: Environment variables with XDG/platformdirs support
 - **Testing**: pytest with CliRunner (live tests for local dev only)
 
 ---
@@ -82,8 +82,9 @@ Based on [clig.dev](https://clig.dev) guidelines and the [TypeScript CLI Playboo
 
 1. CLI flags (`--format json`)
 2. Environment variables (`MONARCH_FORMAT=json`)
-3. User config (`~/.config/monarch-cli/config.toml` via platformdirs)
-4. Defaults
+3. Defaults
+
+> **Note:** TOML config file support (`~/.config/monarch-cli/config.toml`) deferred to v1.1. Environment variables are sufficient for MVP.
 
 ### Global Flags (all commands)
 
@@ -97,8 +98,9 @@ Based on [clig.dev](https://clig.dev) guidelines and the [TypeScript CLI Playboo
 | `--raw` | bool | false | Output raw API response without transforms |
 | `--no-color` | bool | false | Disable colors (also respects `NO_COLOR` env) |
 | `--quiet, -q` | bool | false | Minimal output (IDs only) |
-| `--no-cache` | bool | false | Bypass cache for this request |
 | `--dry-run` | bool | false | Preview operation without executing (mutations) |
+
+> **Deferred to v1.1:** `--no-cache` (when caching is implemented)
 
 ### Secrets Handling ⚠️
 
@@ -377,10 +379,7 @@ dependencies = [
     "keyring>=24.0.0",
     "rich>=13.0.0",
     "platformdirs>=4.0.0",
-    "tomli>=2.0.0;python_version<'3.11'",
-    "tomli-w>=1.0.0",
     "httpx>=0.27.0",  # For retry/timeout handling
-    "jmespath>=1.0.0",  # For --query support
 ]
 
 [project.optional-dependencies]
@@ -452,7 +451,7 @@ warn_redundant_casts = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["monarchmoney.*", "keyring.*", "jmespath.*"]
+module = ["monarchmoney.*", "keyring.*"]
 ignore_missing_imports = true
 
 # ============================================
@@ -500,8 +499,7 @@ monarch-cli/
 │       │   ├── transactions.py
 │       │   ├── budgets.py
 │       │   ├── cashflow.py
-│       │   ├── categories.py
-│       │   └── config.py        # Config management commands
+│       │   └── categories.py
 │       ├── core/                # Infrastructure
 │       │   ├── __init__.py
 │       │   ├── adapter.py       # Isolates monarchmoney private details
@@ -925,7 +923,7 @@ uv publish --repository testpypi  # Publish to test PyPI
 
 Use the complete `pyproject.toml` from the [Python Ecosystem Conventions](#python-ecosystem-conventions) section above. Key points:
 
-- **Runtime deps:** typer, monarchmoneycommunity, keyring, rich, platformdirs, httpx, jmespath
+- **Runtime deps:** typer, monarchmoneycommunity, keyring, rich, platformdirs, httpx
 - **Dev deps:** pytest, pytest-asyncio, pytest-cov, ruff, mypy
 - **Tool configs:** All in pyproject.toml (ruff, mypy, pytest, coverage)
 
@@ -1103,7 +1101,7 @@ class NetworkError(MonarchCLIError):
 """Decorator for consistent error handling across commands."""
 
 import functools
-import sys
+import typer
 from typing import Callable, TypeVar, ParamSpec
 
 from .exceptions import (
@@ -1121,7 +1119,10 @@ R = TypeVar("R")
 
 
 def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
-    """Decorator that catches exceptions and outputs consistent errors."""
+    """Decorator that catches exceptions and outputs consistent errors.
+    
+    Uses typer.Exit() instead of sys.exit() for better testability.
+    """
 
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -1129,18 +1130,13 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
             return func(*args, **kwargs)
         except MonarchCLIError as e:
             output_error(e)
-            sys.exit(e.exit_code)
-        except RuntimeError as e:
-            if "Not authenticated" in str(e):
-                output_error(AuthenticationError())
-                sys.exit(1)
-            raise
+            raise typer.Exit(e.exit_code)
         except Exception as e:
             if is_verbose():
                 import traceback
                 traceback.print_exc()
             output_error(MonarchCLIError(f"Unexpected error: {e}"))
-            sys.exit(1)
+            raise typer.Exit(1)
 
     return wrapper
 ```
@@ -1201,10 +1197,10 @@ def save_session_token(token: str, backend: StorageBackend = StorageBackend.KEYR
         # Atomic write: write to temp, then rename
         fd, tmp_path = tempfile.mkstemp(dir=session_path.parent, suffix=".tmp")
         try:
-            os.chmod(fd, 0o600)  # Strict permissions before writing
+            os.fchmod(fd, 0o600)  # Strict permissions before writing
             with os.fdopen(fd, "w") as f:
                 json.dump({"token": token}, f)
-            os.rename(tmp_path, session_path)
+            os.replace(tmp_path, session_path)  # Atomic replace
         except Exception:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -1218,8 +1214,20 @@ def save_session_token(token: str, backend: StorageBackend = StorageBackend.KEYR
 
 
 def get_session_token() -> str | None:
-    """Retrieve token, checking keyring first, then file, then compat."""
-    # Try keyring first
+    """Retrieve token.
+
+    Precedence (highest to lowest):
+      1) MONARCH_TOKEN env var (best for CI/agents)
+      2) Keyring
+      3) JSON session file
+      4) Legacy compat pickle (if enabled)
+    """
+    # 1) Env var (explicit override for CI/agents)
+    env_token = os.environ.get("MONARCH_TOKEN")
+    if env_token:
+        return env_token
+
+    # 2) Try keyring
     try:
         token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
         if token:
@@ -1252,6 +1260,8 @@ def get_session_token() -> str | None:
 
 def get_storage_info() -> dict:
     """Get info about where token is stored."""
+    env_token = os.environ.get("MONARCH_TOKEN")
+    
     keyring_token = None
     try:
         keyring_token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
@@ -1262,7 +1272,10 @@ def get_storage_info() -> dict:
     file_exists = session_path.exists()
     compat_exists = COMPAT_SESSION_PATH.exists()
 
-    if keyring_token:
+    # Determine active backend (matches get_session_token() precedence)
+    if env_token:
+        active = "env"
+    elif keyring_token:
         active = StorageBackend.KEYRING
     elif file_exists:
         active = StorageBackend.FILE
@@ -1272,10 +1285,11 @@ def get_storage_info() -> dict:
         active = None
 
     return {
+        "has_env_token": env_token is not None,
         "has_keyring_token": keyring_token is not None,
         "has_file_token": file_exists,
         "has_compat_token": compat_exists,
-        "active_backend": active.value if active else None,
+        "active_backend": active if isinstance(active, str) else (active.value if active else None),
         "file_path": str(session_path),
         "compat_path": str(COMPAT_SESSION_PATH),
     }
@@ -1524,14 +1538,16 @@ def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
         print(json.dumps(data, indent=2, default=str))
 
 def output_error(error: MonarchCLIError) -> None:
-    """Output structured error for AI agents."""
-    print(json.dumps(error.to_dict(), indent=2))
+    """Output structured error for AI agents to stderr."""
+    print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
 
 def error(message: str, exit_code: int = 1) -> None:
     """Print error and exit."""
     console.print(f"[red]Error:[/red] {message}", file=sys.stderr)
     sys.exit(exit_code)
 ```
+
+> **Note:** This is a minimal bootstrap version for Phase 1. Phase 2 expands this with table/CSV/NDJSON support.
 
 ### 1.9 Main Entry Point (Auth Only)
 
@@ -1686,6 +1702,7 @@ def doctor():
     # Check storage info
     info = get_storage_info()
     console.print(f"\n[bold]Token Storage:[/bold]")
+    console.print(f"  Env var: {'[green]set[/green]' if info['has_env_token'] else '[dim]not set[/dim]'} (MONARCH_TOKEN)")
     console.print(f"  Keyring: {'[green]present[/green]' if info['has_keyring_token'] else '[dim]empty[/dim]'}")
     console.print(f"  File: {'[green]present[/green]' if info['has_file_token'] else '[dim]empty[/dim]'} ({info['file_path']})")
     console.print(f"  Compat: {'[yellow]present[/yellow]' if info['has_compat_token'] else '[dim]empty[/dim]'} ({info['compat_path']})")
@@ -1875,8 +1892,11 @@ def print_csv(items: list[dict]) -> None:
     print(output_io.getvalue(), end="")
 
 def output_error(error: MonarchCLIError) -> None:
-    """Output structured error for AI agents."""
-    print(json.dumps(error.to_dict(), indent=2))
+    """Output structured error for AI agents to stderr.
+    
+    Errors go to stderr to preserve clean stdout for piping.
+    """
+    print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
 
 def error(message: str, exit_code: int = 1) -> None:
     """Print error and exit."""
@@ -1927,32 +1947,19 @@ def spinner(message: str) -> Generator[None, None, None]:
         yield
 ```
 
-### 2.3 JMESPath Query Support
-
-```python
-# src/monarch_cli/output/query.py
-"""JMESPath query support for flexible data extraction."""
-
-import jmespath
-from typing import Any
-
-
-def apply_query(data: Any, query: str | None) -> Any:
-    """Apply JMESPath query to data if provided."""
-    if query is None:
-        return data
-    return jmespath.search(query, data)
-```
-
-### 2.4 Deliverables
+### 2.3 Deliverables
 - [ ] JSON output (default, pretty-printed)
 - [ ] Compact output (single-line JSON for piping)
 - [ ] Table output (rich tables for human reading)
 - [ ] CSV output (for spreadsheet import)
 - [ ] NDJSON streaming (for large lists)
 - [ ] Progress spinners (TTY-aware)
-- [ ] JMESPath query support
 - [ ] Error messages to stderr with exit codes
+
+> **Note:** JMESPath query support (`--query` flag) deferred to v1.1. Use `jq` for JSON filtering instead:
+> ```bash
+> monarch accounts list | jq '[.[] | select(.balance > 1000)]'
+> ```
 
 ---
 
@@ -2055,7 +2062,6 @@ from ..core.error_handler import handle_errors
 from ..services import accounts as account_service
 from ..output import output, OutputFormat
 from ..output.progress import spinner
-from ..output.query import apply_query
 
 app = typer.Typer(help="Account management")
 
@@ -2064,7 +2070,6 @@ app = typer.Typer(help="Account management")
 @handle_errors
 def list_accounts(
     format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f"),
-    query: Optional[str] = typer.Option(None, "--query", "-q", help="JMESPath query"),
     ndjson: bool = typer.Option(False, "--ndjson", help="Stream as newline-delimited JSON"),
     raw: bool = typer.Option(False, "--raw", help="Output raw API response"),
 ):
@@ -2073,7 +2078,7 @@ def list_accounts(
     Examples:
         monarch accounts list
         monarch accounts list -f table
-        monarch accounts list --query "[?is_active].{name:name, balance:balance}"
+        monarch accounts list | jq '[.[] | select(.is_active)]'
     """
     with spinner("Fetching accounts..."):
         if raw:
@@ -2084,7 +2089,6 @@ def list_accounts(
         else:
             result = account_service.list_accounts()
 
-    result = apply_query(result, query)
     output(result, format, ndjson=ndjson, raw=raw)
 
 
@@ -2102,7 +2106,7 @@ def refresh():
 monarch accounts list                    # List all accounts (JSON)
 monarch accounts list -f table           # List as table
 monarch accounts list -f csv > accounts.csv  # Export to CSV
-monarch accounts list --query "[?balance>1000]"  # Filter with JMESPath
+monarch accounts list | jq '[.[] | select(.balance > 1000)]'  # Filter with jq
 monarch accounts refresh                 # Trigger bank sync
 ```
 
@@ -2119,7 +2123,6 @@ from ..core.dates import DatePreset, parse_date_range
 from ..transformers.transactions import transform_transactions
 from ..output import output, OutputFormat
 from ..output.progress import spinner
-from ..output.query import apply_query
 
 app = typer.Typer(help="Transaction management")
 
@@ -2137,7 +2140,6 @@ def list_transactions(
     account_id: Optional[str] = typer.Option(None, "--account", "-a", help="Filter by account ID"),
     search: Optional[str] = typer.Option(None, "--search", help="Search transactions"),
     format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f"),
-    query: Optional[str] = typer.Option(None, "--query", "-q", help="JMESPath query"),
     ndjson: bool = typer.Option(False, "--ndjson", help="Stream as newline-delimited JSON"),
     raw: bool = typer.Option(False, "--raw", help="Output raw API response"),
 ):
@@ -2166,7 +2168,6 @@ def list_transactions(
     if not raw:
         result = transform_transactions(result)
 
-    result = apply_query(result, query)
     output(result, format, ndjson=ndjson, raw=raw)
 
 
@@ -2350,92 +2351,25 @@ def list_categories(
     output(result, format)
 ```
 
-### 3.8 Config Commands
+### 3.8 Config Commands (Deferred to v1.1)
 
-```python
-# src/monarch_cli/commands/config.py
-"""Configuration management commands."""
+> **Note:** `monarch config` commands (show, set, path) deferred to v1.1 along with TOML config file support.
+> For MVP, use environment variables for configuration.
 
-import typer
-from ..core.config import get_config, CONFIG_FILE
-from ..output import output, OutputFormat, console
-
-app = typer.Typer(help="Configuration management")
-
-
-@app.command("show")
-def show_config(
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
-):
-    """Show current configuration (secrets redacted)."""
-    config = get_config()
-    output({
-        "format": config.format.value,
-        "color": config.color,
-        "verbose": config.verbose,
-        "timeout_seconds": config.timeout_seconds,
-        "max_retries": config.max_retries,
-        "confirm_destructive": config.confirm_destructive,
-        "config_file": str(CONFIG_FILE),
-        "config_file_exists": CONFIG_FILE.exists(),
-    }, format)
-
-
-@app.command("set")
-def set_config(
-    key: str = typer.Argument(..., help="Config key to set"),
-    value: str = typer.Argument(..., help="Value to set"),
-):
-    """Set a configuration value.
-    
-    Examples:
-        monarch config set format table
-        monarch config set timeout_seconds 60
-    """
-    config = get_config()
-
-    if key == "format":
-        from ..output import OutputFormat
-        config.format = OutputFormat(value.lower())
-    elif key == "timeout_seconds":
-        config.timeout_seconds = int(value)
-    elif key == "max_retries":
-        config.max_retries = int(value)
-    elif key == "confirm_destructive":
-        config.confirm_destructive = value.lower() in ("true", "1", "yes")
-    else:
-        console.print(f"[red]Unknown config key: {key}[/red]")
-        raise typer.Exit(2)
-
-    config.save()
-    console.print(f"[green]Set {key} = {value}[/green]")
-
-
-@app.command("path")
-def config_path():
-    """Show config file path."""
-    print(CONFIG_FILE)
-```
-
-### 3.9 Configuration System
+### 3.9 Configuration System (Environment-based for MVP)
 
 ```python
 # src/monarch_cli/core/config.py
-"""Configuration management with proper precedence."""
+"""Configuration via environment variables (MVP).
+
+TOML config file support deferred to v1.1.
+"""
 
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import platformdirs
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
-
-import tomli_w
 
 from ..output import OutputFormat
 
@@ -2446,9 +2380,6 @@ def get_config_dir() -> Path:
     if override:
         return Path(override)
     return Path(platformdirs.user_config_dir("monarch-cli"))
-
-
-CONFIG_FILE = get_config_dir() / "config.toml"
 
 
 @dataclass
@@ -2464,41 +2395,9 @@ class Config:
 
     @classmethod
     def load(cls) -> "Config":
-        """Load config with precedence: env vars > file > defaults."""
+        """Load config from environment variables."""
         config = cls()
 
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, "rb") as f:
-                    file_config = tomllib.load(f)
-                config = cls._apply_dict(config, file_config)
-            except Exception:
-                pass
-
-        config = cls._apply_env(config)
-        return config
-
-    @classmethod
-    def _apply_dict(cls, config: "Config", data: dict[str, Any]) -> "Config":
-        if "format" in data:
-            try:
-                config.format = OutputFormat(data["format"])
-            except ValueError:
-                pass
-        if "color" in data:
-            config.color = bool(data["color"])
-        if "verbose" in data:
-            config.verbose = bool(data["verbose"])
-        if "timeout_seconds" in data:
-            config.timeout_seconds = int(data["timeout_seconds"])
-        if "max_retries" in data:
-            config.max_retries = int(data["max_retries"])
-        if "confirm_destructive" in data:
-            config.confirm_destructive = bool(data["confirm_destructive"])
-        return config
-
-    @classmethod
-    def _apply_env(cls, config: "Config") -> "Config":
         if fmt := os.environ.get("MONARCH_FORMAT"):
             try:
                 config.format = OutputFormat(fmt.lower())
@@ -2527,19 +2426,6 @@ class Config:
 
         return config
 
-    def save(self) -> None:
-        """Save current config to file."""
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, "wb") as f:
-            tomli_w.dump({
-                "format": self.format.value,
-                "color": self.color,
-                "verbose": self.verbose,
-                "timeout_seconds": self.timeout_seconds,
-                "max_retries": self.max_retries,
-                "confirm_destructive": self.confirm_destructive,
-            }, f)
-
 
 _config: Config | None = None
 
@@ -2565,7 +2451,7 @@ app = typer.Typer(
 )
 
 # Import and register all command groups
-from .commands import auth, accounts, transactions, budgets, cashflow, categories, config
+from .commands import auth, accounts, transactions, budgets, cashflow, categories
 
 app.add_typer(auth.app, name="auth")
 app.add_typer(accounts.app, name="accounts")
@@ -2573,7 +2459,7 @@ app.add_typer(transactions.app, name="transactions")
 app.add_typer(budgets.app, name="budgets")
 app.add_typer(cashflow.app, name="cashflow")
 app.add_typer(categories.app, name="categories")
-app.add_typer(config.app, name="config")
+# Note: config commands deferred to v1.1
 
 if __name__ == "__main__":
     app()
@@ -2621,7 +2507,6 @@ monarch --install-completion fish
 - [ ] `monarch categories list` returns categories
 - [ ] JSON, table, CSV output working
 - [ ] Date presets working (`--preset this-month`)
-- [ ] JMESPath queries working (`--query`)
 - [ ] Dry run mode working
 - [ ] Error messages are helpful with error codes
 
@@ -2714,8 +2599,8 @@ README should include:
 | `monarch categories list` | List categories (for IDs) | `get_transaction_categories()` |
 | `monarch budgets list` | Get budget status | `get_budgets()` |
 | `monarch cashflow summary` | Income/expense totals | `get_cashflow_summary()` |
-| `monarch config show` | Show configuration | (local) |
-| `monarch config set` | Set configuration | (local) |
+
+> **Deferred to v1.1:** `monarch config` commands
 
 ### Global Options
 
@@ -2724,12 +2609,12 @@ README should include:
 | `--format, -f` | Output format: json (default), table, csv, compact |
 | `--ndjson` | Stream results as newline-delimited JSON |
 | `--raw` | Output raw API response without transforms |
-| `--query, -q` | JMESPath query for data extraction |
 | `--quiet` | Minimal output (IDs only) |
 | `--dry-run` | Preview operation without executing |
-| `--no-cache` | Bypass cache (when caching enabled) |
 | `--help` | Show help for any command |
 | `--version` | Show version |
+
+> **Deferred to v1.1:** `--query` (use `jq` instead), `--no-cache`
 
 ---
 
@@ -2760,7 +2645,7 @@ Phase 0 (Setup) ──► Phase 1 (Auth + Core Utils) ──► 🔑 USER AUTH
 - Login and authentication works (dual-backend: keyring + file)
 - Priority 1 commands: accounts, transactions, budgets, cashflow, categories
 - JSON, table, CSV output formats
-- Date presets and JMESPath queries
+- Date presets (use `jq` for JSON filtering)
 - Robust error handling with error codes
 - Progress spinners for long operations
 - Shell completions
@@ -2827,16 +2712,9 @@ Phase 0 (Setup) ──► Phase 1 (Auth + Core Utils) ──► 🔑 USER AUTH
 | `MONARCH_SESSION_PATH` | Override session file path | `/custom/session.json` |
 | `NO_COLOR` | Disable colors (standard) | `1` |
 
-### Config File (~/.config/monarch-cli/config.toml)
+### Config File (Deferred to v1.1)
 
-```toml
-format = "json"
-color = true
-verbose = false
-timeout_seconds = 30
-max_retries = 3
-confirm_destructive = true
-```
+> **Note:** TOML config file support deferred to v1.1. Use environment variables above for MVP configuration.
 
 ---
 
@@ -2858,7 +2736,6 @@ confirm_destructive = true
 - [Rich](https://rich.readthedocs.io/) - Terminal formatting
 - [Keyring](https://keyring.readthedocs.io/) - Credential storage
 - [platformdirs](https://platformdirs.readthedocs.io/) - Cross-platform paths
-- [JMESPath](https://jmespath.org/) - JSON query language
 
 ### Python Tooling
 - [uv](https://docs.astral.sh/uv/) - Fast Python package manager
