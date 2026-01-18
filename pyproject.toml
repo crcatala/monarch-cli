@@ -46,4 +46,7 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "live: marks tests that hit the real Monarch Money API (excluded in CI)",
+]
 
