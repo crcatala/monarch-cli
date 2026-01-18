@@ -170,37 +170,49 @@ def login(
 @app.command()
 @handle_errors
 def status(
-    fmt: Annotated[
-        OutputFormat,
+    json_output: Annotated[
+        bool,
         typer.Option(
-            "-f",
-            "--format",
-            help="Output format",
+            "--json",
+            help="Output as JSON (for scripts and AI agents)",
         ),
-    ] = OutputFormat.JSON,
+    ] = False,
 ) -> None:
     """Show current authentication status.
 
-    Returns JSON with authenticated state, storage backend in use,
-    and a human-readable message.
-
     Examples:
-        monarch auth status              # Check if authenticated
-        monarch auth status -f compact   # Compact JSON output
+        monarch auth status              # Human-readable output
+        monarch auth status --json       # JSON output for scripts
     """
     storage_info = get_storage_info()
     is_authenticated = storage_info["active_backend"] is not None
 
-    result = {
-        "authenticated": is_authenticated,
-        "storage_backend": storage_info["active_backend"],
-        "message": (
-            "Authenticated and ready"
-            if is_authenticated
-            else "Not authenticated. Run 'monarch auth login' to authenticate."
-        ),
-    }
-    output(result, fmt)
+    if json_output:
+        result = {
+            "authenticated": is_authenticated,
+            "storage_backend": storage_info["active_backend"],
+            "message": (
+                "Authenticated and ready"
+                if is_authenticated
+                else "Not authenticated. Run 'monarch auth login' to authenticate."
+            ),
+        }
+        output(result, OutputFormat.JSON)
+    else:
+        # Human-readable output
+        if is_authenticated:
+            console.print("[green]✓ Authenticated[/green]")
+            backend = storage_info["active_backend"]
+            if backend == "file":
+                console.print(f"  Backend: {backend} ({get_session_path()})")
+            elif backend == "env":
+                console.print(f"  Backend: {backend} (MONARCH_TOKEN)")
+            else:
+                console.print(f"  Backend: {backend}")
+        else:
+            console.print("[yellow]✗ Not authenticated[/yellow]")
+            console.print()
+            console.print("Run [cyan]monarch auth login[/cyan] to authenticate.")
 
 
 @app.command()
@@ -318,14 +330,13 @@ def doctor() -> None:
 @app.command()
 @handle_errors
 def ping(
-    fmt: Annotated[
-        OutputFormat,
+    json_output: Annotated[
+        bool,
         typer.Option(
-            "-f",
-            "--format",
-            help="Output format",
+            "--json",
+            help="Output as JSON (for scripts and AI agents)",
         ),
-    ] = OutputFormat.JSON,
+    ] = False,
 ) -> None:
     """Test API connectivity.
 
@@ -333,19 +344,26 @@ def ping(
     Requires being logged in first.
 
     Examples:
-        monarch auth ping
-        monarch auth ping -f compact
+        monarch auth ping                # Human-readable output
+        monarch auth ping --json         # JSON output for scripts
     """
     client = get_authenticated_client()
 
     try:
         accounts_data = run_async(client.get_accounts())
         accounts = accounts_data.get("accounts", [])
-        result = {
-            "status": "ok",
-            "message": f"Connected successfully. {len(accounts)} accounts available.",
-        }
-        output(result, fmt)
+        account_count = len(accounts)
+
+        if json_output:
+            result = {
+                "status": "ok",
+                "message": f"Connected successfully. {account_count} accounts available.",
+            }
+            output(result, OutputFormat.JSON)
+        else:
+            # Human-readable output
+            console.print("[green]✓ Connected[/green]")
+            console.print(f"  Accounts: {account_count}")
     except Exception as e:
         raise APIError(f"API request failed: {e}") from e
 
