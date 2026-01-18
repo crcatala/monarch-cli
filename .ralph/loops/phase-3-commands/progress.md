@@ -204,3 +204,16 @@ After this loop, the CLI should be feature-complete for MVP:
 - **Learnings:** None new - straightforward documentation update using Rich console printing
 
 ---
+
+## [2026-01-18 12:08] - Shell Completions Documentation
+- Added "Shell Completions" section to README.md
+- Documents `monarch --install-completion bash`
+- Documents `monarch --install-completion zsh`
+- Documents `monarch --install-completion fish`
+- Includes instructions to restart shell or source config
+- Added example of verifying completions work
+- Files changed:
+  - `README.md`
+- **Learnings:** Typer provides built-in completion support via `--install-completion` and `--show-completion` flags. No code needed, just documentation.
+
+---

@@ -244,7 +244,7 @@ tasks:
       when MONARCH_TOKEN is appropriate (CI/CD with proper secret injection).
 
   - title: "Shell Completions Documentation"
-    status: pending
+    status: done
     ticket: mc-f917
     acceptance:
       - "README.md has Shell Completions section"
