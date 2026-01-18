@@ -41,7 +41,7 @@ tasks:
       ```
 
   - title: "Progress Indicators"
-    status: pending
+    status: done
     ticket: mc-3f7c
     acceptance:
       - "src/monarch_cli/output/progress.py exists"
