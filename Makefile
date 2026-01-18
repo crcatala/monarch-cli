@@ -1,4 +1,4 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test
+.PHONY: setup verify format format-check lint lint-fix typecheck test release release-dry
 
 # Setup development environment (run once after cloning)
 setup:
@@ -39,3 +39,11 @@ test:
 # Run live tests only (requires MONARCH_LIVE_TESTS=1 and valid credentials)
 test-live:
 	MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live -v
+
+# Create GitHub release with tag and changelog
+release:
+	./scripts/release.sh
+
+# Dry-run release to see what would happen
+release-dry:
+	./scripts/release.sh --dry-run
