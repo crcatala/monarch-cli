@@ -19,7 +19,7 @@ pre_commit: "make verify"
 tasks:
   - id: fix-urls
     title: "Fix placeholder URLs in README and CHANGELOG"
-    status: pending
+    status: done
     ticket: mc-27a3
     acceptance:
       - "README.md line ~372 has correct GitHub clone URL (not 'yourusername')"
