@@ -189,3 +189,18 @@ After this loop, the CLI should be feature-complete for MVP:
   - `--no-color` flag works via module-level override in plain.py
 
 ---
+
+## [2026-01-18 12:06] - MONARCH_TOKEN Security Documentation
+- Updated `monarch auth setup` command with comprehensive Security Considerations section
+- Documents keyring as most secure (OS-level encryption, protected by login credentials)
+- Documents file storage as moderate security (0600 permissions, plaintext)
+- Documents MONARCH_TOKEN env var risks explicitly (process listings, shell logs, child processes)
+- Added CI/CD secret injection guidance for:
+  - GitHub Actions (secrets.MONARCH_TOKEN)
+  - GitLab CI (masked CI/CD variables)
+  - Docker/containers (runtime injection, secrets managers)
+- Files changed:
+  - `src/monarch_cli/commands/auth.py`
+- **Learnings:** None new - straightforward documentation update using Rich console printing
+
+---

@@ -226,7 +226,7 @@ tasks:
       ```
 
   - title: "MONARCH_TOKEN Security Documentation"
-    status: pending
+    status: done
     ticket: mc-da1f
     acceptance:
       - "`monarch auth setup` shows Security Considerations section"
