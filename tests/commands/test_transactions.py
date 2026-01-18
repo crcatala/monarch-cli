@@ -592,3 +592,248 @@ class TestTransactionsApp:
         result = runner.invoke(app, ["invalid"])
 
         assert result.exit_code != 0
+
+
+class TestTransactionsBatchUpdate:
+    """Tests for the transactions batch-update command."""
+
+    def test_batch_update_with_category(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update applies category to multiple transactions."""
+        update_calls: list[dict] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app, ["batch-update", "txn_123", "txn_456", "--category", "cat_food"]
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "completed"
+            assert output["success_count"] == 2
+            assert output["failure_count"] == 0
+            assert output["changes"]["category_id"] == "cat_food"
+            assert len(update_calls) == 2
+
+    def test_batch_update_with_notes(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update applies notes to multiple transactions."""
+        update_calls: list[dict] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["batch-update", "txn_123", "--notes", "Q1 Expenses"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "completed"
+            assert output["success_count"] == 1
+            assert output["changes"]["notes"] == "Q1 Expenses"
+
+    def test_batch_update_with_stdin(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update reads IDs from stdin."""
+        update_calls: list[dict] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["batch-update", "--stdin", "--category", "cat_123"],
+                input="txn_001\ntxn_002\ntxn_003\n",
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["success_count"] == 3
+            assert len(update_calls) == 3
+
+    def test_batch_update_stdin_skips_empty_lines(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update skips empty lines from stdin."""
+        update_calls: list[dict] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["batch-update", "--stdin", "--category", "cat_123"],
+                input="txn_001\n\ntxn_002\n\n",
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["success_count"] == 2
+            assert len(update_calls) == 2
+
+    def test_batch_update_dry_run(self) -> None:
+        """Batch update dry-run shows preview without applying."""
+        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+            result = runner.invoke(
+                app,
+                ["batch-update", "txn_123", "txn_456", "--category", "cat_food", "--dry-run"],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "dry_run"
+            assert output["transaction_count"] == 2
+            assert output["transaction_ids"] == ["txn_123", "txn_456"]
+            assert output["changes"]["category_id"] == "cat_food"
+            assert "Would update 2 transaction(s)" in output["message"]
+
+    def test_batch_update_handles_partial_failures(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update continues on partial failures."""
+        call_count = 0
+
+        async def async_update_transaction(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Fail on second transaction
+            if kwargs.get("transaction_id") == "txn_456":
+                raise Exception("API error: transaction not found")
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["batch-update", "txn_123", "txn_456", "txn_789", "--category", "cat_food"],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "completed"
+            assert output["success_count"] == 2
+            assert output["failure_count"] == 1
+            assert output["failures"] is not None
+            assert len(output["failures"]) == 1
+            assert output["failures"][0]["id"] == "txn_456"
+            assert "API error" in output["failures"][0]["error"]
+
+    def test_batch_update_no_ids_shows_error(self) -> None:
+        """Batch update with no IDs shows error."""
+        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+            result = runner.invoke(app, ["batch-update", "--category", "cat_123"])
+
+            assert result.exit_code == 1
+            output = json.loads(result.stdout)
+            assert output["status"] == "error"
+            assert "No transaction IDs provided" in output["message"]
+
+    def test_batch_update_no_changes_shows_error(self) -> None:
+        """Batch update without changes shows error."""
+        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+            result = runner.invoke(app, ["batch-update", "txn_123"])
+
+            assert result.exit_code == 1
+            output = json.loads(result.stdout)
+            assert output["status"] == "error"
+            assert "No changes specified" in output["message"]
+
+    def test_batch_update_both_args_and_stdin(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch update combines argument IDs and stdin IDs."""
+        update_calls: list[dict] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["batch-update", "txn_arg1", "--stdin", "--category", "cat_123"],
+                input="txn_stdin1\ntxn_stdin2\n",
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["success_count"] == 3
+            assert len(update_calls) == 3
+
+    def test_batch_update_help_shows_examples(self) -> None:
+        """Batch update --help shows examples."""
+        result = runner.invoke(app, ["batch-update", "--help"])
+
+        assert result.exit_code == 0
+        import re
+
+        output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+        assert "batch-update" in output.lower()
+        assert "--stdin" in output
+        assert "--category" in output
+        assert "--dry-run" in output

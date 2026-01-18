@@ -28,6 +28,18 @@ The `output()` function checks module flags but parameters can override them.
 - **Learnings:** The quiet mode implementation uses module-level flag pattern consistent with verbose/debug flags. The `output()` function handles quiet mode before checking format, giving it precedence.
 ---
 
+## [2026-01-18 13:04] - Batch Operations (transactions batch-update)
+- Implemented `monarch transactions batch-update` command for bulk transaction updates
+- Accepts IDs via arguments or `--stdin` flag (can combine both)
+- Supports `--category/-c` and `--notes/-n` to set values on all transactions
+- Uses `asyncio.Semaphore` for concurrency control (`--max-concurrency`, default 4)
+- Supports `--dry-run` to preview changes without applying
+- Reports summary with success_count, failure_count, and any errors
+- Gracefully handles partial failures (continues with remaining transactions)
+- Files changed: `src/monarch_cli/commands/transactions.py`, `tests/commands/test_transactions.py`
+- **Learnings:** The `asyncio.gather()` with individual try/except in each task allows graceful partial failure handling. The semaphore pattern limits concurrent API calls effectively.
+---
+
 ## Issues Encountered
 
 (none)

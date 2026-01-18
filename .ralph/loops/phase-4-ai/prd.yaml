@@ -38,7 +38,7 @@ tasks:
       ```
 
   - title: "Batch Operations (transactions batch-update)"
-    status: pending
+    status: done
     ticket: mc-6397
     acceptance:
       - "`monarch transactions batch-update` command added"
