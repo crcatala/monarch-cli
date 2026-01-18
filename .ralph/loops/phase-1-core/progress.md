@@ -62,9 +62,41 @@ delete_session_token()  # all
 delete_session_token(StorageBackend.KEYRING)  # specific
 ```
 
+### Retry Pattern
+```python
+from monarch_cli.core.retry import with_retry
+from monarch_cli.core.async_utils import run_async
+
+# Basic retry (uses defaults: 3 retries, exponential backoff with jitter)
+result = run_async(with_retry(lambda: client.get_accounts()))
+
+# Custom retry settings
+result = run_async(with_retry(
+    lambda: client.get_accounts(),
+    max_retries=5,
+    base_delay=0.5,
+    max_delay=60.0,
+    jitter=True,
+))
+
+# Note: coro_factory is a lambda/callable that RETURNS a coroutine
+# This allows fresh coroutine creation for each retry attempt
+```
+
 ---
 
 ## Completed Tasks
+
+## [2026-01-18 09:12] - mc-79ca (Retry Logic with Exponential Backoff)
+- Created with_retry[T]() async function using PEP 695 type parameters
+- RETRYABLE_EXCEPTIONS tuple: ConnectionError, TimeoutError, OSError
+- Exponential backoff: delay = min(base_delay * 2^attempt, max_delay)
+- Jitter adds randomness (0.75 to 1.25 multiplier) to prevent thundering herd
+- Raises NetworkError with details after max_retries exceeded
+- Uses coro_factory pattern (callable returning coroutine) for retryability
+- Files changed: `src/monarch_cli/core/retry.py`
+- **Learnings:** Use keyword-only args (after `*`) for optional parameters with defaults to improve API clarity and prevent positional arg mistakes
+---
 
 ## [2026-01-18 09:11] - mc-dcbf (Async Utilities Module)
 - Created run_async[T]() generic function using PEP 695 type parameters
