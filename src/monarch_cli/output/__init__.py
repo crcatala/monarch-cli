@@ -2,7 +2,8 @@
 Full output system for monarch-cli.
 
 Supports multiple output formats:
-- JSON (pretty, indented)
+- PLAIN (human-friendly with emoji icons, TTY default)
+- JSON (pretty, indented, piped default)
 - COMPACT (single-line JSON)
 - TABLE (Rich table for human reading)
 - CSV (spreadsheet export)
@@ -18,11 +19,13 @@ from rich.console import Console
 from rich.table import Table
 
 from ..core.exceptions import MonarchCLIError
+from .plain import format_plain, should_use_color
 
 
 class OutputFormat(str, Enum):
     """Output format options."""
 
+    PLAIN = "plain"
     JSON = "json"
     TABLE = "table"
     CSV = "csv"
@@ -38,6 +41,12 @@ _stdout_console = Console()
 # Module-level verbose flag
 _verbose = False
 
+# Module-level debug flag (implies verbose)
+_debug = False
+
+# Module-level default format override (set by --json global flag)
+_default_format_override: OutputFormat | None = None
+
 
 def set_verbose(v: bool) -> None:
     """Set the verbose output flag."""
@@ -47,7 +56,21 @@ def set_verbose(v: bool) -> None:
 
 def is_verbose() -> bool:
     """Check if verbose output is enabled."""
-    return _verbose
+    return _verbose or _debug  # Debug implies verbose
+
+
+def set_debug(d: bool) -> None:
+    """Set the debug output flag.
+
+    Debug mode shows stack traces on errors and implies verbose.
+    """
+    global _debug
+    _debug = d
+
+
+def is_debug() -> bool:
+    """Check if debug output is enabled."""
+    return _debug
 
 
 def is_interactive() -> bool:
@@ -57,6 +80,38 @@ def is_interactive() -> bool:
         True if stdout is connected to a terminal, False if piped/redirected.
     """
     return sys.stdout.isatty()
+
+
+def set_default_format(fmt: OutputFormat | None) -> None:
+    """Set the default output format override.
+
+    Used by global --json flag to force JSON output.
+
+    Args:
+        fmt: Format to use as default, or None to use TTY-aware detection.
+    """
+    global _default_format_override
+    _default_format_override = fmt
+
+
+def get_default_format() -> OutputFormat:
+    """Get the default output format.
+
+    Returns PLAIN when stdout is a TTY (interactive terminal),
+    JSON when piped or redirected.
+
+    Returns:
+        OutputFormat.PLAIN for TTY, OutputFormat.JSON otherwise.
+    """
+    # Check for explicit override first
+    if _default_format_override is not None:
+        return _default_format_override
+
+    # TTY-aware default
+    if sys.stdout.isatty():
+        return OutputFormat.PLAIN
+    else:
+        return OutputFormat.JSON
 
 
 def print_table(items: list[dict[str, Any]]) -> None:
@@ -108,14 +163,15 @@ def print_csv(items: list[dict[str, Any]]) -> None:
 
 def output(
     data: Any,
-    format: OutputFormat = OutputFormat.JSON,
+    format: OutputFormat | None = None,
     raw: bool = False,
 ) -> None:
     """Output data in specified format.
 
     Args:
         data: Data to output.
-        format: Output format (JSON, TABLE, CSV, COMPACT).
+        format: Output format. If None, uses TTY-aware default:
+                PLAIN for terminal, JSON when piped.
         raw: If True, print data as-is (pass-through).
 
     Note:
@@ -127,8 +183,16 @@ def output(
         print(data)
         return
 
+    # Use TTY-aware default if format not specified
+    if format is None:
+        format = get_default_format()
+
     # Format-specific output
-    if format == OutputFormat.COMPACT:
+    if format == OutputFormat.PLAIN:
+        # Plain text with emoji icons - use color detection
+        print(format_plain(data))
+
+    elif format == OutputFormat.COMPACT:
         print(json.dumps(data, default=str))
 
     elif format == OutputFormat.TABLE:
@@ -168,7 +232,12 @@ __all__ = [
     "console",
     "set_verbose",
     "is_verbose",
+    "set_debug",
+    "is_debug",
     "is_interactive",
+    "set_default_format",
+    "get_default_format",
+    "should_use_color",
     "output",
     "output_error",
     "print_table",

@@ -20,7 +20,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Plain Output Format (Human-Friendly Default)"
-    status: pending
+    status: done
     ticket: mc-8d99
     acceptance:
       - "OutputFormat.PLAIN added to enum in output/__init__.py"
@@ -57,7 +57,7 @@ tasks:
       ```
 
   - title: "Account Commands"
-    status: pending
+    status: done
     ticket: mc-7e2e
     acceptance:
       - "src/monarch_cli/commands/accounts.py exists"
@@ -88,7 +88,7 @@ tasks:
       - Test refresh with: --help flag, unit tests with mocks, code review only
 
   - title: "Transaction Commands"
-    status: pending
+    status: done
     ticket: mc-0136
     acceptance:
       - "src/monarch_cli/commands/transactions.py exists"
@@ -114,7 +114,7 @@ tasks:
       - Verify update logic through code review, not live execution
 
   - title: "Budget Commands"
-    status: pending
+    status: done
     ticket: mc-ff18
     acceptance:
       - "src/monarch_cli/commands/budgets.py exists"
@@ -139,7 +139,7 @@ tasks:
       Note: spentAmount is negative, so use abs() for display.
 
   - title: "Cashflow Commands"
-    status: pending
+    status: done
     ticket: mc-a185
     acceptance:
       - "src/monarch_cli/commands/cashflow.py exists"
@@ -155,7 +155,7 @@ tasks:
       The response format is already reasonable, minimal transformation needed.
 
   - title: "Categories Commands"
-    status: pending
+    status: done
     ticket: mc-57e8
     acceptance:
       - "src/monarch_cli/commands/categories.py exists"
@@ -177,7 +177,7 @@ tasks:
       Flatten to list of categories with their group name.
 
   - title: "Update Main Entry Point & Global Flags"
-    status: pending
+    status: done
     ticket: mc-0c0a
     acceptance:
       # Command Registration
@@ -226,7 +226,7 @@ tasks:
       ```
 
   - title: "MONARCH_TOKEN Security Documentation"
-    status: pending
+    status: done
     ticket: mc-da1f
     acceptance:
       - "`monarch auth setup` shows Security Considerations section"
@@ -244,7 +244,7 @@ tasks:
       when MONARCH_TOKEN is appropriate (CI/CD with proper secret injection).
 
   - title: "Shell Completions Documentation"
-    status: pending
+    status: done
     ticket: mc-f917
     acceptance:
       - "README.md has Shell Completions section"

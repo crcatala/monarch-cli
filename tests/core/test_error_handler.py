@@ -132,18 +132,18 @@ class TestHandleErrorsUnexpected:
         assert '"error": true' in result.stderr
         assert '"code":' in result.stderr
 
-    def test_verbose_shows_traceback(self) -> None:
-        """Should show traceback when verbose mode is enabled."""
-        with mock.patch("monarch_cli.core.error_handler.is_verbose", return_value=True):
+    def test_debug_shows_traceback(self) -> None:
+        """Should show traceback when debug mode is enabled."""
+        with mock.patch("monarch_cli.core.error_handler.is_debug", return_value=True):
             result = runner.invoke(_app, ["raises-unexpected"])
 
         assert result.exit_code == 1
         # Traceback should be in stderr
         assert "Traceback" in result.stderr or "ValueError" in result.stderr
 
-    def test_non_verbose_hides_traceback(self) -> None:
-        """Should hide traceback when verbose mode is disabled."""
-        with mock.patch("monarch_cli.core.error_handler.is_verbose", return_value=False):
+    def test_non_debug_hides_traceback(self) -> None:
+        """Should hide traceback when debug mode is disabled."""
+        with mock.patch("monarch_cli.core.error_handler.is_debug", return_value=False):
             result = runner.invoke(_app, ["raises-unexpected"])
 
         assert result.exit_code == 1

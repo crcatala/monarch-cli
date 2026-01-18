@@ -373,7 +373,7 @@ def setup() -> None:
     """Show setup instructions.
 
     Displays detailed instructions for setting up authentication,
-    including storage options and troubleshooting tips.
+    including storage options, security considerations, and troubleshooting tips.
 
     Examples:
         monarch auth setup
@@ -401,6 +401,52 @@ def setup() -> None:
     console.print("  [dim]MONARCH_TOKEN[/dim] (environment variable)")
     console.print("    Set this env var to skip storage entirely")
     console.print("    Useful for CI/CD or containerized environments")
+    console.print()
+
+    console.print("[bold]Security Considerations:[/bold]")
+    console.print()
+    console.print("  [green]🔒 Keyring (Most Secure)[/green]")
+    console.print("    • Token encrypted by OS-level security (Keychain, DPAPI, libsecret)")
+    console.print("    • Protected by your user account/login password")
+    console.print("    • Not accessible to other users or processes without privileges")
+    console.print("    • Best for: Personal workstations, developer machines")
+    console.print()
+    console.print("  [yellow]📁 File Storage (Moderate Security)[/yellow]")
+    console.print("    • Token stored in plaintext JSON file")
+    console.print("    • Protected by filesystem permissions (0600)")
+    console.print("    • Accessible to root/admin and your user account")
+    console.print("    • Best for: Headless servers, VMs where keyring unavailable")
+    console.print()
+    console.print("  [red]⚠️  MONARCH_TOKEN Environment Variable (Use with Caution)[/red]")
+    console.print("    Environment variables have inherent security risks:")
+    console.print("    • Visible in process listings (ps aux, /proc/*/environ)")
+    console.print("    • May be logged by shells, process managers, or monitoring tools")
+    console.print("    • Inherited by child processes (risk of leaking to subprocesses)")
+    console.print("    • Can appear in crash dumps or debug logs")
+    console.print()
+    console.print("    [bold]Only use MONARCH_TOKEN when:[/bold]")
+    console.print("    • Running in CI/CD with proper secret injection")
+    console.print("    • Running in containers with secrets management")
+    console.print("    • You understand and accept the risks")
+    console.print()
+
+    console.print("[bold]CI/CD Secret Injection (Recommended):[/bold]")
+    console.print()
+    console.print("  [cyan]GitHub Actions:[/cyan]")
+    console.print("    1. Add MONARCH_TOKEN to repository secrets")
+    console.print("    2. Reference in workflow:")
+    console.print("       env:")
+    console.print("         MONARCH_TOKEN: ${{ secrets.MONARCH_TOKEN }}")
+    console.print()
+    console.print("  [cyan]GitLab CI:[/cyan]")
+    console.print("    1. Add MONARCH_TOKEN as CI/CD variable (masked, protected)")
+    console.print("    2. Variable is automatically available in jobs")
+    console.print()
+    console.print("  [cyan]Docker / Containers:[/cyan]")
+    console.print("    Avoid baking tokens into images. Instead:")
+    console.print("    • Pass at runtime: docker run -e MONARCH_TOKEN=... image")
+    console.print("    • Use secrets managers (Docker Secrets, Vault, AWS SSM)")
+    console.print("    • Mount secrets as files: docker run -v /secrets:/secrets image")
     console.print()
 
     console.print("[bold]Troubleshooting:[/bold]")

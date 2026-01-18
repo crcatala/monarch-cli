@@ -13,7 +13,7 @@ from typing import ParamSpec, TypeVar
 
 import typer
 
-from ..output import is_verbose, output_error
+from ..output import is_debug, output_error
 from .exceptions import MonarchCLIError
 
 P = ParamSpec("P")
@@ -54,7 +54,7 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:  # noqa: UP047
             output_error(e)
             raise typer.Exit(e.exit_code) from None
         except Exception as e:
-            if is_verbose():
+            if is_debug():
                 traceback.print_exc()
             output_error(MonarchCLIError(f"Unexpected error: {e}"))
             raise typer.Exit(1) from None
