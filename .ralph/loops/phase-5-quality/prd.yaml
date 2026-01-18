@@ -37,7 +37,7 @@ tasks:
       Mock environment variables with monkeypatch or unittest.mock.patch.dict.
 
   - title: "Transformer Unit Tests"
-    status: pending
+    status: done
     ticket: mc-c165
     acceptance:
       - "tests/transformers/__init__.py exists"

@@ -25,6 +25,16 @@ This file tracks completed work and patterns learned during this loop.
 
 ## Completed Tasks
 
+## [2026-01-18 13:17] - Transformer Unit Tests
+- Verified comprehensive transformer tests already in place (53 tests)
+- test_accounts.py: 19 tests covering transform_account, transform_accounts, and schema contracts
+- test_transactions.py: 25 tests covering transform_transaction, transform_transactions, and schema contracts
+- test_cashflow.py: 9 tests (bonus coverage)
+- All tests verify: expected fields, missing nested data handling, snake_case output
+- Files changed: none (tests already complete)
+- **Learnings:** Transformer tests were implemented during development phase. SchemaContract test classes document API stability guarantees for AI agents.
+---
+
 ## [2026-01-18 13:15] - Unit Tests Structure & Core Tests
 - Verified comprehensive test suite already in place (465 tests passing)
 - Updated `tests/conftest.py` with shared fixtures: `mock_monarch_client`, `sample_accounts`, `sample_transactions`
