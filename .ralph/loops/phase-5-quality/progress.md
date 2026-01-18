@@ -98,3 +98,19 @@ After this loop completes:
 - Files changed: `tests/live/test_live_api.py` (new), `Makefile`
 - **Learnings:** Live tests use `get_session_token()` from `monarch_cli.core.session` (not `get_session`). Tests properly fail with 401 when session is invalid/expired - this is expected behavior for dev environment without credentials.
 ---
+
+## [2026-01-18 13:24] - README Documentation
+- Rewrote README.md with comprehensive documentation
+- Added badges (PyPI, Python version, License)
+- Installation section covers pip, uv, pipx with verification step
+- Quick Start shows auth login, accounts list, transactions list, budgets list
+- Complete Command Reference with tables for all commands and options
+- Output Formats section explaining plain/json/table/csv/ndjson/compact
+- Configuration section with all environment variables table
+- AI Agent Integration section with Python example and stable schema fields
+- Shell Completions section for bash/zsh/fish
+- Troubleshooting section with `monarch auth doctor` and common issues
+- Development and Contributing sections
+- Files changed: `README.md`
+- **Learnings:** The CLI has rich help output via Typer; use `monarch <command> --help` to extract full option details. Auto-JSON detection when piped is key for AI agent workflows.
+---
