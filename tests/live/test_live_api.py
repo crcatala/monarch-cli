@@ -281,8 +281,11 @@ class TestLiveTransactionUpdate:
         try:
             # Update notes (no --json flag for update command)
             result = run_cli(
-                "transactions", "update", txn_id,
-                "--notes", test_notes,
+                "transactions",
+                "update",
+                txn_id,
+                "--notes",
+                test_notes,
             )
             assert result.returncode == 0
 
@@ -298,9 +301,12 @@ class TestLiveTransactionUpdate:
             # Always restore original notes
             time.sleep(LIVE_DELAY)  # Rate limit before restore
             run_cli(
-                "transactions", "update", txn_id,
-                "--notes", original_notes,
-                check=False  # Don't fail test if restore fails
+                "transactions",
+                "update",
+                txn_id,
+                "--notes",
+                original_notes,
+                check=False,  # Don't fail test if restore fails
             )
 
     def test_transaction_update_dry_run(self, test_transaction):
@@ -310,8 +316,11 @@ class TestLiveTransactionUpdate:
 
         # Dry-run an update
         result = run_cli(
-            "transactions", "update", txn_id,
-            "--notes", "[DRY RUN TEST] should not persist",
+            "transactions",
+            "update",
+            txn_id,
+            "--notes",
+            "[DRY RUN TEST] should not persist",
             "--dry-run",
         )
         assert result.returncode == 0
@@ -402,9 +411,7 @@ class TestLiveErrorHandling:
     def test_invalid_transaction_id_error(self):
         """Verify invalid transaction ID returns proper error."""
         result = run_cli(
-            "transactions", "update", "invalid-id-12345",
-            "--notes", "test",
-            check=False
+            "transactions", "update", "invalid-id-12345", "--notes", "test", check=False
         )
         # Should fail gracefully
         assert result.returncode != 0
