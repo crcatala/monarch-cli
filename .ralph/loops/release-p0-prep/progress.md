@@ -26,3 +26,11 @@
 - Files changed: pyproject.toml
 - **Learnings:** classifiers/keywords go in [project] section after requires-python; [project.urls] is a separate section
 ---
+
+## [2026-01-18 15:12] - add-twine (mc-a77b)
+- Added twine>=5.0.0 to dev dependencies in pyproject.toml
+- Ran `uv sync --all-extras` to update uv.lock (installed twine 6.2.0 and dependencies)
+- Verified `uv run twine --version` works correctly
+- Files changed: pyproject.toml, uv.lock
+- **Learnings:** None - straightforward dependency addition
+---

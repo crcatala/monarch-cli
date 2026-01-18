@@ -82,7 +82,7 @@ tasks:
 
   - id: add-twine
     title: "Add twine to dev dependencies"
-    status: pending
+    status: done
     ticket: mc-a77b
     acceptance:
       - "pyproject.toml [project.optional-dependencies] dev list includes twine>=5.0.0"
