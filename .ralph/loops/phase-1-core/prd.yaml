@@ -17,7 +17,7 @@ pre_commit: "make verify"
 
 tasks:
   - title: "Exception Hierarchy"
-    status: pending
+    status: done
     ticket: mc-7fb9
     acceptance:
       - "src/monarch_cli/core/exceptions.py exists"
