@@ -46,7 +46,7 @@ tasks:
 
   - id: add-pypi-metadata
     title: "Add PyPI classifiers, keywords, and project URLs to pyproject.toml"
-    status: pending
+    status: done
     ticket: mc-2042
     acceptance:
       - "pyproject.toml has classifiers array with 10+ classifiers"

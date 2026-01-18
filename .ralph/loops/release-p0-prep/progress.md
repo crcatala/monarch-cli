@@ -18,3 +18,11 @@
 - Files changed: pyproject.toml, LICENSE
 - **Learnings:** None - straightforward text replacement
 ---
+
+## [2026-01-18 15:11] - add-pypi-metadata (mc-2042)
+- Added 12 PyPI classifiers (Development Status, Environment, License, Python versions, Topics, Typing)
+- Added keywords array with finance-related terms
+- Added [project.urls] section with Homepage, Documentation, Repository, Issues, Changelog
+- Files changed: pyproject.toml
+- **Learnings:** classifiers/keywords go in [project] section after requires-python; [project.urls] is a separate section
+---
