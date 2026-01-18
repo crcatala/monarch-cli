@@ -96,7 +96,7 @@ tasks:
       Use Python's match statement for clean preset handling.
 
   - title: "Adapter Module (Isolates Upstream Library)"
-    status: pending
+    status: done
     ticket: mc-7bd9
     acceptance:
       - "src/monarch_cli/core/adapter.py exists"

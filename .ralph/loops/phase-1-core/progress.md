@@ -83,6 +83,29 @@ result = run_async(with_retry(
 # This allows fresh coroutine creation for each retry attempt
 ```
 
+### Adapter Pattern (Monarch Client Access)
+```python
+from monarch_cli.core.adapter import (
+    get_authenticated_client, extract_token_from_client, reset_client
+)
+
+# Get authenticated client (cached, raises AuthenticationError if no token)
+client = get_authenticated_client()
+
+# Use with async bridge and retry
+from monarch_cli.core.async_utils import run_async
+from monarch_cli.core.retry import with_retry
+result = run_async(with_retry(lambda: client.get_accounts()))
+
+# Extract token from client (for saving after login)
+token = extract_token_from_client(client)
+
+# Reset cached client (on logout)
+reset_client()
+
+# NOTE: Only adapter.py imports from monarchmoney - all other code uses adapter
+```
+
 ### Date Utilities Pattern
 ```python
 from datetime import date
@@ -175,3 +198,16 @@ start_str, end_str = parse_date_range(DatePreset.ALL)
 ## Issues Encountered
 
 (recorded as tasks complete)
+
+## [2026-01-18 09:14] - mc-7bd9 (Adapter Module - Isolates Upstream Library)
+- Created adapter.py to centralize all monarchmoney imports in one file
+- Implemented get_authenticated_client() that returns cached MonarchMoney instance
+- Uses MonarchMoney(token=stored_token) constructor (never private attributes)
+- Raises AuthenticationError if no token is available
+- Caches client instance in module-level _client variable for performance
+- Implemented extract_token_from_client() using client.token property with cast() for type safety
+- Implemented reset_client() to clear cached client (for logout)
+- Added type: ignore[import-untyped] for monarchmoney import (no py.typed marker)
+- Files changed: `src/monarch_cli/core/adapter.py`
+- **Learnings:** Untyped libraries need `# type: ignore[import-untyped]` and `cast()` for return values when mypy strict mode is enabled
+---
