@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call
 from ..transformers.accounts import transform_accounts
 
 
@@ -22,9 +22,10 @@ def list_accounts() -> list[dict[str, Any]]:
     Raises:
         AuthenticationError: If not authenticated.
         APIError: If API request fails.
+        NetworkError: On timeout or network failure.
     """
     client = get_authenticated_client()
-    raw = run_async(client.get_accounts())
+    raw = run_api_call(lambda: client.get_accounts())
     return transform_accounts(raw)
 
 
@@ -37,6 +38,7 @@ def get_account_ids() -> list[str]:
     Raises:
         AuthenticationError: If not authenticated.
         APIError: If API request fails.
+        NetworkError: On timeout or network failure.
     """
     accounts = list_accounts()
     return [acc["id"] for acc in accounts if acc.get("id")]
@@ -60,6 +62,7 @@ def refresh_accounts(account_ids: list[str] | None = None) -> dict[str, Any]:
     Raises:
         AuthenticationError: If not authenticated.
         APIError: If API request fails.
+        NetworkError: On timeout or network failure.
     """
     client = get_authenticated_client()
 
@@ -76,7 +79,7 @@ def refresh_accounts(account_ids: list[str] | None = None) -> dict[str, Any]:
         }
 
     # Request refresh
-    success = run_async(client.request_accounts_refresh(account_ids))
+    success = run_api_call(lambda: client.request_accounts_refresh(account_ids))
 
     if success:
         return {

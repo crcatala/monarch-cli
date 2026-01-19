@@ -10,7 +10,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call, run_async
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
@@ -164,8 +164,8 @@ def list_cmd(
 
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
-        raw_data: Any = run_async(
-            client.get_transactions(
+        raw_data: Any = run_api_call(
+            lambda: client.get_transactions(
                 limit=limit,
                 offset=offset,
                 start_date=start_str,
@@ -296,7 +296,7 @@ def update(
     # Apply the update
     with spinner("Updating transaction..."):
         client = get_authenticated_client()
-        run_async(client.update_transaction(transaction_id=transaction_id, **changes))
+        run_api_call(lambda: client.update_transaction(transaction_id=transaction_id, **changes))
 
     output(
         {
@@ -426,16 +426,22 @@ def batch_update(
     # Execute batch update
     async def do_batch_update() -> dict[str, Any]:
         """Execute parallel batch updates with concurrency control."""
+        from ..core.config import get_config
+
+        config = get_config()
         client = get_authenticated_client()
         semaphore = asyncio.Semaphore(max_concurrency)
         results: list[dict[str, Any]] = []
 
         async def update_one(txn_id: str) -> dict[str, Any]:
-            """Update a single transaction with semaphore control."""
+            """Update a single transaction with semaphore and timeout control."""
             async with semaphore:
                 try:
-                    await client.update_transaction(transaction_id=txn_id, **changes)
+                    async with asyncio.timeout(config.timeout_seconds):
+                        await client.update_transaction(transaction_id=txn_id, **changes)
                     return {"id": txn_id, "status": "success"}
+                except TimeoutError:
+                    return {"id": txn_id, "status": "error", "error": "Request timed out"}
                 except Exception as e:
                     return {"id": txn_id, "status": "error", "error": str(e)}
 

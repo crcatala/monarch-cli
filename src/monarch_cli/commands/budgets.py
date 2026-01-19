@@ -8,7 +8,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
@@ -111,7 +111,7 @@ def list_cmd(
 
     with spinner("Fetching budgets..."):
         client = get_authenticated_client()
-        raw_data: dict[str, Any] = run_async(client.get_budgets())
+        raw_data: dict[str, Any] = run_api_call(lambda: client.get_budgets())
 
         # Transform to simplified format
         data = _transform_budgets(raw_data)

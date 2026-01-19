@@ -8,7 +8,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
@@ -112,8 +112,8 @@ def summary(
 
     with spinner("Calculating cashflow..."):
         client = get_authenticated_client()
-        data: Any = run_async(
-            client.get_cashflow_summary(
+        data: Any = run_api_call(
+            lambda: client.get_cashflow_summary(
                 start_date=start_str,
                 end_date=end_str,
             )
