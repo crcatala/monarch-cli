@@ -213,19 +213,71 @@ monarch accounts list | jq '.[0]'
 
 ## Configuration
 
-Monarch CLI can be configured via environment variables:
+Monarch CLI uses a **layered configuration system** (similar to Git, kubectl, Docker):
+
+```
+Config File → Environment Variables → CLI Flags
+(lowest precedence)                  (highest precedence)
+```
+
+Each layer overrides the previous, giving you flexible control over defaults and per-command behavior.
+
+### Config File
+
+Create `~/.config/monarch-cli/config.toml` to set persistent defaults:
+
+```toml
+# Output format: plain, json, table, csv, compact
+format = "plain"
+
+# Enable colored output (respects NO_COLOR env var)
+color = true
+
+# Show operational progress messages
+verbose = false
+
+# API request timeout in seconds
+timeout = 30
+
+# Number of retry attempts for transient failures
+max_retries = 3
+```
+
+### Environment Variables
+
+Environment variables override config file values:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `MONARCH_TOKEN` | Session token for authentication | - |
 | `MONARCH_CONFIG_DIR` | Directory for config files | `~/.config/monarch-cli` |
 | `MONARCH_SESSION_PATH` | Path to session file | `<config_dir>/session.json` |
-| `MONARCH_FORMAT` | Default output format | `plain` |
-| `MONARCH_VERBOSE` | Enable verbose output | `false` |
+| `MONARCH_FORMAT` | Default output format (`plain`, `json`, `table`, `csv`, `compact`) | `plain` |
+| `MONARCH_VERBOSE` | Enable verbose output (`1`, `true`, `yes`) | `false` |
+| `MONARCH_DEBUG` | Enable debug mode with stack traces | `false` |
+| `MONARCH_QUIET` | Output only IDs, one per line | `false` |
 | `MONARCH_TIMEOUT` | API timeout in seconds | `30` |
 | `MONARCH_MAX_RETRIES` | Max API retry attempts | `3` |
 | `MONARCH_NO_COLOR` | Disable colored output | `false` |
-| `NO_COLOR` | Standard color disable | - |
+| `NO_COLOR` | Standard color disable ([no-color.org](https://no-color.org)) | - |
+
+### CLI Flags
+
+CLI flags override both config file and environment variables:
+
+```bash
+# Override format for this command
+monarch accounts list --json
+
+# Override timeout for slow connections  
+monarch transactions list --timeout 60
+
+# Disable color for this command
+monarch accounts list --no-color
+
+# Enable verbose output
+monarch accounts list --verbose
+```
 
 ### Authentication Priority
 

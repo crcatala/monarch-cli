@@ -24,6 +24,12 @@ def set_color_enabled(enabled: bool | None) -> None:
     _color_enabled = enabled
 
 
+def reset_color_state() -> None:
+    """Reset color state to auto-detect (for testing)."""
+    global _color_enabled
+    _color_enabled = None
+
+
 def should_use_color() -> bool:
     """Check if colored output should be used.
 

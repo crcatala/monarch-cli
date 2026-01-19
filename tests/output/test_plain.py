@@ -19,8 +19,19 @@ from monarch_cli.output.plain import (
     _get_icon,
     format_plain,
     format_plain_item,
+    reset_color_state,
     should_use_color,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_output_state():
+    """Reset output module state before each test."""
+    reset_color_state()
+    set_default_format(None)
+    yield
+    reset_color_state()
+    set_default_format(None)
 
 
 class TestShouldUseColor:
@@ -279,14 +290,21 @@ class TestOutputWithPlain:
 
     def test_output_plain_explicit(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Explicit PLAIN format should use plain formatter."""
-        data = {"id": "123", "name": "Test"}
-        output(data, OutputFormat.PLAIN)
-        captured = capsys.readouterr()
+        # Patch isatty to False so no color codes are added
+        with patch("sys.stdout.isatty", return_value=False):
+            data = {"id": "123", "name": "Test"}
+            output(data, OutputFormat.PLAIN)
+            captured = capsys.readouterr()
 
-        assert "Id: 123" in captured.out
-        assert "Name: Test" in captured.out
-        # Should not be JSON
-        assert "{" not in captured.out
+            # Check for formatted output (with emoji icons)
+            assert "🔖" in captured.out  # Id icon
+            assert "Id:" in captured.out
+            assert "123" in captured.out
+            assert "📌" in captured.out  # Name icon
+            assert "Name:" in captured.out
+            assert "Test" in captured.out
+            # Should not be JSON
+            assert "{" not in captured.out
 
     def test_output_default_tty_uses_plain(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Default format in TTY should use PLAIN."""
@@ -336,3 +354,64 @@ class TestOutputFormatEnum:
         """PLAIN should be a string enum for Typer compatibility."""
         assert isinstance(OutputFormat.PLAIN, str)
         assert OutputFormat.PLAIN == "plain"
+
+
+class TestApplyConfigColor:
+    """Tests for apply_config color handling."""
+
+    def test_apply_config_color_true_allows_auto_detect(self) -> None:
+        """When config.color=True, auto-detection should still work."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        # Create config with color=True (default)
+        config = Config(color=True)
+        apply_config(config)
+
+        # NO_COLOR should still disable color (auto-detect working)
+        with patch.dict(os.environ, {"NO_COLOR": "1"}, clear=False):
+            assert should_use_color() is False
+
+    def test_apply_config_color_true_respects_tty(self) -> None:
+        """When config.color=True, non-TTY should disable color."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=True)
+        apply_config(config)
+
+        # Non-TTY should disable color
+        with patch("sys.stdout.isatty", return_value=False):
+            # Remove NO_COLOR if present
+            env = dict(os.environ)
+            env.pop("NO_COLOR", None)
+            with patch.dict(os.environ, env, clear=True):
+                assert should_use_color() is False
+
+    def test_apply_config_color_false_disables_color(self) -> None:
+        """When config.color=False, color should be disabled regardless of TTY."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=False)
+        apply_config(config)
+
+        # Even with TTY, color should be disabled
+        with patch("sys.stdout.isatty", return_value=True):
+            assert should_use_color() is False
+
+    def test_apply_config_color_true_enables_on_tty(self) -> None:
+        """When config.color=True and TTY, color should be enabled."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=True)
+        apply_config(config)
+
+        # TTY without NO_COLOR should enable color
+        with patch("sys.stdout.isatty", return_value=True):
+            env = dict(os.environ)
+            env.pop("NO_COLOR", None)
+            env.pop("TERM", None)
+            with patch.dict(os.environ, env, clear=True):
+                assert should_use_color() is True

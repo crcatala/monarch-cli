@@ -10,7 +10,7 @@ import typer
 from monarchmoney import MonarchMoney, RequireMFAException  # type: ignore[import-untyped]
 
 from ..core.adapter import extract_token_from_client, get_authenticated_client, reset_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call, run_async
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, AuthenticationError
 from ..core.session import (
@@ -152,7 +152,7 @@ def login(
     # Show success with account count
     try:
         client = get_authenticated_client()
-        accounts_data = run_async(client.get_accounts())
+        accounts_data = run_api_call(lambda: client.get_accounts())
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 
@@ -316,7 +316,7 @@ def doctor() -> None:
     if storage_info["active_backend"]:
         try:
             client = get_authenticated_client()
-            accounts_data = run_async(client.get_accounts())
+            accounts_data = run_api_call(lambda: client.get_accounts())
             accounts = accounts_data.get("accounts", [])
             console.print(f"  [green]✓ Connected[/green] ({len(accounts)} accounts)")
         except AuthenticationError:
@@ -350,7 +350,7 @@ def ping(
     client = get_authenticated_client()
 
     try:
-        accounts_data = run_async(client.get_accounts())
+        accounts_data = run_api_call(lambda: client.get_accounts())
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 

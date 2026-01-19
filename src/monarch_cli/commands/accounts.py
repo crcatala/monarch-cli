@@ -7,7 +7,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_async
+from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
@@ -75,7 +75,7 @@ def list_cmd(
         if raw:
             # Raw mode: return untransformed API response
             client = get_authenticated_client()
-            data: Any = run_async(client.get_accounts())
+            data: Any = run_api_call(lambda: client.get_accounts())
         else:
             # Normal mode: use service with transformation
             data = list_accounts()

@@ -12,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from monarch_cli.core.config import get_config_dir
 from monarch_cli.core.session import (
     KEYRING_SERVICE,
     KEYRING_USERNAME,
@@ -22,7 +23,6 @@ from monarch_cli.core.session import (
     _get_from_file,
     _get_from_keyring,
     delete_session_token,
-    get_config_dir,
     get_session_path,
     get_session_token,
     get_storage_info,
