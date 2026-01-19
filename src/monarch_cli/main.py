@@ -4,8 +4,8 @@ import typer
 
 from monarch_cli import __version__
 from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
-from monarch_cli.core.config import Config, get_config, set_config
-from monarch_cli.output import OutputFormat, apply_config
+from monarch_cli.core.config import get_config, set_config
+from monarch_cli.output import apply_config
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
 

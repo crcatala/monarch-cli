@@ -12,7 +12,6 @@ This follows the standard CLI convention used by git, kubectl, docker, etc.
 from __future__ import annotations
 
 import os
-import sys
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
