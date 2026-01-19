@@ -1,0 +1,40 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi  # Create this environment in GitHub repo settings
+    permissions:
+      id-token: write  # Required for trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run quality checks
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy src/
+          uv run pytest -m "not live" --tb=short
+
+      - name: Build package
+        run: uv build
+
+      - name: Validate package
+        run: uv run twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No token needed - uses OpenID Connect trusted publishing

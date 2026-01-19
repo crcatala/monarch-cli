@@ -93,7 +93,7 @@ tasks:
 
   - id: create-publish-workflow
     title: "Create PyPI publish GitHub Actions workflow"
-    status: pending
+    status: done
     ticket: mc-b9f6
     acceptance:
       - ".github/workflows/publish.yml exists"

@@ -1,6 +1,6 @@
 ---
 id: mc-b9f6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-01-18T22:28:20Z

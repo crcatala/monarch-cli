@@ -35,3 +35,12 @@
 - Files changed: .github/ISSUE_TEMPLATE/bug_report.md, .github/ISSUE_TEMPLATE/feature_request.md, .github/ISSUE_TEMPLATE/config.yml
 - **Learnings:** GitHub issue templates require YAML frontmatter with name, about, title, labels, and assignees fields
 ---
+
+## [2026-01-18 16:07] - create-publish-workflow (mc-b9f6)
+- Created .github/workflows/publish.yml for automated PyPI publishing
+- Workflow triggers on release published, runs quality checks, builds, validates, and publishes
+- Uses trusted publishing with id-token: write permission
+- Uses pypa/gh-action-pypi-publish@release/v1 action
+- Files changed: .github/workflows/publish.yml
+- **Learnings:** Trusted publishing eliminates need for PyPI API tokens - uses OpenID Connect instead
+---
