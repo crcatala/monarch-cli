@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 
 from .config import get_config
 from .exceptions import NetworkError
-from .retry import RETRYABLE_EXCEPTIONS, with_retry
+from .retry import RETRYABLE_EXCEPTIONS
 
 
 def _run_in_new_loop[T](coro: Coroutine[object, object, T]) -> T:

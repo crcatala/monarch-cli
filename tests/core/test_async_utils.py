@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
 
 import pytest
 
@@ -183,7 +182,7 @@ class TestRunApiCall:
         assert result == "success"
         assert call_count == 2
 
-    def test_uses_config_defaults(self, monkeypatch, tmp_path) -> None:
+    def test_uses_config_defaults(self, tmp_path) -> None:
         """Should use timeout and max_retries from config."""
         # Create config file with custom values
         config_file = tmp_path / "config.toml"
