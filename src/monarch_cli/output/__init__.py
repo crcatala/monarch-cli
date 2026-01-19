@@ -67,7 +67,14 @@ def apply_config(config: Config) -> None:
     set_verbose(config.verbose)
     set_debug(config.debug)
     set_quiet(config.quiet)
-    set_color_enabled(config.color)
+
+    # Only override color when explicitly disabled.
+    # When color=True (default), leave as None for auto-detection
+    # (respects NO_COLOR, TERM=dumb, TTY detection).
+    if not config.color:
+        set_color_enabled(False)
+    else:
+        set_color_enabled(None)  # Auto-detect
 
     # Set default format from config (plain -> use TTY detection, others -> override)
     if config.format != "plain":

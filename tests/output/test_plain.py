@@ -354,3 +354,64 @@ class TestOutputFormatEnum:
         """PLAIN should be a string enum for Typer compatibility."""
         assert isinstance(OutputFormat.PLAIN, str)
         assert OutputFormat.PLAIN == "plain"
+
+
+class TestApplyConfigColor:
+    """Tests for apply_config color handling."""
+
+    def test_apply_config_color_true_allows_auto_detect(self) -> None:
+        """When config.color=True, auto-detection should still work."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        # Create config with color=True (default)
+        config = Config(color=True)
+        apply_config(config)
+
+        # NO_COLOR should still disable color (auto-detect working)
+        with patch.dict(os.environ, {"NO_COLOR": "1"}, clear=False):
+            assert should_use_color() is False
+
+    def test_apply_config_color_true_respects_tty(self) -> None:
+        """When config.color=True, non-TTY should disable color."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=True)
+        apply_config(config)
+
+        # Non-TTY should disable color
+        with patch("sys.stdout.isatty", return_value=False):
+            # Remove NO_COLOR if present
+            env = dict(os.environ)
+            env.pop("NO_COLOR", None)
+            with patch.dict(os.environ, env, clear=True):
+                assert should_use_color() is False
+
+    def test_apply_config_color_false_disables_color(self) -> None:
+        """When config.color=False, color should be disabled regardless of TTY."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=False)
+        apply_config(config)
+
+        # Even with TTY, color should be disabled
+        with patch("sys.stdout.isatty", return_value=True):
+            assert should_use_color() is False
+
+    def test_apply_config_color_true_enables_on_tty(self) -> None:
+        """When config.color=True and TTY, color should be enabled."""
+        from monarch_cli.core.config import Config
+        from monarch_cli.output import apply_config
+
+        config = Config(color=True)
+        apply_config(config)
+
+        # TTY without NO_COLOR should enable color
+        with patch("sys.stdout.isatty", return_value=True):
+            env = dict(os.environ)
+            env.pop("NO_COLOR", None)
+            env.pop("TERM", None)
+            with patch.dict(os.environ, env, clear=True):
+                assert should_use_color() is True
