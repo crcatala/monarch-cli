@@ -9,17 +9,22 @@ Supports multiple output formats:
 - CSV (spreadsheet export)
 """
 
+from __future__ import annotations
+
 import csv
 import json
 import sys
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.table import Table
 
 from ..core.exceptions import MonarchCLIError
-from .plain import format_plain, should_use_color
+from .plain import format_plain, set_color_enabled, should_use_color
+
+if TYPE_CHECKING:
+    from ..core.config import Config
 
 
 class OutputFormat(str, Enum):
@@ -47,8 +52,29 @@ _debug = False
 # Module-level quiet flag (for ID-only output)
 _quiet = False
 
-# Module-level default format override (set by --json global flag)
+# Module-level default format override (set by --json global flag or config)
 _default_format_override: OutputFormat | None = None
+
+
+def apply_config(config: Config) -> None:
+    """Apply configuration to the output system.
+
+    This wires up the Config values to the output module's state.
+
+    Args:
+        config: Config instance with resolved settings.
+    """
+    set_verbose(config.verbose)
+    set_debug(config.debug)
+    set_quiet(config.quiet)
+    set_color_enabled(config.color)
+
+    # Set default format from config (plain -> use TTY detection, others -> override)
+    if config.format != "plain":
+        set_default_format(OutputFormat(config.format))
+    else:
+        # For "plain", use TTY-aware detection (plain for TTY, json for piped)
+        set_default_format(None)
 
 
 def set_verbose(v: bool) -> None:
@@ -266,6 +292,7 @@ def output_error(error: MonarchCLIError) -> None:
 
 __all__ = [
     "OutputFormat",
+    "apply_config",
     "console",
     "set_verbose",
     "is_verbose",

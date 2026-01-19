@@ -19,8 +19,19 @@ from monarch_cli.output.plain import (
     _get_icon,
     format_plain,
     format_plain_item,
+    reset_color_state,
     should_use_color,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_output_state():
+    """Reset output module state before each test."""
+    reset_color_state()
+    set_default_format(None)
+    yield
+    reset_color_state()
+    set_default_format(None)
 
 
 class TestShouldUseColor:
@@ -279,14 +290,21 @@ class TestOutputWithPlain:
 
     def test_output_plain_explicit(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Explicit PLAIN format should use plain formatter."""
-        data = {"id": "123", "name": "Test"}
-        output(data, OutputFormat.PLAIN)
-        captured = capsys.readouterr()
+        # Patch isatty to False so no color codes are added
+        with patch("sys.stdout.isatty", return_value=False):
+            data = {"id": "123", "name": "Test"}
+            output(data, OutputFormat.PLAIN)
+            captured = capsys.readouterr()
 
-        assert "Id: 123" in captured.out
-        assert "Name: Test" in captured.out
-        # Should not be JSON
-        assert "{" not in captured.out
+            # Check for formatted output (with emoji icons)
+            assert "🔖" in captured.out  # Id icon
+            assert "Id:" in captured.out
+            assert "123" in captured.out
+            assert "📌" in captured.out  # Name icon
+            assert "Name:" in captured.out
+            assert "Test" in captured.out
+            # Should not be JSON
+            assert "{" not in captured.out
 
     def test_output_default_tty_uses_plain(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Default format in TTY should use PLAIN."""

@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 import keyring
 import keyring.errors
-import platformdirs
 
+from .config import get_config_dir
 from .exceptions import ErrorCode, MonarchCLIError
 
 if TYPE_CHECKING:
@@ -54,19 +54,6 @@ class StorageBackend(str, Enum):
     KEYRING = "keyring"
     FILE = "file"
     FILE_COMPAT = "file-compat"
-
-
-def get_config_dir() -> Path:
-    """Get the config directory, respecting MONARCH_CONFIG_DIR env var.
-
-    Returns:
-        Path to config directory (created if needed).
-    """
-    env_dir = os.environ.get("MONARCH_CONFIG_DIR")
-    config_dir = Path(env_dir) if env_dir else Path(platformdirs.user_config_dir("monarch-cli"))
-
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
 
 
 def get_session_path() -> Path:

@@ -4,8 +4,8 @@ import typer
 
 from monarch_cli import __version__
 from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
-from monarch_cli.output import OutputFormat, set_debug, set_default_format, set_quiet, set_verbose
-from monarch_cli.output.plain import set_color_enabled
+from monarch_cli.core.config import Config, get_config, set_config
+from monarch_cli.output import OutputFormat, apply_config
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
 
@@ -62,18 +62,31 @@ def main(
         "--no-color",
         help="Disable colored output.",
     ),
+    timeout: int | None = typer.Option(
+        None,
+        "--timeout",
+        help="API request timeout in seconds.",
+    ),
 ) -> None:
     """CLI for Monarch Money - AI-agent friendly financial data access."""
-    if verbose:
-        set_verbose(True)
-    if debug:
-        set_debug(True)
-    if json_output:
-        set_default_format(OutputFormat.JSON)
-    if quiet:
-        set_quiet(True)
-    if no_color:
-        set_color_enabled(False)
+    # Load config from file and env vars
+    config = get_config()
+
+    # Apply CLI flag overrides
+    config = config.with_overrides(
+        verbose=verbose if verbose else None,
+        debug=debug if debug else None,
+        format="json" if json_output else None,
+        quiet=quiet if quiet else None,
+        color=False if no_color else None,
+        timeout_seconds=timeout,
+    )
+
+    # Set the global config with overrides applied
+    set_config(config)
+
+    # Apply config to output system
+    apply_config(config)
 
 
 if __name__ == "__main__":
