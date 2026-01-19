@@ -21,7 +21,7 @@ pre_commit: "make verify"
 tasks:
   - id: create-contributing
     title: "Create CONTRIBUTING.md"
-    status: pending
+    status: done
     ticket: mc-3aa3
     acceptance:
       - "CONTRIBUTING.md exists in repo root"
