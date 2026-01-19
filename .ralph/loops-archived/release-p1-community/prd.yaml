@@ -21,7 +21,7 @@ pre_commit: "make verify"
 tasks:
   - id: create-contributing
     title: "Create CONTRIBUTING.md"
-    status: pending
+    status: done
     ticket: mc-3aa3
     acceptance:
       - "CONTRIBUTING.md exists in repo root"
@@ -36,7 +36,7 @@ tasks:
 
   - id: create-security
     title: "Create SECURITY.md"
-    status: pending
+    status: done
     ticket: mc-5db9
     acceptance:
       - "SECURITY.md exists in repo root"
@@ -52,7 +52,7 @@ tasks:
 
   - id: create-coc
     title: "Create CODE_OF_CONDUCT.md"
-    status: pending
+    status: done
     ticket: mc-bcb5
     acceptance:
       - "CODE_OF_CONDUCT.md exists in repo root"
@@ -67,7 +67,7 @@ tasks:
 
   - id: create-issue-templates
     title: "Create GitHub issue templates"
-    status: pending
+    status: done
     ticket: mc-cbf7
     acceptance:
       - ".github/ISSUE_TEMPLATE/ directory exists"
@@ -93,7 +93,7 @@ tasks:
 
   - id: create-publish-workflow
     title: "Create PyPI publish GitHub Actions workflow"
-    status: pending
+    status: done
     ticket: mc-b9f6
     acceptance:
       - ".github/workflows/publish.yml exists"
@@ -116,7 +116,7 @@ tasks:
 
   - id: add-prepublish-target
     title: "Add prepublish target to Makefile"
-    status: pending
+    status: done
     ticket: mc-8834
     acceptance:
       - "Makefile has 'prepublish' target"
