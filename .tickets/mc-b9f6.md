@@ -21,3 +21,9 @@ Runs quality checks before publish
 Uses trusted publishing (id-token permission)
 Uses pypa/gh-action-pypi-publish action
 
+
+## Notes
+
+**2026-01-19T00:53:59Z**
+
+Workflow created but later removed in favor of manual publishing via 'make prepublish' + twine. See docs/RELEASING.md.
