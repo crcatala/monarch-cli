@@ -1,6 +1,6 @@
 ---
 id: mc-da1f
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-01-18T19:15:00Z
@@ -87,3 +87,9 @@ monarch auth login -s file
 - [ ] Documents MONARCH_TOKEN risks explicitly
 - [ ] Provides guidance for CI/CD secret injection
 - [ ] Mentions GitHub Actions, GitLab CI, Docker patterns
+
+## Notes
+
+**2026-01-19T01:04:52Z**
+
+Verified complete: auth.py setup command includes full security guidance

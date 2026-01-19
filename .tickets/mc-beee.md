@@ -1,6 +1,6 @@
 ---
 id: mc-beee
-status: open
+status: closed
 deps: [mc-0e26]
 links: []
 created: 2026-01-18T16:04:18Z
@@ -81,3 +81,9 @@ Transaction and cashflow commands support:
 - [ ] `--dry-run` previews mutations
 - [ ] Error handling consistent across commands
 
+
+## Notes
+
+**2026-01-19T01:05:05Z**
+
+Verified complete: All child command tickets implemented and tested (484 tests pass)

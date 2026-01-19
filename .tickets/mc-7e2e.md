@@ -1,6 +1,6 @@
 ---
 id: mc-7e2e
-status: open
+status: closed
 deps: [mc-4c28, mc-8d99]
 links: []
 created: 2026-01-18T16:05:23Z
@@ -100,3 +100,9 @@ Each command should have clear help text with examples in the docstring.
 - [ ] Help text includes examples
 - [ ] Live test: real accounts returned
 
+
+## Notes
+
+**2026-01-19T01:05:00Z**
+
+Verified complete: commands/accounts.py with list and refresh commands

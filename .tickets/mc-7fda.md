@@ -1,6 +1,6 @@
 ---
 id: mc-7fda
-status: open
+status: closed
 deps: [mc-299b]
 links: []
 created: 2026-01-18T16:06:48Z
@@ -112,3 +112,9 @@ Respect the NO_COLOR environment variable (https://no-color.org/):
 - [ ] MONARCH_CONFIG_DIR override works
 - [ ] Unit tests for config loading
 
+
+## Notes
+
+**2026-01-19T01:04:52Z**
+
+Verified complete: core/config.py with env vars, NO_COLOR support

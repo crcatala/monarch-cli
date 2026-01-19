@@ -1,6 +1,6 @@
 ---
 id: mc-ff18
-status: open
+status: closed
 deps: [mc-3f7c, mc-8d99]
 links: []
 created: 2026-01-18T16:05:58Z
@@ -89,3 +89,9 @@ The get_budgets() API returns the current month's budget by default. Period sele
 - [ ] Help text includes examples
 - [ ] Live test: real budget data returned
 
+
+## Notes
+
+**2026-01-19T01:05:00Z**
+
+Verified complete: commands/budgets.py with list and transform

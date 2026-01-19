@@ -1,6 +1,6 @@
 ---
 id: mc-0c0a
-status: open
+status: closed
 deps: [mc-7e2e, mc-0136, mc-ff18, mc-a185, mc-57e8]
 links: []
 created: 2026-01-18T16:07:03Z
@@ -178,3 +178,9 @@ monarch accounts --help        # Shows account commands
 - [ ] `set_debug()` / `is_debug()` functions added
 - [ ] `set_default_format()` / `get_default_format()` functions added
 - [ ] Error handler uses `is_debug()` for stack traces (instead of `is_verbose()`)
+
+## Notes
+
+**2026-01-19T01:05:00Z**
+
+Verified complete: main.py registers all 6 command groups with global flags
