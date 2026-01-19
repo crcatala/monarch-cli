@@ -30,8 +30,8 @@ Examples of unacceptable behavior:
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the project maintainers. All complaints will be reviewed and
-investigated promptly and fairly.
+reported by contacting the project maintainer at crcatala@gmail.com. All
+complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 
