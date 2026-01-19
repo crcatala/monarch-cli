@@ -7,13 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Additional output formats (planned)
-
-### Changed
-
-- Nothing yet
+Nothing yet.
 
 ## [0.1.0] - 2026-01-18
 
@@ -71,8 +65,11 @@ Initial release of Monarch CLI - a command-line interface for Monarch Money.
 
 #### Configuration
 - `MONARCH_CONFIG_DIR` - Custom config directory location
-- `MONARCH_SESSION_TOKEN` - Direct token authentication
-- `MONARCH_OUTPUT_FORMAT` - Default output format preference
+- `MONARCH_TOKEN` - Direct token authentication (for CI/automation)
+- `MONARCH_FORMAT` - Default output format preference
+- `MONARCH_TIMEOUT` - Request timeout in seconds
+- `MONARCH_VERBOSE` - Enable verbose output
+- `NO_COLOR` / `MONARCH_NO_COLOR` - Disable colored output
 
 ### Security
 
