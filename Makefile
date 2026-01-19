@@ -1,4 +1,4 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test release release-dry
+.PHONY: setup verify format format-check lint lint-fix typecheck test release release-dry prepublish
 
 # Setup development environment (run once after cloning)
 setup:
@@ -47,3 +47,13 @@ release:
 # Dry-run release to see what would happen
 release-dry:
 	./scripts/release.sh --dry-run
+
+# Pre-publish verification
+prepublish: verify
+	rm -rf dist/
+	uv build
+	@echo "✓ Build successful"
+	uv run twine check dist/*
+	@echo "✓ Package metadata valid"
+	uv run python -m readme_renderer README.md > /dev/null
+	@echo "✓ README renders correctly"

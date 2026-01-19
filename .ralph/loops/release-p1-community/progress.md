@@ -44,3 +44,12 @@
 - Files changed: .github/workflows/publish.yml
 - **Learnings:** Trusted publishing eliminates need for PyPI API tokens - uses OpenID Connect instead
 ---
+
+## [2026-01-18 16:08] - add-prepublish-target (mc-8834)
+- Added 'prepublish' target to Makefile that depends on verify
+- Target cleans dist/, runs uv build, validates with twine check, and renders README
+- Added prepublish to .PHONY line
+- Verified 'make prepublish' runs successfully
+- Files changed: Makefile
+- **Learnings:** twine and readme-renderer were already in dev dependencies (pyproject.toml)
+---

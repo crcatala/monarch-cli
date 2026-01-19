@@ -116,7 +116,7 @@ tasks:
 
   - id: add-prepublish-target
     title: "Add prepublish target to Makefile"
-    status: pending
+    status: done
     ticket: mc-8834
     acceptance:
       - "Makefile has 'prepublish' target"
