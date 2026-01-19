@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+#### Layered Configuration System
+- **Config file support** - Create `~/.config/monarch-cli/config.toml` for persistent settings
+- **Layered precedence** - Config file → Environment variables → CLI flags (highest priority)
+- **Source tracking** - `config.get_source("key")` returns where each setting came from (`default`, `file`, `env`, or `cli`)
+- **`--timeout` flag** - Override API request timeout per-command (e.g., `monarch accounts list --timeout 60`)
+
+#### Network Resilience
+- **Automatic retry** - API calls now retry on transient network errors with exponential backoff
+- **Configurable timeout** - `MONARCH_TIMEOUT` and config file `timeout` setting now functional
+- **Configurable retries** - `MONARCH_MAX_RETRIES` and config file `max_retries` setting now functional
+
+### Changed
+
+- **Default output format** - Changed from `json` to `plain` for interactive terminal use
+  - TTY: Human-friendly output with emoji icons
+  - Piped/redirected: Automatic JSON output (backwards compatible)
+
+### Fixed
+
+- **Color auto-detection** - `NO_COLOR`, `TERM=dumb`, and non-TTY now properly disable color
+  - Previously, color settings bypassed auto-detection, causing ANSI codes in piped output
+- **Environment variables** - `MONARCH_TIMEOUT`, `MONARCH_MAX_RETRIES` were documented but non-functional; now wired up to actual API calls
 
 ## [0.1.0] - 2026-01-18
 
