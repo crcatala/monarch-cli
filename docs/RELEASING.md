@@ -47,13 +47,21 @@ chmod 600 ~/.pypirc
 1. Update version in `src/monarch_cli/__init__.py`
 2. Update `CHANGELOG.md` with release notes under the new version header
 
-### Step 2: Test on TestPyPI
+### Step 2: Verify & Build
 
-Build and upload to TestPyPI first:
+Run the prepublish target to verify everything and build the package:
 
 ```bash
-rm -rf dist/
-uv build
+make prepublish
+```
+
+This runs all quality checks (format, lint, typecheck, test), builds the package, validates metadata with twine, and confirms the README renders correctly.
+
+### Step 3: Test on TestPyPI
+
+Upload to TestPyPI first:
+
+```bash
 uv run twine upload --repository testpypi dist/*
 ```
 
@@ -77,7 +85,7 @@ rm -rf /tmp/test-monarch
 
 Check the package page looks correct: `https://test.pypi.org/project/monarch-cli/`
 
-### Step 3: Create GitHub Release
+### Step 4: Create GitHub Release
 
 Once TestPyPI looks good, create the GitHub release:
 
@@ -92,7 +100,7 @@ This will:
 - Create a GitHub release with changelog notes
 - Upload wheel and tarball as release assets
 
-### Step 4: Publish to PyPI
+### Step 5: Publish to PyPI
 
 After the GitHub release is created:
 
@@ -106,8 +114,7 @@ Verify at: `https://pypi.org/project/monarch-cli/`
 
 | Action | Command |
 |--------|---------|
-| Build package | `uv build` |
-| Validate package | `uv run twine check dist/*` |
+| Verify + build + validate | `make prepublish` |
 | Upload to TestPyPI | `uv run twine upload --repository testpypi dist/*` |
 | Upload to PyPI | `uv run twine upload dist/*` |
 | Preview GitHub release | `make release-dry` |
