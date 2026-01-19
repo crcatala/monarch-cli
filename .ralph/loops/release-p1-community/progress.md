@@ -12,3 +12,10 @@
 - Files changed: CONTRIBUTING.md
 - **Learnings:** Templates in plans/RELEASE-READINESS-v0.1.0.md are well-structured and can be used directly after substituting variables
 ---
+
+## [2026-01-18 16:04] - create-security (mc-5db9)
+- Created SECURITY.md with supported versions table, vulnerability reporting instructions, and security considerations
+- Replaced ${AUTHOR_EMAIL} placeholder with crcatala@gmail.com
+- Files changed: SECURITY.md
+- **Learnings:** Template uses ${VAR} syntax for placeholders - easy to search and replace
+---

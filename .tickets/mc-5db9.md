@@ -1,6 +1,6 @@
 ---
 id: mc-5db9
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-01-18T22:28:02Z
