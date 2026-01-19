@@ -146,7 +146,7 @@ tasks:
 
   - id: verify-completions
     title: "Verify shell completions work"
-    status: pending
+    status: done
     ticket: mc-0902
     acceptance:
       - "'monarch --show-completion bash' outputs valid bash completion script"
