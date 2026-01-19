@@ -19,3 +19,10 @@
 - Files changed: SECURITY.md
 - **Learnings:** Template uses ${VAR} syntax for placeholders - easy to search and replace
 ---
+
+## [2026-01-18 16:05] - create-coc (mc-bcb5)
+- Created CODE_OF_CONDUCT.md using Contributor Covenant v2.1 template
+- Contains Our Pledge, Our Standards (positive and unacceptable behaviors), Enforcement, and Attribution sections
+- Files changed: CODE_OF_CONDUCT.md
+- **Learnings:** Standard Contributor Covenant template requires no variable substitution - can be used verbatim
+---

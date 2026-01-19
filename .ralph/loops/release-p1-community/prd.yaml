@@ -52,7 +52,7 @@ tasks:
 
   - id: create-coc
     title: "Create CODE_OF_CONDUCT.md"
-    status: pending
+    status: done
     ticket: mc-bcb5
     acceptance:
       - "CODE_OF_CONDUCT.md exists in repo root"
