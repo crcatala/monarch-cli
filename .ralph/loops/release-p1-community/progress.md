@@ -26,3 +26,12 @@
 - Files changed: CODE_OF_CONDUCT.md
 - **Learnings:** Standard Contributor Covenant template requires no variable substitution - can be used verbatim
 ---
+
+## [2026-01-18 16:06] - create-issue-templates (mc-cbf7)
+- Created .github/ISSUE_TEMPLATE/ directory with bug_report.md, feature_request.md, and config.yml
+- Bug report includes: Description, Steps to Reproduce, Expected/Actual Behavior, Environment sections
+- Feature request includes: Problem Statement, Proposed Solution, Alternatives Considered, Additional Context sections
+- config.yml enables blank issues and links to documentation
+- Files changed: .github/ISSUE_TEMPLATE/bug_report.md, .github/ISSUE_TEMPLATE/feature_request.md, .github/ISSUE_TEMPLATE/config.yml
+- **Learnings:** GitHub issue templates require YAML frontmatter with name, about, title, labels, and assignees fields
+---

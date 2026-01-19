@@ -67,7 +67,7 @@ tasks:
 
   - id: create-issue-templates
     title: "Create GitHub issue templates"
-    status: pending
+    status: done
     ticket: mc-cbf7
     acceptance:
       - ".github/ISSUE_TEMPLATE/ directory exists"
