@@ -3,7 +3,16 @@
 import typer
 
 from monarch_cli import __version__
-from monarch_cli.commands import accounts, api, auth, budgets, cashflow, categories, transactions
+from monarch_cli.commands import (
+    accounts,
+    api,
+    auth,
+    budgets,
+    cashflow,
+    categories,
+    investments,
+    transactions,
+)
 from monarch_cli.core.config import get_config, set_config
 from monarch_cli.output import apply_config
 
@@ -17,6 +26,7 @@ app.add_typer(budgets.app, name="budgets")
 app.add_typer(cashflow.app, name="cashflow")
 app.add_typer(categories.app, name="categories")
 app.command("api")(api.api_cmd)
+app.add_typer(investments.app, name="investments")
 
 
 def version_callback(value: bool) -> None:

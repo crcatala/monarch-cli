@@ -142,6 +142,16 @@ monarch api GetTransactions --query-file query.graphql -F limit=100
 monarch api GetTransactions --query-file query.graphql --variables-json '{"limit": 100}'
 ```
 
+### investments
+
+```bash
+monarch investments holdings                    # List visible investment holdings
+monarch investments holdings --json             # JSON format
+monarch investments holdings --format table     # Table format
+monarch investments holdings --aggregate        # Combine by ticker/name
+monarch investments holdings --account ACC123   # Query a specific investment account
+```
+
 ### transactions
 
 ```bash
