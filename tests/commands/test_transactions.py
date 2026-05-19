@@ -572,6 +572,144 @@ class TestTransactionsUpdate:
         assert "dry-run" in output.lower()
 
 
+class TestTransactionsAttach:
+    """Tests for the transactions attach command."""
+
+    def test_attach_uploads_file(
+        self,
+        mock_authenticated_client: MagicMock,
+        tmp_path,
+    ) -> None:
+        """Attach uploads file bytes to the Monarch API."""
+        receipt = tmp_path / "receipt.pdf"
+        receipt.write_bytes(b"%PDF test receipt")
+        upload_calls: list[dict] = []
+
+        async def async_upload_attachment(**kwargs):
+            upload_calls.append(kwargs)
+            return {"addTransactionAttachment": {"attachment": {"id": "att_123"}}}
+
+        mock_authenticated_client.upload_attachment = async_upload_attachment
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["attach", "txn_123", str(receipt)])
+
+            assert result.exit_code == 0
+            parsed = json.loads(result.stdout)
+            assert parsed["status"] == "attached"
+            assert parsed["transaction_id"] == "txn_123"
+            assert parsed["filename"] == "receipt.pdf"
+            assert parsed["notes_updated"] is False
+            assert upload_calls == [
+                {
+                    "transaction_id": "txn_123",
+                    "file_content": b"%PDF test receipt",
+                    "filename": "receipt.pdf",
+                }
+            ]
+
+    def test_attach_with_filename_and_notes(
+        self,
+        mock_authenticated_client: MagicMock,
+        tmp_path,
+    ) -> None:
+        """Attach can override filename and update notes."""
+        receipt = tmp_path / "local-name.png"
+        receipt.write_bytes(b"png bytes")
+        upload_calls: list[dict] = []
+        update_calls: list[dict] = []
+
+        async def async_upload_attachment(**kwargs):
+            upload_calls.append(kwargs)
+            return {"ok": True}
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+            return {"updated": True}
+
+        mock_authenticated_client.upload_attachment = async_upload_attachment
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "attach",
+                    "txn_123",
+                    str(receipt),
+                    "--filename",
+                    "merchant-receipt.png",
+                    "--notes",
+                    "Receipt: merchant, $12.34.",
+                ],
+            )
+
+            assert result.exit_code == 0
+            parsed = json.loads(result.stdout)
+            assert parsed["filename"] == "merchant-receipt.png"
+            assert parsed["notes_updated"] is True
+            assert upload_calls[0]["filename"] == "merchant-receipt.png"
+            assert update_calls == [
+                {
+                    "transaction_id": "txn_123",
+                    "notes": "Receipt: merchant, $12.34.",
+                }
+            ]
+
+    def test_attach_dry_run_does_not_authenticate(self, tmp_path) -> None:
+        """Dry run validates the file and reports planned upload only."""
+        receipt = tmp_path / "receipt.pdf"
+        receipt.write_bytes(b"receipt")
+
+        with (
+            patch("monarch_cli.commands.transactions.get_authenticated_client") as auth,
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["attach", "txn_123", str(receipt), "--notes", "Receipt note", "--dry-run"],
+            )
+
+            assert result.exit_code == 0
+            parsed = json.loads(result.stdout)
+            assert parsed["status"] == "dry_run"
+            assert parsed["filename"] == "receipt.pdf"
+            assert parsed["notes"] == "Receipt note"
+            auth.assert_not_called()
+
+    def test_attach_missing_file_shows_typer_error(self) -> None:
+        """Attach rejects missing files before authentication."""
+        result = runner.invoke(app, ["attach", "txn_123", "/tmp/does-not-exist.pdf"])
+
+        assert result.exit_code != 0
+        assert "does not" in result.stderr.lower()
+        assert "exist" in result.stderr.lower()
+
+    def test_attach_help_shows_examples(self) -> None:
+        """Attach --help shows examples."""
+        result = runner.invoke(app, ["attach", "--help"])
+
+        assert result.exit_code == 0
+        import re
+
+        output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+        assert "monarch transactions attach" in output
+        assert "--filename" in output
+        assert "--dry-run" in output
+
+
 class TestTransactionsApp:
     """Tests for the transactions app structure."""
 

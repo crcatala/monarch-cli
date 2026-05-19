@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from datetime import date
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -303,6 +304,108 @@ def update(
             "status": "updated",
             "transaction_id": transaction_id,
             "changes": changes,
+        }
+    )
+
+
+@app.command("attach")
+@handle_errors
+def attach(
+    transaction_id: Annotated[
+        str,
+        typer.Argument(help="Transaction ID to attach the file to"),
+    ],
+    file_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Receipt or supporting document to upload",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ],
+    filename: Annotated[
+        str | None,
+        typer.Option(
+            "--filename",
+            help="Filename to store in Monarch (defaults to the local basename)",
+        ),
+    ] = None,
+    notes: Annotated[
+        str | None,
+        typer.Option(
+            "--notes",
+            help="Optionally replace the transaction notes after uploading",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Show what would be uploaded without applying changes",
+        ),
+    ] = False,
+) -> None:
+    """Upload a receipt or attachment to a transaction.
+
+    The command uses Monarch's transaction attachment upload API exposed by
+    monarchmoneycommunity. Pass --notes when the receipt upload and note update
+    should be verified as one workflow.
+
+    Examples:
+        monarch transactions attach TXN123 ./receipt.pdf
+        monarch transactions attach TXN123 ./receipt.png --notes "Receipt: dinner, $42.18."
+        monarch transactions attach TXN123 ./receipt.pdf --filename vendor-receipt.pdf
+    """
+    upload_filename = filename or file_path.name
+    file_size = file_path.stat().st_size
+
+    if dry_run:
+        output(
+            {
+                "status": "dry_run",
+                "transaction_id": transaction_id,
+                "file": str(file_path),
+                "filename": upload_filename,
+                "size_bytes": file_size,
+                "notes": notes,
+                "message": "No attachment uploaded (dry run mode)",
+            }
+        )
+        return
+
+    file_content = file_path.read_bytes()
+
+    with spinner("Uploading transaction attachment..."):
+        client = get_authenticated_client()
+        attachment_result = run_api_call(
+            lambda: client.upload_attachment(
+                transaction_id=transaction_id,
+                file_content=file_content,
+                filename=upload_filename,
+            )
+        )
+        note_result = None
+        if notes is not None:
+            note_result = run_api_call(
+                lambda: client.update_transaction(
+                    transaction_id=transaction_id,
+                    notes=notes,
+                )
+            )
+
+    output(
+        {
+            "status": "attached",
+            "transaction_id": transaction_id,
+            "file": str(file_path),
+            "filename": upload_filename,
+            "size_bytes": file_size,
+            "notes_updated": notes is not None,
+            "attachment_result": attachment_result,
+            "note_result": note_result,
         }
     )
 

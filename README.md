@@ -149,6 +149,11 @@ monarch transactions update TXN123 --notes "Business expense"
 monarch transactions update TXN123 --date 2024-01-15
 monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
 
+# Attach a receipt or supporting document
+monarch transactions attach TXN123 ./receipt.pdf
+monarch transactions attach TXN123 ./receipt.png --notes "Receipt: dinner, $42.18."
+monarch transactions attach TXN123 ./receipt.pdf --filename vendor-receipt.pdf
+
 # Batch update multiple transactions
 monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 ```

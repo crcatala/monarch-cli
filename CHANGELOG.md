@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable timeout** - `MONARCH_TIMEOUT` and config file `timeout` setting now functional
 - **Configurable retries** - `MONARCH_MAX_RETRIES` and config file `max_retries` setting now functional
 
+#### Transaction Attachments
+- **Receipt upload command** - `monarch transactions attach TXN123 ./receipt.pdf` uploads a receipt or supporting document to a transaction.
+- **Atomic receipt workflow** - `--notes` can update transaction notes after a successful attachment upload.
+- **Upload preview** - `--dry-run` validates the file and reports the planned attachment without authenticating or mutating Monarch.
+
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
