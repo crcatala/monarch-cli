@@ -130,6 +130,18 @@ monarch accounts refresh         # Refresh all account data
 monarch accounts refresh ACC123  # Refresh specific account
 ```
 
+### api
+
+Raw GraphQL escape hatch for Monarch endpoints that do not have first-class CLI commands yet.
+
+```bash
+monarch api docs
+monarch api docs --output monarch-api-docs.md
+monarch api GetAccounts --query 'query GetAccounts { accounts { id displayName } }'
+monarch api GetTransactions --query-file query.graphql -F limit=100
+monarch api GetTransactions --query-file query.graphql --variables-json '{"limit": 100}'
+```
+
 ### transactions
 
 ```bash
