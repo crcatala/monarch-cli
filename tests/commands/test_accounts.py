@@ -322,6 +322,180 @@ class TestAccountsRefresh:
         assert "monarch accounts refresh" in output
         assert "account" in output.lower()
 
+    def test_refresh_waits_when_requested(self, mock_authenticated_client: MagicMock) -> None:
+        """Refresh --wait calls the wait-capable API."""
+        captured: dict = {}
+
+        async def async_refresh_and_wait(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        mock_authenticated_client.request_accounts_refresh_and_wait = async_refresh_and_wait
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["refresh", "-a", "acc_123", "--wait", "--timeout", "120", "--delay", "5"],
+            )
+
+            assert result.exit_code == 0
+            assert captured == {"account_ids": ["acc_123"], "timeout": 120, "delay": 5}
+            assert json.loads(result.stdout)["status"] == "complete"
+
+
+class TestAccountsApiCoverage:
+    """Tests for API-backed account workflows."""
+
+    def test_history_calls_account_history(self, mock_authenticated_client: MagicMock) -> None:
+        """Account history command calls get_account_history."""
+
+        async def async_history(account_id: int):
+            return {"account_id": account_id, "history": []}
+
+        mock_authenticated_client.get_account_history = async_history
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["history", "123", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout)["account_id"] == 123
+
+    def test_create_manual_account(self, mock_authenticated_client: MagicMock) -> None:
+        """Manual account creation maps CLI options to API args."""
+        captured: dict = {}
+
+        async def async_create(**kwargs):
+            captured.update(kwargs)
+            return {"id": "acc_manual"}
+
+        mock_authenticated_client.create_manual_account = async_create
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "create",
+                    "--name",
+                    "Cash",
+                    "--type",
+                    "cash",
+                    "--subtype",
+                    "cash",
+                    "--balance",
+                    "42.50",
+                    "--exclude-from-net-worth",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured == {
+                "account_type": "cash",
+                "account_sub_type": "cash",
+                "is_in_net_worth": False,
+                "account_name": "Cash",
+                "account_balance": 42.50,
+            }
+
+    def test_update_account_metadata(self, mock_authenticated_client: MagicMock) -> None:
+        """Account update sends only requested fields."""
+        captured: dict = {}
+
+        async def async_update(**kwargs):
+            captured.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_account = async_update
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["update", "acc_123", "--name", "Brokerage", "--balance", "100", "--json"],
+            )
+
+            assert result.exit_code == 0
+            assert captured == {
+                "account_id": "acc_123",
+                "account_name": "Brokerage",
+                "account_balance": 100.0,
+            }
+
+    def test_delete_requires_yes(self) -> None:
+        """Account delete is guarded."""
+        result = runner.invoke(app, ["delete", "acc_123"])
+
+        assert result.exit_code == 1
+        assert "requires --yes" in result.stdout
+
+    def test_recent_balances_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Recent balances command calls get_recent_account_balances."""
+        captured: dict = {}
+
+        async def async_recent(**kwargs):
+            captured.update(kwargs)
+            return {"balances": []}
+
+        mock_authenticated_client.get_recent_account_balances = async_recent
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["recent-balances", "--start", "2024-01-01", "--json"])
+
+            assert result.exit_code == 0
+            assert captured == {"start_date": "2024-01-01"}
+
+    def test_refresh_status_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Refresh status command calls is_accounts_refresh_complete."""
+        captured: dict = {}
+
+        async def async_status(**kwargs):
+            captured.update(kwargs)
+            return False
+
+        mock_authenticated_client.is_accounts_refresh_complete = async_status
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["refresh-status", "-a", "acc_123", "--json"])
+
+            assert result.exit_code == 0
+            assert captured == {"account_ids": ["acc_123"]}
+            assert json.loads(result.stdout)["complete"] is False
+
 
 class TestAccountsApp:
     """Tests for the accounts app structure."""

@@ -276,6 +276,62 @@ class TestTransactionsList:
             assert result.exit_code == 0
             assert captured_kwargs["search"] == "coffee"
 
+    def test_list_with_api_filters(
+        self,
+        mock_authenticated_client: MagicMock,
+        sample_transactions_response: dict,
+    ) -> None:
+        """List exposes full upstream transaction filters."""
+        captured_kwargs = {}
+
+        async def async_get_transactions(**kwargs):
+            captured_kwargs.update(kwargs)
+            return sample_transactions_response
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "list",
+                    "--category",
+                    "cat_tax",
+                    "--tag",
+                    "tag_tax",
+                    "--has-attachments",
+                    "--has-notes",
+                    "--hidden-from-reports",
+                    "--is-split",
+                    "--is-recurring",
+                    "--imported-from-mint",
+                    "--synced-from-institution",
+                    "--needs-review",
+                    "--visibility",
+                    "all_transactions",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured_kwargs["category_ids"] == ["cat_tax"]
+            assert captured_kwargs["tag_ids"] == ["tag_tax"]
+            assert captured_kwargs["has_attachments"] is True
+            assert captured_kwargs["has_notes"] is True
+            assert captured_kwargs["hidden_from_reports"] is True
+            assert captured_kwargs["is_split"] is True
+            assert captured_kwargs["is_recurring"] is True
+            assert captured_kwargs["imported_from_mint"] is True
+            assert captured_kwargs["synced_from_institution"] is True
+            assert captured_kwargs["needs_review"] is True
+            assert captured_kwargs["transaction_visibility"] == "all_transactions"
+
     def test_list_raw_returns_api_response(
         self,
         mock_authenticated_client: MagicMock,
@@ -536,6 +592,43 @@ class TestTransactionsUpdate:
             assert output["changes"]["merchant_name"] == "Lunch"
             assert output["changes"]["notes"] == "Team lunch"
 
+    def test_update_with_goal_visibility_and_review_flags(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Update exposes goal, report visibility, and review flags."""
+        captured_kwargs: dict = {}
+
+        async def async_update_transaction(**kwargs):
+            captured_kwargs.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "update",
+                    "txn_123",
+                    "--goal",
+                    "goal_1",
+                    "--hide-from-reports",
+                    "--needs-review",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured_kwargs["goal_id"] == "goal_1"
+            assert captured_kwargs["hide_from_reports"] is True
+            assert captured_kwargs["needs_review"] is True
+
     def test_update_dry_run(self) -> None:
         """Update with --dry-run shows changes without applying."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
@@ -570,6 +663,164 @@ class TestTransactionsUpdate:
         assert "monarch transactions update" in output
         assert "amount" in output.lower()
         assert "dry-run" in output.lower()
+
+
+class TestTransactionsApiCoverage:
+    """Tests for API-backed transaction workflows."""
+
+    def test_create_manual_transaction(self, mock_authenticated_client: MagicMock) -> None:
+        """Create command maps required fields to API."""
+        captured: dict = {}
+
+        async def async_create(**kwargs):
+            captured.update(kwargs)
+            return {"id": "txn_new"}
+
+        mock_authenticated_client.create_transaction = async_create
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "create",
+                    "--date",
+                    "2024-01-15",
+                    "--account",
+                    "acc_123",
+                    "--amount",
+                    "-12.34",
+                    "--merchant",
+                    "Coffee",
+                    "--category",
+                    "cat_123",
+                    "--notes",
+                    "latte",
+                    "--update-balance",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured["date"] == "2024-01-15"
+            assert captured["account_id"] == "acc_123"
+            assert captured["amount"] == -12.34
+            assert captured["merchant_name"] == "Coffee"
+            assert captured["category_id"] == "cat_123"
+            assert captured["notes"] == "latte"
+            assert captured["update_balance"] is True
+
+    def test_show_calls_transaction_details(self, mock_authenticated_client: MagicMock) -> None:
+        """Show command calls get_transaction_details."""
+
+        async def async_details(transaction_id: str, redirect_posted: bool = True):
+            return {"id": transaction_id, "redirect": redirect_posted}
+
+        mock_authenticated_client.get_transaction_details = async_details
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["show", "txn_123", "--no-redirect-posted", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout) == {"id": "txn_123", "redirect": False}
+
+    def test_delete_requires_yes(self) -> None:
+        """Transaction delete is guarded."""
+        result = runner.invoke(app, ["delete", "txn_123"])
+
+        assert result.exit_code == 1
+        assert "requires --yes" in result.stdout
+
+    def test_duplicates_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Duplicate finder passes filters to API."""
+        captured: dict = {}
+
+        async def async_duplicates(**kwargs):
+            captured.update(kwargs)
+            return []
+
+        mock_authenticated_client.find_duplicate_transactions = async_duplicates
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["duplicates", "--start", "2024-01-01", "--account", "acc_123", "--json"],
+            )
+
+            assert result.exit_code == 0
+            assert captured["start_date"] == "2024-01-01"
+            assert captured["account_ids"] == ["acc_123"]
+
+    def test_tags_set_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Tag assignment command calls set_transaction_tags."""
+        captured: dict = {}
+
+        async def async_set_tags(**kwargs):
+            captured.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.set_transaction_tags = async_set_tags
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["tags", "set", "txn_123", "--tag", "tag_tax"])
+
+            assert result.exit_code == 0
+            assert captured == {"transaction_id": "txn_123", "tag_ids": ["tag_tax"]}
+
+    def test_splits_update_reads_json(self, mock_authenticated_client: MagicMock) -> None:
+        """Split update accepts JSON split data."""
+        captured: dict = {}
+
+        async def async_update_splits(**kwargs):
+            captured.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction_splits = async_update_splits
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "splits",
+                    "update",
+                    "txn_123",
+                    "--splits-json",
+                    '[{"amount": 10, "category_id": "cat_1"}]',
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured["transaction_id"] == "txn_123"
+            assert captured["split_data"] == [{"amount": 10, "category_id": "cat_1"}]
 
 
 class TestTransactionsAttach:

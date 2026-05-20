@@ -378,6 +378,100 @@ class TestBudgetsList:
         assert "json" in output.lower()
         assert "format" in output.lower()
 
+    def test_list_accepts_explicit_date_range(
+        self,
+        mock_authenticated_client: MagicMock,
+        sample_budgets_response: dict,
+    ) -> None:
+        """Budget list passes explicit date range to API."""
+        captured: dict = {}
+
+        async def async_budgets(**kwargs):
+            captured.update(kwargs)
+            return sample_budgets_response
+
+        mock_authenticated_client.get_budgets = async_budgets
+
+        with (
+            patch(
+                "monarch_cli.commands.budgets.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["--start", "2024-01-01", "--end", "2024-03-31", "--json"],
+            )
+
+            assert result.exit_code == 0
+            assert captured["start_date"] == "2024-01-01"
+            assert captured["end_date"] == "2024-03-31"
+
+
+class TestBudgetMutations:
+    """Tests for API-backed budget mutations."""
+
+    def test_set_budget_amount(self, mock_authenticated_client: MagicMock) -> None:
+        """Set command updates a category budget."""
+        captured: dict = {}
+
+        async def async_set_budget(**kwargs):
+            captured.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.set_budget_amount = async_set_budget
+
+        with (
+            patch(
+                "monarch_cli.commands.budgets.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "set",
+                    "--amount",
+                    "800",
+                    "--category",
+                    "cat_dining",
+                    "--start",
+                    "2024-06-01",
+                    "--future",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured["amount"] == 800.0
+            assert captured["category_id"] == "cat_dining"
+            assert captured["start_date"] == "2024-06-01"
+            assert captured["apply_to_future"] is True
+
+    def test_flexible_budget_update(self, mock_authenticated_client: MagicMock) -> None:
+        """Flexible budget command calls update_flexible_budget."""
+        captured: dict = {}
+
+        async def async_flexible(**kwargs):
+            captured.update(kwargs)
+            return {"success": True}
+
+        mock_authenticated_client.update_flexible_budget = async_flexible
+
+        with (
+            patch(
+                "monarch_cli.commands.budgets.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["flexible", "--amount", "1200", "--future"])
+
+            assert result.exit_code == 0
+            assert captured["amount"] == 1200.0
+            assert captured["apply_to_future"] is True
+
 
 class TestBudgetsApp:
     """Tests for the budgets app structure."""

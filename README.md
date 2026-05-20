@@ -127,7 +127,17 @@ monarch accounts list --format table  # Table format
 monarch accounts list --raw      # Raw API response
 
 monarch accounts refresh         # Refresh all account data
-monarch accounts refresh ACC123  # Refresh specific account
+monarch accounts refresh -a ACC123 --wait  # Refresh and wait for sync
+monarch accounts refresh-status -a ACC123  # Check refresh completion
+monarch accounts history ACC123            # Balance history over time
+monarch accounts holdings ACC123           # Holdings for one investment account
+monarch accounts recent-balances --start 2024-01-01
+monarch accounts snapshots --start 2024-01-01 --timeframe month
+monarch accounts aggregate-snapshots --start 2024-01-01 --end 2024-12-31
+monarch accounts create --name Cash --type cash --subtype cash --balance 100
+monarch accounts update ACC123 --name "Brokerage" --exclude-from-net-worth
+monarch accounts upload-history ACC123 balances.csv
+monarch accounts delete ACC123 --yes
 ```
 
 ### api
@@ -162,6 +172,11 @@ monarch transactions list --preset this-month
 monarch transactions list --start 2024-01-01 --end 2024-01-31
 monarch transactions list --account ACC123
 monarch transactions list --search "grocery"
+monarch transactions list --needs-review
+monarch transactions list --has-attachments
+monarch transactions list --missing-attachments
+monarch transactions list --hidden-from-reports
+monarch transactions list --tag TAG123 --category CAT456
 
 # Update a transaction
 monarch transactions update TXN123 --amount 25.50
@@ -169,12 +184,29 @@ monarch transactions update TXN123 --description "Coffee Shop"
 monarch transactions update TXN123 --category CAT456
 monarch transactions update TXN123 --notes "Business expense"
 monarch transactions update TXN123 --date 2024-01-15
+monarch transactions update TXN123 --hide-from-reports
+monarch transactions update TXN123 --needs-review
+monarch transactions update TXN123 --goal GOAL123
 monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
+
+# Create, inspect, delete, and de-duplicate
+monarch transactions create --date 2024-01-15 --account ACC123 --amount -12.34 --merchant "Coffee" --category CAT456
+monarch transactions show TXN123
+monarch transactions delete TXN123 --yes
+monarch transactions duplicates --start 2024-01-01 --account ACC123
 
 # Attach a receipt or supporting document
 monarch transactions attach TXN123 ./receipt.pdf
 monarch transactions attach TXN123 ./receipt.png --notes "Receipt: dinner, $42.18."
 monarch transactions attach TXN123 ./receipt.pdf --filename vendor-receipt.pdf
+
+# Tags and splits
+monarch transactions tags list
+monarch transactions tags create --name Tax --color "#2f855a"
+monarch transactions tags set TXN123 --tag TAG123 --tag TAG456
+monarch transactions tags remove TXN123 --tag TAG123
+monarch transactions splits show TXN123
+monarch transactions splits update TXN123 --splits-file splits.json
 
 # Batch update multiple transactions
 monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
@@ -192,8 +224,14 @@ monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 
 ```bash
 monarch budgets list             # Budget status with spent/remaining
+monarch budgets list --start 2024-06-01 --end 2024-06-30
 monarch budgets list --json      # JSON format
 monarch budgets list --format table
+monarch budgets reset --start 2024-06-01
+monarch budgets set --category CAT_DINING --amount 800 --start 2024-06-01 --future
+monarch budgets set --group GROUP_FOOD --amount 2500
+monarch budgets flexible --amount 1200 --future
+monarch budgets flex-rollover --start-month 2024-01-01 --starting-balance 0
 ```
 
 ### cashflow
@@ -203,6 +241,12 @@ monarch cashflow summary                      # Current period
 monarch cashflow summary --preset this-month  # This month
 monarch cashflow summary --preset ytd         # Year to date
 monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
+monarch cashflow detail --start 2024-01-01 --end 2024-01-31
+monarch cashflow transaction-summary
+monarch cashflow recurring --start 2024-06-01 --end 2024-06-30
+monarch cashflow credit-history
+monarch cashflow subscription
+monarch cashflow institutions
 ```
 
 ### categories
@@ -210,6 +254,10 @@ monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
 ```bash
 monarch categories list          # All transaction categories
 monarch categories list --json   # JSON format
+monarch categories groups
+monarch categories create --group GROUP_FOOD --name "Dining" --icon D --rollover-enabled
+monarch categories delete CAT123 --yes
+monarch categories delete CAT123 CAT456 --yes
 ```
 
 ## Output Formats

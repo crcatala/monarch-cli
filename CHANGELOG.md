@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Atomic receipt workflow** - `--notes` can update transaction notes after a successful attachment upload.
 - **Upload preview** - `--dry-run` validates the file and reports the planned attachment without authenticating or mutating Monarch.
 
+#### API Coverage
+- **Account workflows** - Added account history, holdings, recent balances, snapshots, manual account create/update/delete, balance-history upload, refresh waiting, and refresh status commands.
+- **Transaction workflows** - Added create/show/delete/duplicates, full list filters, report/review/goal update flags, tag list/create/set/remove/clear, and split show/update commands.
+- **Budget workflows** - Added explicit date ranges, reset, category/group budget updates, flexible budget updates, and flex rollover settings.
+- **Category workflows** - Added category groups, create, and guarded single/bulk delete commands.
+- **Reports workflows** - Added detailed cashflow, transactions summary, recurring transactions, credit history, subscription details, and linked institutions commands.
+
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use

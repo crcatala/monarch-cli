@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -22,6 +23,9 @@ app = typer.Typer(
     help="Transaction management",
     no_args_is_help=True,
 )
+
+tags_app = typer.Typer(help="Transaction tag management", no_args_is_help=True)
+splits_app = typer.Typer(help="Transaction split management", no_args_is_help=True)
 
 
 def _parse_date(date_str: str | None) -> date | None:
@@ -97,11 +101,66 @@ def list_cmd(
             help="Filter by account ID (repeatable)",
         ),
     ] = None,
+    category: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-c",
+            "--category",
+            help="Filter by category ID (repeatable)",
+        ),
+    ] = None,
+    tag: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-t",
+            "--tag",
+            help="Filter by transaction tag ID (repeatable)",
+        ),
+    ] = None,
     search: Annotated[
         str | None,
         typer.Option(
             "--search",
             help="Search term for transaction description/merchant",
+        ),
+    ] = None,
+    has_attachments: Annotated[
+        bool | None,
+        typer.Option("--has-attachments/--missing-attachments"),
+    ] = None,
+    has_notes: Annotated[
+        bool | None,
+        typer.Option("--has-notes/--missing-notes"),
+    ] = None,
+    hidden_from_reports: Annotated[
+        bool | None,
+        typer.Option("--hidden-from-reports/--visible-in-reports"),
+    ] = None,
+    is_split: Annotated[
+        bool | None,
+        typer.Option("--is-split/--not-split"),
+    ] = None,
+    is_recurring: Annotated[
+        bool | None,
+        typer.Option("--is-recurring/--not-recurring"),
+    ] = None,
+    imported_from_mint: Annotated[
+        bool | None,
+        typer.Option("--imported-from-mint/--not-imported-from-mint"),
+    ] = None,
+    synced_from_institution: Annotated[
+        bool | None,
+        typer.Option("--synced-from-institution/--not-synced-from-institution"),
+    ] = None,
+    needs_review: Annotated[
+        bool | None,
+        typer.Option("--needs-review/--reviewed"),
+    ] = None,
+    visibility: Annotated[
+        str | None,
+        typer.Option(
+            "--visibility",
+            help="Transaction visibility: hidden_transactions_only or all_transactions",
         ),
     ] = None,
     format: Annotated[
@@ -162,6 +221,8 @@ def list_cmd(
 
     # Prepare account IDs
     account_ids = list(account) if account else []
+    category_ids = list(category) if category else []
+    tag_ids = list(tag) if tag else []
 
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
@@ -172,7 +233,18 @@ def list_cmd(
                 start_date=start_str,
                 end_date=end_str,
                 search=search or "",
+                category_ids=category_ids,
                 account_ids=account_ids,
+                tag_ids=tag_ids,
+                has_attachments=has_attachments,
+                has_notes=has_notes,
+                hidden_from_reports=hidden_from_reports,
+                is_split=is_split,
+                is_recurring=is_recurring,
+                imported_from_mint=imported_from_mint,
+                synced_from_institution=synced_from_institution,
+                needs_review=needs_review,
+                transaction_visibility=visibility,
             )
         )
 
@@ -236,6 +308,27 @@ def update(
             help="New transaction date (YYYY-MM-DD)",
         ),
     ] = None,
+    goal: Annotated[
+        str | None,
+        typer.Option(
+            "--goal",
+            help="Goal ID to assign",
+        ),
+    ] = None,
+    hide_from_reports: Annotated[
+        bool | None,
+        typer.Option(
+            "--hide-from-reports/--show-in-reports",
+            help="Hide or show transaction in reports",
+        ),
+    ] = None,
+    needs_review: Annotated[
+        bool | None,
+        typer.Option(
+            "--needs-review/--clear-review",
+            help="Mark transaction as needing review or reviewed",
+        ),
+    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -269,6 +362,12 @@ def update(
         changes["notes"] = notes
     if date_value is not None:
         changes["date"] = date_value
+    if goal is not None:
+        changes["goal_id"] = goal
+    if hide_from_reports is not None:
+        changes["hide_from_reports"] = hide_from_reports
+    if needs_review is not None:
+        changes["needs_review"] = needs_review
 
     # Require at least one change
     if not changes:
@@ -277,7 +376,8 @@ def update(
                 "status": "error",
                 "transaction_id": transaction_id,
                 "message": "No changes specified. "
-                "Use --amount, --description, --category, --notes, or --date.",
+                "Use --amount, --description, --category, --notes, --date, --goal, "
+                "--hide-from-reports, or --needs-review.",
             }
         )
         raise typer.Exit(1)
@@ -306,6 +406,119 @@ def update(
             "changes": changes,
         }
     )
+
+
+@app.command("create")
+@handle_errors
+def create(
+    date_value: Annotated[str, typer.Option("--date", help="Transaction date (YYYY-MM-DD)")],
+    account: Annotated[str, typer.Option("-a", "--account", help="Account ID")],
+    amount: Annotated[float, typer.Option("--amount", help="Transaction amount")],
+    merchant: Annotated[str, typer.Option("--merchant", help="Merchant name")],
+    category: Annotated[str, typer.Option("-c", "--category", help="Category ID")],
+    notes: Annotated[str, typer.Option("--notes", help="Transaction notes")] = "",
+    update_balance: Annotated[
+        bool,
+        typer.Option("--update-balance", help="Update the manual account balance"),
+    ] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Create a manual transaction."""
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Creating transaction..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.create_transaction(
+                date=date_value,
+                account_id=account,
+                amount=amount,
+                merchant_name=merchant,
+                category_id=category,
+                notes=notes,
+                update_balance=update_balance,
+            )
+        )
+    output(data, output_format)
+
+
+@app.command("show")
+@handle_errors
+def show(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    redirect_posted: Annotated[
+        bool,
+        typer.Option("--redirect-posted/--no-redirect-posted"),
+    ] = True,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Fetch full details for one transaction."""
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Fetching transaction details..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.get_transaction_details(
+                transaction_id=transaction_id,
+                redirect_posted=redirect_posted,
+            )
+        )
+    output(data, output_format)
+
+
+@app.command("delete")
+@handle_errors
+def delete(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID to delete")],
+    yes: Annotated[bool, typer.Option("--yes", help="Confirm transaction deletion")] = False,
+) -> None:
+    """Delete a transaction."""
+    if not yes:
+        output({"status": "error", "message": "Transaction delete requires --yes."})
+        raise typer.Exit(1)
+
+    with spinner("Deleting transaction..."):
+        client = get_authenticated_client()
+        success: bool = run_api_call(lambda: client.delete_transaction(transaction_id))
+    output({"status": "deleted" if success else "failed", "transaction_id": transaction_id})
+
+
+@app.command("duplicates")
+@handle_errors
+def duplicates(
+    start: Annotated[str | None, typer.Option("-s", "--start", help="Start date")] = None,
+    end: Annotated[str | None, typer.Option("-e", "--end", help="End date")] = None,
+    account: Annotated[
+        list[str] | None,
+        typer.Option("-a", "--account", help="Account ID filter, repeatable"),
+    ] = None,
+    page_size: Annotated[int, typer.Option("--page-size", help="Duplicate scan page size")] = 500,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Find duplicate transactions."""
+    output_format = OutputFormat.JSON if json_output else format
+    account_ids = list(account) if account else None
+    with spinner("Finding duplicate transactions..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.find_duplicate_transactions(
+                start_date=start,
+                end_date=end,
+                account_ids=account_ids,
+                page_size=page_size,
+            )
+        )
+    output(data, output_format)
 
 
 @app.command("attach")
@@ -568,3 +781,199 @@ def batch_update(
         result = run_async(do_batch_update())
 
     output(result)
+
+
+@tags_app.command("list")
+@handle_errors
+def tags_list(
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """List all transaction tags."""
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Fetching transaction tags..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(lambda: client.get_transaction_tags())
+    output(data, output_format)
+
+
+@tags_app.command("create")
+@handle_errors
+def tags_create(
+    name: Annotated[str, typer.Option("--name", help="Tag name")],
+    color: Annotated[str, typer.Option("--color", help="Tag color")],
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Create a transaction tag."""
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Creating transaction tag..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(lambda: client.create_transaction_tag(name=name, color=color))
+    output(data, output_format)
+
+
+@tags_app.command("set")
+@handle_errors
+def tags_set(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    tag: Annotated[
+        list[str],
+        typer.Option("-t", "--tag", help="Tag ID to assign. Repeatable."),
+    ],
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Set the exact tag list on a transaction."""
+    output_format = OutputFormat.JSON if json_output else format
+    tag_ids = list(tag)
+    with spinner("Setting transaction tags..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.set_transaction_tags(transaction_id=transaction_id, tag_ids=tag_ids)
+        )
+    output(data, output_format)
+
+
+def _extract_tag_ids(details: dict[str, Any]) -> list[str]:
+    """Extract tag IDs from common transaction detail response shapes."""
+    transaction = (
+        details.get("transaction") if isinstance(details.get("transaction"), dict) else details
+    )
+    raw_tags = transaction.get("tags") if isinstance(transaction, dict) else []
+    if not isinstance(raw_tags, list):
+        return []
+    return [str(tag["id"]) for tag in raw_tags if isinstance(tag, dict) and tag.get("id")]
+
+
+@tags_app.command("remove")
+@handle_errors
+def tags_remove(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    tag: Annotated[
+        list[str],
+        typer.Option("-t", "--tag", help="Tag ID to remove. Repeatable."),
+    ],
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Remove transaction tags while preserving the remaining tags."""
+    output_format = OutputFormat.JSON if json_output else format
+    remove_ids = set(tag)
+    with spinner("Removing transaction tags..."):
+        client = get_authenticated_client()
+        details: dict[str, Any] = run_api_call(
+            lambda: client.get_transaction_details(transaction_id=transaction_id)
+        )
+        remaining = [tag_id for tag_id in _extract_tag_ids(details) if tag_id not in remove_ids]
+        data: Any = run_api_call(
+            lambda: client.set_transaction_tags(transaction_id=transaction_id, tag_ids=remaining)
+        )
+    output(data, output_format)
+
+
+@tags_app.command("clear")
+@handle_errors
+def tags_clear(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+) -> None:
+    """Remove all tags from a transaction."""
+    with spinner("Clearing transaction tags..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.set_transaction_tags(transaction_id=transaction_id, tag_ids=[])
+        )
+    output(data)
+
+
+@splits_app.command("show")
+@handle_errors
+def splits_show(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Read transaction splits."""
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Fetching transaction splits..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(lambda: client.get_transaction_splits(transaction_id))
+    output(data, output_format)
+
+
+def _read_split_data(splits_json: str | None, splits_file: Path | None) -> list[dict[str, Any]]:
+    """Read split payload from inline JSON or a JSON file."""
+    if splits_json is None and splits_file is None:
+        raise typer.BadParameter("Provide --splits-json or --splits-file.")
+    if splits_json is not None and splits_file is not None:
+        raise typer.BadParameter("Use only one of --splits-json or --splits-file.")
+
+    if splits_json is not None:
+        raw = splits_json
+    else:
+        if splits_file is None:
+            raise typer.BadParameter("Provide --splits-json or --splits-file.")
+        raw = splits_file.read_text()
+    data = json.loads(raw)
+    if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+        raise typer.BadParameter("Split data must be a JSON array of objects.")
+    return data
+
+
+@splits_app.command("update")
+@handle_errors
+def splits_update(
+    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    splits_json: Annotated[
+        str | None,
+        typer.Option("--splits-json", help="JSON array of split objects"),
+    ] = None,
+    splits_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--splits-file",
+            help="Path to JSON array of split objects",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Update transaction splits."""
+    output_format = OutputFormat.JSON if json_output else format
+    split_data = _read_split_data(splits_json, splits_file)
+    with spinner("Updating transaction splits..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.update_transaction_splits(
+                transaction_id=transaction_id,
+                split_data=split_data,
+            )
+        )
+    output(data, output_format)
+
+
+app.add_typer(tags_app, name="tags")
+app.add_typer(splits_app, name="splits")
