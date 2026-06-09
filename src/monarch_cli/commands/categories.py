@@ -12,6 +12,7 @@ from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ._mutation import extract_id, mutation_result
 
 app = typer.Typer(
     help=(
@@ -192,7 +193,21 @@ def create(
                 rollover_type=rollover_type,
             )
         )
-    output(data, _resolve_format(format, json_output))
+    output(
+        mutation_result(
+            status="created",
+            entity="category",
+            id=extract_id(
+                data,
+                ("createTransactionCategory", "transactionCategory"),
+                ("createTransactionCategory", "category"),
+            ),
+            name=name,
+            group_id=group,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("delete")
@@ -200,10 +215,19 @@ def create(
 def delete(
     category_ids: Annotated[list[str], typer.Argument(help="Category ID(s) to delete")],
     yes: Annotated[bool, typer.Option("--yes", help="Confirm category deletion")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Delete one or more categories."""
+    output_format = _resolve_format(format, json_output)
     if not yes:
-        output({"status": "error", "message": "Category delete requires --yes."})
+        output(
+            {"status": "error", "entity": "category", "message": "Category delete requires --yes."},
+            output_format,
+        )
         raise typer.Exit(1)
 
     with spinner("Deleting categories..."):
@@ -212,4 +236,14 @@ def delete(
             data: Any = run_api_call(lambda: client.delete_transaction_category(category_ids[0]))
         else:
             data = run_api_call(lambda: client.delete_transaction_categories(category_ids))
-    output({"status": "deleted", "category_ids": category_ids, "result": data})
+    output(
+        mutation_result(
+            status="deleted",
+            entity="category",
+            id=category_ids[0] if len(category_ids) == 1 else None,
+            ids=category_ids,
+            category_ids=category_ids,
+            result=data,
+        ),
+        output_format,
+    )

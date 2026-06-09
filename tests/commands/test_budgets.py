@@ -440,6 +440,7 @@ class TestBudgetMutations:
                     "--start",
                     "2024-06-01",
                     "--future",
+                    "--json",
                 ],
             )
 
@@ -448,6 +449,10 @@ class TestBudgetMutations:
             assert captured["category_id"] == "cat_dining"
             assert captured["start_date"] == "2024-06-01"
             assert captured["apply_to_future"] is True
+            output = json.loads(result.stdout)
+            assert output["id"] == "cat_dining"
+            assert output["entity"] == "budget"
+            assert output["status"] == "updated"
 
     def test_flexible_budget_update(self, mock_authenticated_client: MagicMock) -> None:
         """Flexible budget command calls update_flexible_budget."""
@@ -466,11 +471,73 @@ class TestBudgetMutations:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["flexible", "--amount", "1200", "--future"])
+            result = runner.invoke(app, ["flexible", "--amount", "1200", "--future", "--json"])
 
             assert result.exit_code == 0
             assert captured["amount"] == 1200.0
             assert captured["apply_to_future"] is True
+            output = json.loads(result.stdout)
+            assert output["entity"] == "budget"
+            assert output["status"] == "updated"
+
+    def test_reset_accepts_local_json_flag(self, mock_authenticated_client: MagicMock) -> None:
+        """Reset accepts --json and emits a normalized envelope."""
+
+        async def async_reset(**_kwargs):
+            return {"success": True}
+
+        mock_authenticated_client.reset_budget = async_reset
+
+        with (
+            patch(
+                "monarch_cli.commands.budgets.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["reset", "--start", "2024-06-01", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["entity"] == "budget"
+            assert output["status"] == "reset"
+            assert output["start"] == "2024-06-01"
+
+    def test_flex_rollover_accepts_local_json_flag(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Flex rollover accepts --json and emits a normalized envelope."""
+
+        async def async_rollover(**_kwargs):
+            return {"success": True}
+
+        mock_authenticated_client.update_flex_rollover_settings = async_rollover
+
+        with (
+            patch(
+                "monarch_cli.commands.budgets.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "flex-rollover",
+                    "--start-month",
+                    "2024-06-01",
+                    "--starting-balance",
+                    "25",
+                    "--disabled",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["entity"] == "budget"
+            assert output["status"] == "updated"
+            assert output["result"] == {"success": True}
 
 
 class TestBudgetsApp:

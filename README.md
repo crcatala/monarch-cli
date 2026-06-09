@@ -190,7 +190,9 @@ monarch transactions update TXN123 --goal GOAL123
 monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
 
 # Create, inspect, delete, and de-duplicate
-monarch transactions create --date 2024-01-15 --account ACC123 --amount -12.34 --merchant "Coffee" --category CAT456
+monarch transactions create --date 2024-01-15 --account ACC123 --amount -12.34 --merchant "Coffee" --category CAT456 --json
+monarch transactions create --date 2024-01-15 --account ACC123 --amount 1000 --merchant "Payroll" --category CAT_INCOME --tag TAG123 --dedupe-key date,amount,category,notes --json
+monarch transactions upsert --date 2024-01-15 --account ACC123 --amount 1000 --merchant "Payroll" --category CAT_INCOME --notes "January payroll" --tag TAG123 --json
 monarch transactions show TXN123
 monarch transactions delete TXN123 --yes
 monarch transactions duplicates --start 2024-01-01 --account ACC123
@@ -211,6 +213,14 @@ monarch transactions splits update TXN123 --splits-file splits.json
 # Batch update multiple transactions
 monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 ```
+
+`transactions create --json` and `transactions upsert --json` return a normalized
+object with top-level `id`, `status` (`created` or `existing`), transaction fields,
+`tag_ids`, and `dedupe_key`. The upstream raw create response nests the ID at
+`createTransaction.transaction.id`; the CLI normalizes that shape so scripts can
+read `.id` directly. `--tag` is repeatable and is applied before the command
+returns success. `upsert` defaults to `--dedupe-key date,amount,category,notes`;
+`create` can opt into the same duplicate guard with `--dedupe-key`.
 
 **Date Presets:**
 - `today`, `yesterday`
@@ -284,6 +294,20 @@ monarch accounts list --json
 
 # Auto-detection: JSON when piped
 monarch accounts list | jq '.[0]'
+```
+
+Mutation commands also accept subcommand-local `--json`/`--format` flags, so
+scripts can put output flags at the end of the command. JSON mutation responses
+use a stable envelope:
+
+```json
+{
+  "status": "created|updated|deleted|uploaded|attached|completed|failed|dry_run",
+  "entity": "account|budget|category|transaction|transaction_tag|transaction_split",
+  "id": "primary-id-when-singular",
+  "ids": ["ids-for-batch-or-bulk-commands"],
+  "result": {}
+}
 ```
 
 ## Configuration

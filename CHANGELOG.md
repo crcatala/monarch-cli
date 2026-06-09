@@ -31,18 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Budget workflows** - Added explicit date ranges, reset, category/group budget updates, flexible budget updates, and flex rollover settings.
 - **Category workflows** - Added category groups, create, and guarded single/bulk delete commands.
 - **Reports workflows** - Added detailed cashflow, transactions summary, recurring transactions, credit history, subscription details, and linked institutions commands.
+- **Idempotent manual transactions** - `transactions create` now supports repeatable `--tag` and optional `--dedupe-key`; `transactions upsert` creates only when the default dedupe key does not match an existing row.
 
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
   - TTY: Human-friendly output with emoji icons
   - Piped/redirected: Automatic JSON output (backwards compatible)
+- **Transaction create output** - `transactions create --json` now normalizes the upstream `createTransaction.transaction.id` response to a top-level `id` and includes normalized readback fields for safer scripts.
+- **Mutation output schemas** - Account, budget, category, and transaction write commands now accept subcommand-local `--json`/`--format` flags and return normalized envelopes with `status`, `entity`, top-level `id`/`ids`, and `result`.
 
 ### Fixed
 
 - **Color auto-detection** - `NO_COLOR`, `TERM=dumb`, and non-TTY now properly disable color
   - Previously, color settings bypassed auto-detection, causing ANSI codes in piped output
 - **Environment variables** - `MONARCH_TIMEOUT`, `MONARCH_MAX_RETRIES` were documented but non-functional; now wired up to actual API calls
+- **Manual transaction merchant readback** - Created manual transactions preserve the requested merchant name in normalized output when Monarch returns a blank `plaidName`.
 
 ## [0.1.0] - 2026-01-18
 

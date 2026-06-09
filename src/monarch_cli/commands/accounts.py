@@ -16,6 +16,7 @@ from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 from ..services.accounts import list_accounts, refresh_accounts
+from ._mutation import extract_id, mutation_result
 
 app = typer.Typer(
     help="Account management",
@@ -136,6 +137,11 @@ def refresh(
             help="Polling delay in seconds when --wait is used.",
         ),
     ] = 10,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Request account refresh from linked institutions.
 
@@ -173,7 +179,17 @@ def refresh(
         else:
             result = refresh_accounts(account_ids)
 
-    output(result)
+    refresh_extra: dict[str, Any] = {key: value for key, value in result.items() if key != "status"}
+    output(
+        mutation_result(
+            status=str(result.get("status", "requested")),
+            entity="account",
+            ids=account_ids,
+            result=result,
+            **refresh_extra,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("refresh-status")
@@ -342,7 +358,15 @@ def create(
                 account_balance=balance,
             )
         )
-    output(data, _resolve_format(format, json_output))
+    output(
+        mutation_result(
+            status="created",
+            entity="account",
+            id=extract_id(data),
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("update")
@@ -389,13 +413,25 @@ def update(
         changes["hide_transactions_from_reports"] = hide_transactions_from_reports
 
     if not changes:
-        output({"status": "error", "message": "No account changes specified."})
+        output(
+            {"status": "error", "entity": "account", "message": "No account changes specified."},
+            _resolve_format(format, json_output),
+        )
         raise typer.Exit(1)
 
     with spinner("Updating account..."):
         client = get_authenticated_client()
         data: Any = run_api_call(lambda: client.update_account(account_id=account_id, **changes))
-    output(data, _resolve_format(format, json_output))
+    output(
+        mutation_result(
+            status="updated",
+            entity="account",
+            id=account_id,
+            changes=changes,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("delete")
@@ -403,16 +439,33 @@ def update(
 def delete(
     account_id: Annotated[str, typer.Argument(help="Account ID to delete")],
     yes: Annotated[bool, typer.Option("--yes", help="Confirm account deletion")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Delete an account."""
     if not yes:
-        output({"status": "error", "message": "Account delete requires --yes."})
+        output(
+            {"status": "error", "entity": "account", "message": "Account delete requires --yes."},
+            _resolve_format(format, json_output),
+        )
         raise typer.Exit(1)
 
     with spinner("Deleting account..."):
         client = get_authenticated_client()
         data: Any = run_api_call(lambda: client.delete_account(account_id=account_id))
-    output({"status": "deleted", "account_id": account_id, "result": data})
+    output(
+        mutation_result(
+            status="deleted",
+            entity="account",
+            id=account_id,
+            account_id=account_id,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 def _read_balance_history_csv(path: Path) -> list[BalanceHistoryRow]:
@@ -455,6 +508,11 @@ def upload_history(
     ],
     timeout: Annotated[int, typer.Option("--timeout", help="Upload timeout seconds")] = 300,
     delay: Annotated[int, typer.Option("--delay", help="Polling delay seconds")] = 10,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Upload historical balance CSV data."""
     rows = _read_balance_history_csv(csv_path)
@@ -471,5 +529,13 @@ def upload_history(
             max_retries=0,
         )
     output(
-        {"status": "uploaded" if success else "failed", "account_id": account_id, "rows": len(rows)}
+        mutation_result(
+            status="uploaded" if success else "failed",
+            entity="account",
+            id=account_id,
+            account_id=account_id,
+            rows=len(rows),
+            result=success,
+        ),
+        _resolve_format(format, json_output),
     )

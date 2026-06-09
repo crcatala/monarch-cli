@@ -287,6 +287,7 @@ class TestCategoryMutations:
                     "monthly",
                     "--rollover-start",
                     "2024-01-01",
+                    "--json",
                 ],
             )
 
@@ -294,6 +295,10 @@ class TestCategoryMutations:
             assert captured["group_id"] == "grp_1"
             assert captured["transaction_category_name"] == "Tax"
             assert captured["rollover_enabled"] is True
+            output = json.loads(result.stdout)
+            assert output["id"] == "cat_new"
+            assert output["entity"] == "category"
+            assert output["status"] == "created"
 
     def test_delete_multiple_categories(self, mock_authenticated_client: MagicMock) -> None:
         """Delete command uses bulk deletion for multiple IDs."""
@@ -312,10 +317,15 @@ class TestCategoryMutations:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["delete", "cat_1", "cat_2", "--yes"])
+            result = runner.invoke(app, ["delete", "cat_1", "cat_2", "--yes", "--json"])
 
             assert result.exit_code == 0
             assert captured["category_ids"] == ["cat_1", "cat_2"]
+            output = json.loads(result.stdout)
+            assert output["ids"] == ["cat_1", "cat_2"]
+            assert output["entity"] == "category"
+            assert output["status"] == "deleted"
+            assert output["result"] == [True, True]
 
     def test_list_table_format(
         self,

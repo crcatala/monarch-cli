@@ -592,6 +592,31 @@ class TestTransactionsUpdate:
             assert output["changes"]["merchant_name"] == "Lunch"
             assert output["changes"]["notes"] == "Team lunch"
 
+    def test_update_accepts_json_flag(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Update accepts --json like other transaction write commands."""
+
+        async def async_update_transaction(**_):
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["update", "txn_123", "--notes", "Done", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "updated"
+            assert output["transaction_id"] == "txn_123"
+
     def test_update_with_goal_visibility_and_review_flags(
         self,
         mock_authenticated_client: MagicMock,
@@ -674,9 +699,25 @@ class TestTransactionsApiCoverage:
 
         async def async_create(**kwargs):
             captured.update(kwargs)
-            return {"id": "txn_new"}
+            return {"createTransaction": {"transaction": {"id": "txn_new"}}}
+
+        async def async_details(transaction_id: str, **_kwargs):
+            return {
+                "getTransaction": {
+                    "id": transaction_id,
+                    "date": "2024-01-15",
+                    "amount": -12.34,
+                    "merchant": {"name": "Coffee"},
+                    "plaidName": "",
+                    "category": {"id": "cat_123"},
+                    "account": {"id": "acc_123", "displayName": "Manual Cash"},
+                    "pending": False,
+                    "notes": "latte",
+                }
+            }
 
         mock_authenticated_client.create_transaction = async_create
+        mock_authenticated_client.get_transaction_details = async_details
 
         with (
             patch(
@@ -707,6 +748,10 @@ class TestTransactionsApiCoverage:
             )
 
             assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_new"
+            assert output["status"] == "created"
+            assert output["transaction"]["description"] == "Coffee"
             assert captured["date"] == "2024-01-15"
             assert captured["account_id"] == "acc_123"
             assert captured["amount"] == -12.34
@@ -714,6 +759,182 @@ class TestTransactionsApiCoverage:
             assert captured["category_id"] == "cat_123"
             assert captured["notes"] == "latte"
             assert captured["update_balance"] is True
+
+    def test_create_with_tags_sets_tags_before_success(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Create command accepts repeatable tags and reports tagged result."""
+        tag_calls: list[dict] = []
+
+        async def async_create(**_):
+            return {"createTransaction": {"transaction": {"id": "txn_tagged"}}}
+
+        async def async_set_tags(**kwargs):
+            tag_calls.append(kwargs)
+            return {
+                "setTransactionTags": {
+                    "transaction": {"id": "txn_tagged", "tags": [{"id": "tag_1"}, {"id": "tag_2"}]}
+                }
+            }
+
+        async def async_details(transaction_id: str, **_kwargs):
+            return {"getTransaction": {"id": transaction_id, "merchant": {"name": "Payroll"}}}
+
+        mock_authenticated_client.create_transaction = async_create
+        mock_authenticated_client.set_transaction_tags = async_set_tags
+        mock_authenticated_client.get_transaction_details = async_details
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "create",
+                    "--date",
+                    "2024-01-15",
+                    "--account",
+                    "acc_123",
+                    "--amount",
+                    "1000",
+                    "--merchant",
+                    "Payroll",
+                    "--category",
+                    "cat_income",
+                    "--tag",
+                    "tag_1",
+                    "--tag",
+                    "tag_2",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_tagged"
+            assert output["tag_ids"] == ["tag_1", "tag_2"]
+            assert tag_calls == [{"transaction_id": "txn_tagged", "tag_ids": ["tag_1", "tag_2"]}]
+
+    def test_create_with_dedupe_key_returns_existing_transaction(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Create with --dedupe-key skips creation when a matching row exists."""
+
+        async def async_get_transactions(**kwargs):
+            assert kwargs["start_date"] == "2024-01-15"
+            assert kwargs["end_date"] == "2024-01-15"
+            assert kwargs["account_ids"] == ["acc_123"]
+            assert kwargs["category_ids"] == ["cat_income"]
+            return {
+                "allTransactions": {
+                    "results": [
+                        {
+                            "id": "txn_existing",
+                            "date": "2024-01-15",
+                            "amount": 1000.0,
+                            "merchant": {"name": "Payroll"},
+                            "category": {"id": "cat_income", "name": "Income"},
+                            "account": {"id": "acc_123", "displayName": "Manual Cash"},
+                            "notes": "June payroll",
+                        }
+                    ]
+                }
+            }
+
+        async def async_create(**_):
+            raise AssertionError("create_transaction should not be called")
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+        mock_authenticated_client.create_transaction = async_create
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "create",
+                    "--date",
+                    "2024-01-15",
+                    "--account",
+                    "acc_123",
+                    "--amount",
+                    "1000",
+                    "--merchant",
+                    "Payroll",
+                    "--category",
+                    "cat_income",
+                    "--notes",
+                    "June payroll",
+                    "--dedupe-key",
+                    "date,amount,category,notes",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "existing"
+            assert output["id"] == "txn_existing"
+
+    def test_upsert_uses_default_dedupe_key(self, mock_authenticated_client: MagicMock) -> None:
+        """Upsert is create with a safe default dedupe key."""
+        get_calls: list[dict] = []
+
+        async def async_get_transactions(**kwargs):
+            get_calls.append(kwargs)
+            return {"allTransactions": {"results": []}}
+
+        async def async_create(**_):
+            return {"createTransaction": {"transaction": {"id": "txn_new"}}}
+
+        async def async_details(transaction_id: str, **_kwargs):
+            return {"getTransaction": {"id": transaction_id, "merchant": {"name": "Payroll"}}}
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+        mock_authenticated_client.create_transaction = async_create
+        mock_authenticated_client.get_transaction_details = async_details
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "upsert",
+                    "--date",
+                    "2024-01-15",
+                    "--account",
+                    "acc_123",
+                    "--amount",
+                    "1000",
+                    "--merchant",
+                    "Payroll",
+                    "--category",
+                    "cat_income",
+                    "--notes",
+                    "June payroll",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["status"] == "created"
+            assert output["id"] == "txn_new"
+            assert get_calls
 
     def test_show_calls_transaction_details(self, mock_authenticated_client: MagicMock) -> None:
         """Show command calls get_transaction_details."""
@@ -741,6 +962,30 @@ class TestTransactionsApiCoverage:
 
         assert result.exit_code == 1
         assert "requires --yes" in result.stdout
+
+    def test_delete_accepts_local_json_flag(self, mock_authenticated_client: MagicMock) -> None:
+        """Transaction delete accepts --json and emits a normalized envelope."""
+
+        async def async_delete(transaction_id: str):
+            return transaction_id == "txn_123"
+
+        mock_authenticated_client.delete_transaction = async_delete
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["delete", "txn_123", "--yes", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_123"
+            assert output["entity"] == "transaction"
+            assert output["status"] == "deleted"
+            assert output["result"] is True
 
     def test_duplicates_calls_api(self, mock_authenticated_client: MagicMock) -> None:
         """Duplicate finder passes filters to API."""
@@ -785,10 +1030,66 @@ class TestTransactionsApiCoverage:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["tags", "set", "txn_123", "--tag", "tag_tax"])
+            result = runner.invoke(app, ["tags", "set", "txn_123", "--tag", "tag_tax", "--json"])
 
             assert result.exit_code == 0
             assert captured == {"transaction_id": "txn_123", "tag_ids": ["tag_tax"]}
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_123"
+            assert output["entity"] == "transaction_tag"
+            assert output["status"] == "updated"
+            assert output["tag_ids"] == ["tag_tax"]
+
+    def test_tags_create_returns_normalized_envelope(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Tag create returns top-level id/status/entity."""
+
+        async def async_create_tag(**_kwargs):
+            return {"createTransactionTag": {"transactionTag": {"id": "tag_new"}}}
+
+        mock_authenticated_client.create_transaction_tag = async_create_tag
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app, ["tags", "create", "--name", "Tax", "--color", "#2f855a", "--json"]
+            )
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "tag_new"
+            assert output["entity"] == "transaction_tag"
+            assert output["status"] == "created"
+
+    def test_tags_clear_accepts_local_json_flag(self, mock_authenticated_client: MagicMock) -> None:
+        """Tag clear accepts --json and emits a normalized envelope."""
+
+        async def async_set_tags(**_kwargs):
+            return {"success": True}
+
+        mock_authenticated_client.set_transaction_tags = async_set_tags
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["tags", "clear", "txn_123", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_123"
+            assert output["entity"] == "transaction_tag"
+            assert output["status"] == "updated"
+            assert output["tag_ids"] == []
 
     def test_splits_update_reads_json(self, mock_authenticated_client: MagicMock) -> None:
         """Split update accepts JSON split data."""
@@ -821,6 +1122,10 @@ class TestTransactionsApiCoverage:
             assert result.exit_code == 0
             assert captured["transaction_id"] == "txn_123"
             assert captured["split_data"] == [{"amount": 10, "category_id": "cat_1"}]
+            output = json.loads(result.stdout)
+            assert output["id"] == "txn_123"
+            assert output["entity"] == "transaction_split"
+            assert output["status"] == "updated"
 
 
 class TestTransactionsAttach:
@@ -849,11 +1154,13 @@ class TestTransactionsAttach:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["attach", "txn_123", str(receipt)])
+            result = runner.invoke(app, ["attach", "txn_123", str(receipt), "--json"])
 
             assert result.exit_code == 0
             parsed = json.loads(result.stdout)
             assert parsed["status"] == "attached"
+            assert parsed["id"] == "txn_123"
+            assert parsed["entity"] == "transaction_attachment"
             assert parsed["transaction_id"] == "txn_123"
             assert parsed["filename"] == "receipt.pdf"
             assert parsed["notes_updated"] is False
@@ -904,11 +1211,14 @@ class TestTransactionsAttach:
                     "merchant-receipt.png",
                     "--notes",
                     "Receipt: merchant, $12.34.",
+                    "--json",
                 ],
             )
 
             assert result.exit_code == 0
             parsed = json.loads(result.stdout)
+            assert parsed["id"] == "txn_123"
+            assert parsed["entity"] == "transaction_attachment"
             assert parsed["filename"] == "merchant-receipt.png"
             assert parsed["notes_updated"] is True
             assert upload_calls[0]["filename"] == "merchant-receipt.png"
@@ -930,12 +1240,22 @@ class TestTransactionsAttach:
         ):
             result = runner.invoke(
                 app,
-                ["attach", "txn_123", str(receipt), "--notes", "Receipt note", "--dry-run"],
+                [
+                    "attach",
+                    "txn_123",
+                    str(receipt),
+                    "--notes",
+                    "Receipt note",
+                    "--dry-run",
+                    "--json",
+                ],
             )
 
             assert result.exit_code == 0
             parsed = json.loads(result.stdout)
             assert parsed["status"] == "dry_run"
+            assert parsed["id"] == "txn_123"
+            assert parsed["entity"] == "transaction_attachment"
             assert parsed["filename"] == "receipt.pdf"
             assert parsed["notes"] == "Receipt note"
             auth.assert_not_called()
@@ -1007,15 +1327,22 @@ class TestTransactionsBatchUpdate:
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
             result = runner.invoke(
-                app, ["batch-update", "txn_123", "txn_456", "--category", "cat_food"]
+                app,
+                ["batch-update", "txn_123", "txn_456", "--category", "cat_food", "--json"],
             )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
             assert output["status"] == "completed"
+            assert output["entity"] == "transaction"
+            assert output["ids"] == ["txn_123", "txn_456"]
             assert output["success_count"] == 2
             assert output["failure_count"] == 0
             assert output["changes"]["category_id"] == "cat_food"
+            assert output["results"] == [
+                {"id": "txn_123", "status": "success"},
+                {"id": "txn_456", "status": "success"},
+            ]
             assert len(update_calls) == 2
 
     def test_batch_update_with_notes(

@@ -348,6 +348,25 @@ class TestAccountsRefresh:
             assert captured == {"account_ids": ["acc_123"], "timeout": 120, "delay": 5}
             assert json.loads(result.stdout)["status"] == "complete"
 
+    def test_refresh_accepts_local_json_flag(self) -> None:
+        """Refresh accepts subcommand-local --json for script consistency."""
+        refresh_result = {"status": "ok", "account_count": 1}
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.refresh_accounts",
+                return_value=refresh_result,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["refresh", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["entity"] == "account"
+            assert output["status"] == "ok"
+            assert output["result"] == refresh_result
+
 
 class TestAccountsApiCoverage:
     """Tests for API-backed account workflows."""
@@ -414,6 +433,10 @@ class TestAccountsApiCoverage:
                 "account_name": "Cash",
                 "account_balance": 42.50,
             }
+            output = json.loads(result.stdout)
+            assert output["id"] == "acc_manual"
+            assert output["entity"] == "account"
+            assert output["status"] == "created"
 
     def test_update_account_metadata(self, mock_authenticated_client: MagicMock) -> None:
         """Account update sends only requested fields."""
@@ -443,6 +466,10 @@ class TestAccountsApiCoverage:
                 "account_name": "Brokerage",
                 "account_balance": 100.0,
             }
+            output = json.loads(result.stdout)
+            assert output["id"] == "acc_123"
+            assert output["entity"] == "account"
+            assert output["status"] == "updated"
 
     def test_delete_requires_yes(self) -> None:
         """Account delete is guarded."""
@@ -450,6 +477,58 @@ class TestAccountsApiCoverage:
 
         assert result.exit_code == 1
         assert "requires --yes" in result.stdout
+
+    def test_delete_accepts_local_json_flag(self, mock_authenticated_client: MagicMock) -> None:
+        """Account delete accepts --json and emits a normalized envelope."""
+
+        async def async_delete(account_id: str):
+            return {"deleted": account_id}
+
+        mock_authenticated_client.delete_account = async_delete
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["delete", "acc_123", "--yes", "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "acc_123"
+            assert output["entity"] == "account"
+            assert output["status"] == "deleted"
+            assert output["result"] == {"deleted": "acc_123"}
+
+    def test_upload_history_accepts_local_json_flag(
+        self, mock_authenticated_client: MagicMock, tmp_path
+    ) -> None:
+        """Upload history accepts --json and emits a normalized envelope."""
+        csv_path = tmp_path / "history.csv"
+        csv_path.write_text("date,amount\n2024-01-01,123.45\n")
+
+        async def async_upload(**_kwargs):
+            return True
+
+        mock_authenticated_client.upload_account_balance_history = async_upload
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["upload-history", "acc_123", str(csv_path), "--json"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.stdout)
+            assert output["id"] == "acc_123"
+            assert output["entity"] == "account"
+            assert output["status"] == "uploaded"
+            assert output["rows"] == 1
 
     def test_recent_balances_calls_api(self, mock_authenticated_client: MagicMock) -> None:
         """Recent balances command calls get_recent_account_balances."""

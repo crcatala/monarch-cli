@@ -27,7 +27,9 @@ def transform_transaction(raw: dict[str, Any]) -> dict[str, Any]:
     account = raw.get("account") or {}
 
     merchant_name = merchant.get("name")
-    description = merchant_name if merchant_name else raw.get("plaidName")
+    description = (
+        merchant_name if merchant_name else raw.get("merchantName") or raw.get("plaidName")
+    )
 
     return {
         "id": raw.get("id"),
@@ -38,7 +40,7 @@ def transform_transaction(raw: dict[str, Any]) -> dict[str, Any]:
         "category_id": category.get("id"),
         "account": account.get("displayName"),
         "account_id": account.get("id"),
-        "is_pending": raw.get("isPending", False),
+        "is_pending": raw.get("isPending", raw.get("pending", False)),
         "notes": raw.get("notes"),
     }
 

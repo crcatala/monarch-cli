@@ -12,6 +12,7 @@ from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ._mutation import mutation_result
 
 app = typer.Typer(
     help=(
@@ -184,12 +185,20 @@ def list_cmd(
 @handle_errors
 def reset(
     start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Reset budget data."""
     with spinner("Resetting budget..."):
         client = get_authenticated_client()
         data: Any = run_api_call(lambda: client.reset_budget(start_date=start))
-    output(data)
+    output(
+        mutation_result(status="reset", entity="budget", start=start, result=data),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("set")
@@ -207,10 +216,23 @@ def set_amount(
     timeframe: Annotated[str, typer.Option("--timeframe", help="Budget timeframe")] = "month",
     start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
     future: Annotated[bool, typer.Option("--future", help="Apply to future months")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Set a category or category-group budget amount."""
+    output_format = _resolve_format(format, json_output)
     if (category is None and group is None) or (category is not None and group is not None):
-        output({"status": "error", "message": "Provide exactly one of --category or --group."})
+        output(
+            {
+                "status": "error",
+                "entity": "budget",
+                "message": "Provide exactly one of --category or --group.",
+            },
+            output_format,
+        )
         raise typer.Exit(1)
 
     with spinner("Updating budget amount..."):
@@ -225,7 +247,22 @@ def set_amount(
                 apply_to_future=future,
             )
         )
-    output(data)
+    target_id = category or group
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            id=target_id,
+            category_id=category,
+            group_id=group,
+            amount=amount,
+            timeframe=timeframe,
+            start=start,
+            future=future,
+            result=data,
+        ),
+        output_format,
+    )
 
 
 @app.command("flexible")
@@ -234,6 +271,11 @@ def flexible(
     amount: Annotated[float, typer.Option("--amount", help="Flexible budget amount")],
     start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
     future: Annotated[bool, typer.Option("--future", help="Apply to future months")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Update flexible budget amount."""
     with spinner("Updating flexible budget..."):
@@ -245,7 +287,17 @@ def flexible(
                 apply_to_future=future,
             )
         )
-    output(data)
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            amount=amount,
+            start=start,
+            future=future,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
 
 
 @app.command("flex-rollover")
@@ -266,6 +318,11 @@ def flex_rollover(
     budget_system: Annotated[str, typer.Option("--budget-system", help="Budget system")] = (
         "fixed_and_flex"
     ),
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Update flex rollover settings."""
     with spinner("Updating flex rollover settings..."):
@@ -278,4 +335,15 @@ def flex_rollover(
                 budget_system=budget_system,
             )
         )
-    output(data)
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            start_month=start_month,
+            starting_balance=starting_balance,
+            enabled=enabled,
+            budget_system=budget_system,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
