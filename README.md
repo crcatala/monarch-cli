@@ -100,7 +100,19 @@ monarch budgets list --json
 | `--json` | | Output in JSON format |
 | `--quiet` | `-q` | Output only IDs, one per line |
 | `--no-color` | | Disable colored output |
+| `--non-interactive` | | Fail instead of prompting for input |
 | `--help` | | Show help and exit |
+
+### Agent Capabilities
+
+Agents can inspect the CLI contract in one deterministic JSON call:
+
+```bash
+monarch capabilities --json
+```
+
+The manifest includes commands, flags, arguments, JSON support, documented exit
+codes, environment variables, and config/session file locations.
 
 ### auth
 
@@ -357,8 +369,10 @@ Environment variables override config file values:
 | `MONARCH_QUIET` | Output only IDs, one per line | `false` |
 | `MONARCH_TIMEOUT` | API timeout in seconds | `30` |
 | `MONARCH_MAX_RETRIES` | Max API retry attempts | `3` |
+| `MONARCH_NON_INTERACTIVE` | Fail instead of prompting (`1`, `true`, `yes`) | `false` |
 | `MONARCH_NO_COLOR` | Disable colored output | `false` |
 | `NO_COLOR` | Standard color disable ([no-color.org](https://no-color.org)) | - |
+| `CI` | Enables non-interactive prompt failures when truthy | - |
 
 ### CLI Flags
 
@@ -376,7 +390,19 @@ monarch accounts list --no-color
 
 # Enable verbose output
 monarch accounts list --verbose
+
+# Fail fast instead of prompting
+monarch --non-interactive auth login
 ```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | General error |
+| `2` | Usage error |
+| `4` | Input needed in non-interactive mode |
 
 ### Authentication Priority
 

@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING, Literal
 
 import platformdirs
 
+from .state_files import back_up_corrupt_file
+
 if TYPE_CHECKING:
     from typing import Any
 
@@ -78,6 +80,7 @@ class Config:
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
     confirm_destructive: bool = True
+    non_interactive: bool = False
 
     # Track which source set each value (for debugging/diagnostics)
     _sources: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
@@ -105,6 +108,7 @@ class Config:
             "timeout_seconds": DEFAULT_TIMEOUT_SECONDS,
             "max_retries": DEFAULT_MAX_RETRIES,
             "confirm_destructive": True,
+            "non_interactive": False,
         }
         for key in config_dict:
             sources[key] = "default"
@@ -136,6 +140,7 @@ class Config:
         timeout_seconds: int | None = None,
         max_retries: int | None = None,
         confirm_destructive: bool | None = None,
+        non_interactive: bool | None = None,
     ) -> Config:
         """Create a new Config with specified overrides applied.
 
@@ -181,6 +186,9 @@ class Config:
         if confirm_destructive is not None:
             overrides["confirm_destructive"] = confirm_destructive
             new_sources["confirm_destructive"] = "cli"
+        if non_interactive is not None:
+            overrides["non_interactive"] = non_interactive
+            new_sources["non_interactive"] = "cli"
 
         if not overrides:
             return self
@@ -219,8 +227,10 @@ def _load_config_file() -> dict[str, Any]:
     try:
         with config_path.open("rb") as f:
             data = tomllib.load(f)
-    except (tomllib.TOMLDecodeError, OSError):
-        # Invalid TOML or read error - silently use defaults
+    except tomllib.TOMLDecodeError:
+        back_up_corrupt_file(config_path, "config")
+        return {}
+    except OSError:
         return {}
 
     result: dict[str, Any] = {}
@@ -310,6 +320,12 @@ def _load_from_env() -> dict[str, Any | None]:
 
     # Color: NO_COLOR standard + MONARCH_NO_COLOR
     result["color"] = _parse_color_from_env()
+
+    env_non_interactive = os.environ.get("MONARCH_NON_INTERACTIVE")
+    if env_non_interactive:
+        result["non_interactive"] = _parse_bool(env_non_interactive)
+    elif os.environ.get("CI"):
+        result["non_interactive"] = _parse_bool(os.environ["CI"])
 
     return result
 
@@ -463,4 +479,7 @@ max_retries = 3
 
 # Require confirmation for destructive operations (delete, etc.)
 confirm_destructive = true
+
+# Fail instead of prompting for input
+non_interactive = false
 """

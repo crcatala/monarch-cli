@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reports workflows** - Added detailed cashflow, transactions summary, recurring transactions, credit history, subscription details, and linked institutions commands.
 - **Idempotent manual transactions** - `transactions create` now supports repeatable `--tag` and optional `--dedupe-key`; `transactions upsert` creates only when the default dedupe key does not match an existing row.
 
+#### Agent Ergonomics
+- **Capabilities manifest** - Added `monarch capabilities --json` with deterministic command, flag, argument, exit code, environment variable, and config/session file metadata.
+- **Non-interactive mode** - Added global `--non-interactive`, `MONARCH_NON_INTERACTIVE`, and `CI` prompt guards. Commands that would prompt now fail fast with exit code `4`.
+- **Exit-code contract** - Documented `0` success, `1` general error, `2` usage error, and `4` input needed in help, docs, and the capabilities manifest.
+- **JSON auth errors** - Auth commands with explicit `--json` now emit structured JSON errors on stdout instead of leaving stdout empty.
+
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
@@ -47,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Previously, color settings bypassed auto-detection, causing ANSI codes in piped output
 - **Environment variables** - `MONARCH_TIMEOUT`, `MONARCH_MAX_RETRIES` were documented but non-functional; now wired up to actual API calls
 - **Manual transaction merchant readback** - Created manual transactions preserve the requested merchant name in normalized output when Monarch returns a blank `plaidName`.
+- **State-file diagnostics** - Corrupt config/session JSON or TOML files are copied to `*.corrupt.<timestamp>` with a warning instead of being silently ignored.
 
 ## [0.1.0] - 2026-01-18
 

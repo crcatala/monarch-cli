@@ -20,6 +20,7 @@ import keyring.errors
 
 from .config import get_config_dir
 from .exceptions import ErrorCode, MonarchCLIError
+from .state_files import back_up_corrupt_file
 
 if TYPE_CHECKING:
     from typing import Any
@@ -184,7 +185,10 @@ def _get_from_file() -> str | None:
             return None
         token = data.get("token")
         return token if isinstance(token, str) else None
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError:
+        back_up_corrupt_file(session_path, "session")
+        return None
+    except OSError:
         return None
 
 
