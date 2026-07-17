@@ -15,7 +15,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import platformdirs
 
@@ -327,7 +327,7 @@ def _parse_format(value: Any) -> FormatType | None:
         return None
     value_lower = value.lower().strip()
     if value_lower in VALID_FORMATS:
-        return value_lower  # type: ignore[return-value]
+        return cast(FormatType, value_lower)
     return None
 
 
