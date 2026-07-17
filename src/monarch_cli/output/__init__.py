@@ -14,7 +14,7 @@ from __future__ import annotations
 import csv
 import json
 import sys
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ..core.config import Config
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """Output format options."""
 
     PLAIN = "plain"

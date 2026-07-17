@@ -11,7 +11,7 @@ import os
 import pickle
 import sys
 import tempfile
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -48,7 +48,7 @@ class KeyringUnavailableError(MonarchCLIError):
         )
 
 
-class StorageBackend(str, Enum):
+class StorageBackend(StrEnum):
     """Token storage backends in order of security preference."""
 
     KEYRING = "keyring"
