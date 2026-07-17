@@ -100,7 +100,19 @@ monarch budgets list --json
 | `--json` | | Output in JSON format |
 | `--quiet` | `-q` | Output only IDs, one per line |
 | `--no-color` | | Disable colored output |
+| `--non-interactive` | | Fail instead of prompting for input |
 | `--help` | | Show help and exit |
+
+### Agent Capabilities
+
+Agents can inspect the CLI contract in one deterministic JSON call:
+
+```bash
+monarch capabilities --json
+```
+
+The manifest includes commands, flags, arguments, JSON support, documented exit
+codes, environment variables, and config/session file locations.
 
 ### auth
 
@@ -127,7 +139,39 @@ monarch accounts list --format table  # Table format
 monarch accounts list --raw      # Raw API response
 
 monarch accounts refresh         # Refresh all account data
-monarch accounts refresh ACC123  # Refresh specific account
+monarch accounts refresh -a ACC123 --wait  # Refresh and wait for sync
+monarch accounts refresh-status -a ACC123  # Check refresh completion
+monarch accounts history ACC123            # Balance history over time
+monarch accounts holdings ACC123           # Holdings for one investment account
+monarch accounts recent-balances --start 2024-01-01
+monarch accounts snapshots --start 2024-01-01 --timeframe month
+monarch accounts aggregate-snapshots --start 2024-01-01 --end 2024-12-31
+monarch accounts create --name Cash --type cash --subtype cash --balance 100
+monarch accounts update ACC123 --name "Brokerage" --exclude-from-net-worth
+monarch accounts upload-history ACC123 balances.csv
+monarch accounts delete ACC123 --yes
+```
+
+### api
+
+Raw GraphQL escape hatch for Monarch endpoints that do not have first-class CLI commands yet.
+
+```bash
+monarch api docs
+monarch api docs --output monarch-api-docs.md
+monarch api GetAccounts --query 'query GetAccounts { accounts { id displayName } }'
+monarch api GetTransactions --query-file query.graphql -F limit=100
+monarch api GetTransactions --query-file query.graphql --variables-json '{"limit": 100}'
+```
+
+### investments
+
+```bash
+monarch investments holdings                    # List visible investment holdings
+monarch investments holdings --json             # JSON format
+monarch investments holdings --format table     # Table format
+monarch investments holdings --aggregate        # Combine by ticker/name
+monarch investments holdings --account ACC123   # Query a specific investment account
 ```
 
 ### transactions
@@ -140,6 +184,11 @@ monarch transactions list --preset this-month
 monarch transactions list --start 2024-01-01 --end 2024-01-31
 monarch transactions list --account ACC123
 monarch transactions list --search "grocery"
+monarch transactions list --needs-review
+monarch transactions list --has-attachments
+monarch transactions list --missing-attachments
+monarch transactions list --hidden-from-reports
+monarch transactions list --tag TAG123 --category CAT456
 
 # Update a transaction
 monarch transactions update TXN123 --amount 25.50
@@ -147,11 +196,43 @@ monarch transactions update TXN123 --description "Coffee Shop"
 monarch transactions update TXN123 --category CAT456
 monarch transactions update TXN123 --notes "Business expense"
 monarch transactions update TXN123 --date 2024-01-15
+monarch transactions update TXN123 --hide-from-reports
+monarch transactions update TXN123 --needs-review
+monarch transactions update TXN123 --goal GOAL123
 monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
+
+# Create, inspect, delete, and de-duplicate
+monarch transactions create --date 2024-01-15 --account ACC123 --amount -12.34 --merchant "Coffee" --category CAT456 --json
+monarch transactions create --date 2024-01-15 --account ACC123 --amount 1000 --merchant "Payroll" --category CAT_INCOME --tag TAG123 --dedupe-key date,amount,category,notes --json
+monarch transactions upsert --date 2024-01-15 --account ACC123 --amount 1000 --merchant "Payroll" --category CAT_INCOME --notes "January payroll" --tag TAG123 --json
+monarch transactions show TXN123
+monarch transactions delete TXN123 --yes
+monarch transactions duplicates --start 2024-01-01 --account ACC123
+
+# Attach a receipt or supporting document
+monarch transactions attach TXN123 ./receipt.pdf
+monarch transactions attach TXN123 ./receipt.png --notes "Receipt: dinner, $42.18."
+monarch transactions attach TXN123 ./receipt.pdf --filename vendor-receipt.pdf
+
+# Tags and splits
+monarch transactions tags list
+monarch transactions tags create --name Tax --color "#2f855a"
+monarch transactions tags set TXN123 --tag TAG123 --tag TAG456
+monarch transactions tags remove TXN123 --tag TAG123
+monarch transactions splits show TXN123
+monarch transactions splits update TXN123 --splits-file splits.json
 
 # Batch update multiple transactions
 monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 ```
+
+`transactions create --json` and `transactions upsert --json` return a normalized
+object with top-level `id`, `status` (`created` or `existing`), transaction fields,
+`tag_ids`, and `dedupe_key`. The upstream raw create response nests the ID at
+`createTransaction.transaction.id`; the CLI normalizes that shape so scripts can
+read `.id` directly. `--tag` is repeatable and is applied before the command
+returns success. `upsert` defaults to `--dedupe-key date,amount,category,notes`;
+`create` can opt into the same duplicate guard with `--dedupe-key`.
 
 **Date Presets:**
 - `today`, `yesterday`
@@ -165,8 +246,14 @@ monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 
 ```bash
 monarch budgets list             # Budget status with spent/remaining
+monarch budgets list --start 2024-06-01 --end 2024-06-30
 monarch budgets list --json      # JSON format
 monarch budgets list --format table
+monarch budgets reset --start 2024-06-01
+monarch budgets set --category CAT_DINING --amount 800 --start 2024-06-01 --future
+monarch budgets set --group GROUP_FOOD --amount 2500
+monarch budgets flexible --amount 1200 --future
+monarch budgets flex-rollover --start-month 2024-01-01 --starting-balance 0
 ```
 
 ### cashflow
@@ -176,6 +263,12 @@ monarch cashflow summary                      # Current period
 monarch cashflow summary --preset this-month  # This month
 monarch cashflow summary --preset ytd         # Year to date
 monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
+monarch cashflow detail --start 2024-01-01 --end 2024-01-31
+monarch cashflow transaction-summary
+monarch cashflow recurring --start 2024-06-01 --end 2024-06-30
+monarch cashflow credit-history
+monarch cashflow subscription
+monarch cashflow institutions
 ```
 
 ### categories
@@ -183,6 +276,10 @@ monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
 ```bash
 monarch categories list          # All transaction categories
 monarch categories list --json   # JSON format
+monarch categories groups
+monarch categories create --group GROUP_FOOD --name "Dining" --icon D --rollover-enabled
+monarch categories delete CAT123 --yes
+monarch categories delete CAT123 CAT456 --yes
 ```
 
 ## Output Formats
@@ -209,6 +306,20 @@ monarch accounts list --json
 
 # Auto-detection: JSON when piped
 monarch accounts list | jq '.[0]'
+```
+
+Mutation commands also accept subcommand-local `--json`/`--format` flags, so
+scripts can put output flags at the end of the command. JSON mutation responses
+use a stable envelope:
+
+```json
+{
+  "status": "created|updated|deleted|uploaded|attached|completed|failed|dry_run",
+  "entity": "account|budget|category|transaction|transaction_tag|transaction_split",
+  "id": "primary-id-when-singular",
+  "ids": ["ids-for-batch-or-bulk-commands"],
+  "result": {}
+}
 ```
 
 ## Configuration
@@ -258,8 +369,10 @@ Environment variables override config file values:
 | `MONARCH_QUIET` | Output only IDs, one per line | `false` |
 | `MONARCH_TIMEOUT` | API timeout in seconds | `30` |
 | `MONARCH_MAX_RETRIES` | Max API retry attempts | `3` |
+| `MONARCH_NON_INTERACTIVE` | Fail instead of prompting (`1`, `true`, `yes`) | `false` |
 | `MONARCH_NO_COLOR` | Disable colored output | `false` |
 | `NO_COLOR` | Standard color disable ([no-color.org](https://no-color.org)) | - |
+| `CI` | Enables non-interactive prompt failures when truthy | - |
 
 ### CLI Flags
 
@@ -277,7 +390,19 @@ monarch accounts list --no-color
 
 # Enable verbose output
 monarch accounts list --verbose
+
+# Fail fast instead of prompting
+monarch --non-interactive auth login
 ```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | General error |
+| `2` | Usage error |
+| `4` | Input needed in non-interactive mode |
 
 ### Authentication Priority
 

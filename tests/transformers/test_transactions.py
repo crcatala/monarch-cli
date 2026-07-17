@@ -98,6 +98,25 @@ class TestTransformTransaction:
         assert result["is_pending"] is False  # default
         assert result["notes"] is None
 
+    def test_handles_null_nested_objects(self):
+        """Present-but-null nested fields should not raise errors."""
+        raw = {
+            "id": "txn-null",
+            "merchant": None,
+            "plaidName": "Fallback Name",
+            "category": None,
+            "account": None,
+        }
+
+        result = transform_transaction(raw)
+
+        assert result["id"] == "txn-null"
+        assert result["description"] == "Fallback Name"
+        assert result["category"] is None
+        assert result["category_id"] is None
+        assert result["account"] is None
+        assert result["account_id"] is None
+
     def test_handles_empty_dict(self):
         """Empty input should not raise errors."""
         result = transform_transaction({})

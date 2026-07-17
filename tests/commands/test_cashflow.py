@@ -335,6 +335,79 @@ class TestCashflowSummary:
             assert captured_kwargs.get("end_date") is None
 
 
+class TestCashflowReports:
+    """Tests for API-backed report commands."""
+
+    def test_detail_calls_cashflow_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Detail command calls get_cashflow."""
+        captured: dict = {}
+
+        async def async_cashflow(**kwargs):
+            captured.update(kwargs)
+            return {"cashflow": []}
+
+        mock_authenticated_client.get_cashflow = async_cashflow
+
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["detail", "--start", "2024-01-01", "--end", "2024-01-31", "--limit", "50"],
+            )
+
+            assert result.exit_code == 0
+            assert captured["start_date"] == "2024-01-01"
+            assert captured["end_date"] == "2024-01-31"
+            assert captured["limit"] == 50
+
+    def test_recurring_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Recurring command calls get_recurring_transactions."""
+        captured: dict = {}
+
+        async def async_recurring(**kwargs):
+            captured.update(kwargs)
+            return {"recurring": []}
+
+        mock_authenticated_client.get_recurring_transactions = async_recurring
+
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["recurring", "--start", "2024-02-01", "--json"])
+
+            assert result.exit_code == 0
+            assert captured["start_date"] == "2024-02-01"
+
+    def test_institutions_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Institutions command calls get_institutions."""
+
+        async def async_institutions():
+            return {"institutions": []}
+
+        mock_authenticated_client.get_institutions = async_institutions
+
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["institutions", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout) == {"institutions": []}
+
+
 class TestCashflowApp:
     """Tests for the cashflow app structure."""
 

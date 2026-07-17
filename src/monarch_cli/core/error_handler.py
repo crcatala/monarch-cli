@@ -11,6 +11,7 @@ import traceback
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar
 
+import click
 import typer
 
 from ..output import is_debug, output_error
@@ -18,6 +19,16 @@ from .exceptions import MonarchCLIError
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+
+def _json_requested() -> bool:
+    """Return true when any active Click context requested JSON output."""
+    ctx = click.get_current_context(silent=True)
+    while ctx is not None:
+        if ctx.params.get("json_output"):
+            return True
+        ctx = ctx.parent
+    return False
 
 
 def handle_errors(func: Callable[P, R]) -> Callable[P, R]:  # noqa: UP047
@@ -51,12 +62,12 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:  # noqa: UP047
             print("\nInterrupted.", file=sys.stderr)
             raise typer.Exit(130) from None
         except MonarchCLIError as e:
-            output_error(e)
+            output_error(e, stdout=_json_requested())
             raise typer.Exit(e.exit_code) from None
         except Exception as e:
             if is_debug():
                 traceback.print_exc()
-            output_error(MonarchCLIError(f"Unexpected error: {e}"))
+            output_error(MonarchCLIError(f"Unexpected error: {e}"), stdout=_json_requested())
             raise typer.Exit(1) from None
 
     return wrapper

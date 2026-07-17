@@ -22,19 +22,25 @@ def transform_transaction(raw: dict[str, Any]) -> dict[str, Any]:
         {"id": "123", "date": "2024-01-15", "description": "Coffee Shop", ...}
     """
     # Description prefers merchant.name, falls back to plaidName
-    merchant_name = raw.get("merchant", {}).get("name")
-    description = merchant_name if merchant_name else raw.get("plaidName")
+    merchant = raw.get("merchant") or {}
+    category = raw.get("category") or {}
+    account = raw.get("account") or {}
+
+    merchant_name = merchant.get("name")
+    description = (
+        merchant_name if merchant_name else raw.get("merchantName") or raw.get("plaidName")
+    )
 
     return {
         "id": raw.get("id"),
         "date": raw.get("date"),
         "amount": raw.get("amount"),
         "description": description,
-        "category": raw.get("category", {}).get("name"),
-        "category_id": raw.get("category", {}).get("id"),
-        "account": raw.get("account", {}).get("displayName"),
-        "account_id": raw.get("account", {}).get("id"),
-        "is_pending": raw.get("isPending", False),
+        "category": category.get("name"),
+        "category_id": category.get("id"),
+        "account": account.get("displayName"),
+        "account_id": account.get("id"),
+        "is_pending": raw.get("isPending", raw.get("pending", False)),
         "notes": raw.get("notes"),
     }
 

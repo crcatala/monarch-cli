@@ -82,6 +82,22 @@ class TestTransformAccount:
         assert result["is_manual"] is False  # default
         assert result["last_updated"] is None
 
+    def test_handles_null_nested_objects(self):
+        """Present-but-null nested fields should not raise errors."""
+        raw = {
+            "id": "acc-null",
+            "type": None,
+            "subtype": None,
+            "institution": None,
+        }
+
+        result = transform_account(raw)
+
+        assert result["id"] == "acc-null"
+        assert result["type"] is None
+        assert result["subtype"] is None
+        assert result["institution"] is None
+
     def test_handles_empty_dict(self):
         """Empty input should not raise errors."""
         result = transform_account({})

@@ -231,6 +231,102 @@ class TestCategoriesList:
             output = json.loads(result.stdout)
             assert isinstance(output, list)
 
+
+class TestCategoryMutations:
+    """Tests for API-backed category workflows."""
+
+    def test_groups_calls_api(self, mock_authenticated_client: MagicMock) -> None:
+        """Groups command calls get_transaction_category_groups."""
+
+        async def async_groups():
+            return {"categoryGroups": [{"id": "grp_1"}]}
+
+        mock_authenticated_client.get_transaction_category_groups = async_groups
+
+        with (
+            patch(
+                "monarch_cli.commands.categories.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["groups", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout)["categoryGroups"][0]["id"] == "grp_1"
+
+    def test_create_category(self, mock_authenticated_client: MagicMock) -> None:
+        """Create command maps category creation options."""
+        captured: dict = {}
+
+        async def async_create(**kwargs):
+            captured.update(kwargs)
+            return {"id": "cat_new"}
+
+        mock_authenticated_client.create_transaction_category = async_create
+
+        with (
+            patch(
+                "monarch_cli.commands.categories.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "create",
+                    "--group",
+                    "grp_1",
+                    "--name",
+                    "Tax",
+                    "--icon",
+                    "T",
+                    "--rollover-enabled",
+                    "--rollover-type",
+                    "monthly",
+                    "--rollover-start",
+                    "2024-01-01",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured["group_id"] == "grp_1"
+            assert captured["transaction_category_name"] == "Tax"
+            assert captured["rollover_enabled"] is True
+            output = json.loads(result.stdout)
+            assert output["id"] == "cat_new"
+            assert output["entity"] == "category"
+            assert output["status"] == "created"
+
+    def test_delete_multiple_categories(self, mock_authenticated_client: MagicMock) -> None:
+        """Delete command uses bulk deletion for multiple IDs."""
+        captured: dict = {}
+
+        async def async_delete_many(category_ids):
+            captured["category_ids"] = category_ids
+            return [True, True]
+
+        mock_authenticated_client.delete_transaction_categories = async_delete_many
+
+        with (
+            patch(
+                "monarch_cli.commands.categories.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["delete", "cat_1", "cat_2", "--yes", "--json"])
+
+            assert result.exit_code == 0
+            assert captured["category_ids"] == ["cat_1", "cat_2"]
+            output = json.loads(result.stdout)
+            assert output["ids"] == ["cat_1", "cat_2"]
+            assert output["entity"] == "category"
+            assert output["status"] == "deleted"
+            assert output["result"] == [True, True]
+
     def test_list_table_format(
         self,
         mock_authenticated_client: MagicMock,

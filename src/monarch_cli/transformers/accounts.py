@@ -21,13 +21,17 @@ def transform_account(raw: dict[str, Any]) -> dict[str, Any]:
         >>> transform_account(raw)
         {"id": "123", "name": "Checking", "type": "Checking", ...}
     """
+    account_type = raw.get("type") or {}
+    account_subtype = raw.get("subtype") or {}
+    institution = raw.get("institution") or {}
+
     return {
         "id": raw.get("id"),
         "name": raw.get("displayName"),
-        "type": raw.get("type", {}).get("display"),
-        "subtype": raw.get("subtype", {}).get("display"),
+        "type": account_type.get("display"),
+        "subtype": account_subtype.get("display"),
         "balance": raw.get("currentBalance"),
-        "institution": raw.get("institution", {}).get("name"),
+        "institution": institution.get("name"),
         "is_active": not raw.get("isHidden", False),
         "is_manual": raw.get("isManual", False),
         "last_updated": raw.get("updatedAt"),

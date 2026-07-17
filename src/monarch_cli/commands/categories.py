@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 
 import typer
@@ -11,10 +12,16 @@ from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ._mutation import extract_id, mutation_result
 
 app = typer.Typer(
-    help="Category management",
-    no_args_is_help=True,
+    help=(
+        "Category management\n\nExamples:\n"
+        "    monarch categories list\n"
+        "    monarch categories list --json"
+    ),
+    no_args_is_help=False,
+    invoke_without_command=True,
 )
 
 
@@ -59,6 +66,46 @@ def _transform_categories(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _resolve_format(format: OutputFormat | None, json_output: bool) -> OutputFormat | None:
+    """Resolve explicit output flags."""
+    return OutputFormat.JSON if json_output else format
+
+
+def _list_categories(format: OutputFormat | None, json_output: bool) -> None:
+    """Fetch and output categories."""
+    output_format = _resolve_format(format, json_output)
+    with spinner("Fetching categories..."):
+        client = get_authenticated_client()
+        raw_data: dict[str, Any] = run_api_call(lambda: client.get_transaction_categories())
+        data = _transform_categories(raw_data)
+    output(data, output_format)
+
+
+@app.callback()
+@handle_errors
+def main(
+    ctx: typer.Context,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option(
+            "-f",
+            "--format",
+            help="Output format (plain, json, table, csv, compact)",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output as JSON (shortcut for --format json)",
+        ),
+    ] = False,
+) -> None:
+    """List all transaction categories."""
+    if ctx.invoked_subcommand is None:
+        _list_categories(format, json_output)
+
+
 @app.command("list")
 @handle_errors
 def list_cmd(
@@ -90,16 +137,113 @@ def list_cmd(
         monarch categories list | jq .         # Auto-JSON when piped
         monarch categories list | jq '[.[] | select(.group == "Food")]'  # Filter by group
     """
-    # Determine output format
-    output_format = format
-    if json_output:
-        output_format = OutputFormat.JSON
+    _list_categories(format, json_output)
 
-    with spinner("Fetching categories..."):
+
+@app.command("groups")
+@handle_errors
+def groups(
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """List category groups."""
+    with spinner("Fetching category groups..."):
         client = get_authenticated_client()
-        raw_data: dict[str, Any] = run_api_call(lambda: client.get_transaction_categories())
+        data: Any = run_api_call(lambda: client.get_transaction_category_groups())
+    output(data, _resolve_format(format, json_output))
 
-        # Transform to simplified structure
-        data = _transform_categories(raw_data)
 
-    output(data, output_format)
+@app.command("create")
+@handle_errors
+def create(
+    group: Annotated[str, typer.Option("--group", help="Category group ID")],
+    name: Annotated[str, typer.Option("--name", help="Category name")],
+    icon: Annotated[str, typer.Option("--icon", help="Category icon")] = "?",
+    rollover_enabled: Annotated[
+        bool,
+        typer.Option("--rollover-enabled/--rollover-disabled"),
+    ] = False,
+    rollover_type: Annotated[str, typer.Option("--rollover-type", help="Rollover type")] = (
+        "monthly"
+    ),
+    rollover_start: Annotated[
+        str | None,
+        typer.Option("--rollover-start", help="Rollover start month/date (YYYY-MM-DD)"),
+    ] = None,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Create a transaction category."""
+    start_month = datetime.fromisoformat(rollover_start) if rollover_start else datetime.now()
+    with spinner("Creating category..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.create_transaction_category(
+                group_id=group,
+                transaction_category_name=name,
+                rollover_start_month=start_month,
+                icon=icon,
+                rollover_enabled=rollover_enabled,
+                rollover_type=rollover_type,
+            )
+        )
+    output(
+        mutation_result(
+            status="created",
+            entity="category",
+            id=extract_id(
+                data,
+                ("createTransactionCategory", "transactionCategory"),
+                ("createTransactionCategory", "category"),
+            ),
+            name=name,
+            group_id=group,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
+
+
+@app.command("delete")
+@handle_errors
+def delete(
+    category_ids: Annotated[list[str], typer.Argument(help="Category ID(s) to delete")],
+    yes: Annotated[bool, typer.Option("--yes", help="Confirm category deletion")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Delete one or more categories."""
+    output_format = _resolve_format(format, json_output)
+    if not yes:
+        output(
+            {"status": "error", "entity": "category", "message": "Category delete requires --yes."},
+            output_format,
+        )
+        raise typer.Exit(1)
+
+    with spinner("Deleting categories..."):
+        client = get_authenticated_client()
+        if len(category_ids) == 1:
+            data: Any = run_api_call(lambda: client.delete_transaction_category(category_ids[0]))
+        else:
+            data = run_api_call(lambda: client.delete_transaction_categories(category_ids))
+    output(
+        mutation_result(
+            status="deleted",
+            entity="category",
+            id=category_ids[0] if len(category_ids) == 1 else None,
+            ids=category_ids,
+            category_ids=category_ids,
+            result=data,
+        ),
+        output_format,
+    )

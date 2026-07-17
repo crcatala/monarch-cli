@@ -12,10 +12,14 @@ from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ._mutation import mutation_result
 
 app = typer.Typer(
-    help="Budget management",
-    no_args_is_help=True,
+    help=(
+        "Budget management\n\nExamples:\n    monarch budgets list\n    monarch budgets list --json"
+    ),
+    no_args_is_help=False,
+    invoke_without_command=True,
 )
 
 
@@ -73,9 +77,79 @@ def _transform_budgets(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _resolve_format(format: OutputFormat | None, json_output: bool) -> OutputFormat | None:
+    """Resolve explicit output flags."""
+    return OutputFormat.JSON if json_output else format
+
+
+def _list_budgets(
+    *,
+    start: str | None,
+    end: str | None,
+    raw: bool,
+    format: OutputFormat | None,
+    json_output: bool,
+) -> None:
+    """Fetch and output budgets."""
+    output_format = _resolve_format(format, json_output)
+
+    with spinner("Fetching budgets..."):
+        client = get_authenticated_client()
+        if start is None and end is None:
+            raw_data: dict[str, Any] = run_api_call(lambda: client.get_budgets())
+        else:
+            raw_data = run_api_call(lambda: client.get_budgets(start_date=start, end_date=end))
+        data: Any = raw_data if raw else _transform_budgets(raw_data)
+
+    output(data, output_format)
+
+
+@app.callback()
+@handle_errors
+def main(
+    ctx: typer.Context,
+    start: Annotated[
+        str | None,
+        typer.Option("-s", "--start", help="Start date filter (YYYY-MM-DD)"),
+    ] = None,
+    end: Annotated[
+        str | None,
+        typer.Option("-e", "--end", help="End date filter (YYYY-MM-DD)"),
+    ] = None,
+    raw: Annotated[bool, typer.Option("--raw", help="Output raw API response")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option(
+            "-f",
+            "--format",
+            help="Output format (plain, json, table, csv, compact)",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output as JSON (shortcut for --format json)",
+        ),
+    ] = False,
+) -> None:
+    """List budget status with spent/remaining amounts."""
+    if ctx.invoked_subcommand is None:
+        _list_budgets(start=start, end=end, raw=raw, format=format, json_output=json_output)
+
+
 @app.command("list")
 @handle_errors
 def list_cmd(
+    start: Annotated[
+        str | None,
+        typer.Option("-s", "--start", help="Start date filter (YYYY-MM-DD)"),
+    ] = None,
+    end: Annotated[
+        str | None,
+        typer.Option("-e", "--end", help="End date filter (YYYY-MM-DD)"),
+    ] = None,
+    raw: Annotated[bool, typer.Option("--raw", help="Output raw API response")] = False,
     format: Annotated[
         OutputFormat | None,
         typer.Option(
@@ -104,16 +178,172 @@ def list_cmd(
         monarch budgets list | jq .         # Auto-JSON when piped
         monarch budgets list | jq '[.[] | select(.remaining < 0)]'  # Over budget
     """
-    # Determine output format
-    output_format = format
-    if json_output:
-        output_format = OutputFormat.JSON
+    _list_budgets(start=start, end=end, raw=raw, format=format, json_output=json_output)
 
-    with spinner("Fetching budgets..."):
+
+@app.command("reset")
+@handle_errors
+def reset(
+    start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Reset budget data."""
+    with spinner("Resetting budget..."):
         client = get_authenticated_client()
-        raw_data: dict[str, Any] = run_api_call(lambda: client.get_budgets())
+        data: Any = run_api_call(lambda: client.reset_budget(start_date=start))
+    output(
+        mutation_result(status="reset", entity="budget", start=start, result=data),
+        _resolve_format(format, json_output),
+    )
 
-        # Transform to simplified format
-        data = _transform_budgets(raw_data)
 
-    output(data, output_format)
+@app.command("set")
+@handle_errors
+def set_amount(
+    amount: Annotated[float, typer.Option("--amount", help="Budget amount")],
+    category: Annotated[
+        str | None,
+        typer.Option("--category", help="Category ID to update"),
+    ] = None,
+    group: Annotated[
+        str | None,
+        typer.Option("--group", help="Category group ID to update"),
+    ] = None,
+    timeframe: Annotated[str, typer.Option("--timeframe", help="Budget timeframe")] = "month",
+    start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
+    future: Annotated[bool, typer.Option("--future", help="Apply to future months")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Set a category or category-group budget amount."""
+    output_format = _resolve_format(format, json_output)
+    if (category is None and group is None) or (category is not None and group is not None):
+        output(
+            {
+                "status": "error",
+                "entity": "budget",
+                "message": "Provide exactly one of --category or --group.",
+            },
+            output_format,
+        )
+        raise typer.Exit(1)
+
+    with spinner("Updating budget amount..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.set_budget_amount(
+                amount=amount,
+                category_id=category,
+                category_group_id=group,
+                timeframe=timeframe,
+                start_date=start,
+                apply_to_future=future,
+            )
+        )
+    target_id = category or group
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            id=target_id,
+            category_id=category,
+            group_id=group,
+            amount=amount,
+            timeframe=timeframe,
+            start=start,
+            future=future,
+            result=data,
+        ),
+        output_format,
+    )
+
+
+@app.command("flexible")
+@handle_errors
+def flexible(
+    amount: Annotated[float, typer.Option("--amount", help="Flexible budget amount")],
+    start: Annotated[str | None, typer.Option("--start", help="Start date (YYYY-MM-DD)")] = None,
+    future: Annotated[bool, typer.Option("--future", help="Apply to future months")] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Update flexible budget amount."""
+    with spinner("Updating flexible budget..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.update_flexible_budget(
+                amount=amount,
+                start_date=start,
+                apply_to_future=future,
+            )
+        )
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            amount=amount,
+            start=start,
+            future=future,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )
+
+
+@app.command("flex-rollover")
+@handle_errors
+def flex_rollover(
+    start_month: Annotated[
+        str | None,
+        typer.Option("--start-month", help="Rollover start month (YYYY-MM-DD)"),
+    ] = None,
+    starting_balance: Annotated[
+        float,
+        typer.Option("--starting-balance", help="Starting rollover balance"),
+    ] = 0.0,
+    enabled: Annotated[
+        bool,
+        typer.Option("--enabled/--disabled", help="Enable or disable flex rollover"),
+    ] = True,
+    budget_system: Annotated[str, typer.Option("--budget-system", help="Budget system")] = (
+        "fixed_and_flex"
+    ),
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Update flex rollover settings."""
+    with spinner("Updating flex rollover settings..."):
+        client = get_authenticated_client()
+        data: Any = run_api_call(
+            lambda: client.update_flex_rollover_settings(
+                rollover_start_month=start_month,
+                rollover_starting_balance=starting_balance,
+                rollover_enabled=enabled,
+                budget_system=budget_system,
+            )
+        )
+    output(
+        mutation_result(
+            status="updated",
+            entity="budget",
+            start_month=start_month,
+            starting_balance=starting_balance,
+            enabled=enabled,
+            budget_system=budget_system,
+            result=data,
+        ),
+        _resolve_format(format, json_output),
+    )

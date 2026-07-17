@@ -20,17 +20,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable timeout** - `MONARCH_TIMEOUT` and config file `timeout` setting now functional
 - **Configurable retries** - `MONARCH_MAX_RETRIES` and config file `max_retries` setting now functional
 
+#### Transaction Attachments
+- **Receipt upload command** - `monarch transactions attach TXN123 ./receipt.pdf` uploads a receipt or supporting document to a transaction.
+- **Atomic receipt workflow** - `--notes` can update transaction notes after a successful attachment upload.
+- **Upload preview** - `--dry-run` validates the file and reports the planned attachment without authenticating or mutating Monarch.
+
+#### API Coverage
+- **Account workflows** - Added account history, holdings, recent balances, snapshots, manual account create/update/delete, balance-history upload, refresh waiting, and refresh status commands.
+- **Transaction workflows** - Added create/show/delete/duplicates, full list filters, report/review/goal update flags, tag list/create/set/remove/clear, and split show/update commands.
+- **Budget workflows** - Added explicit date ranges, reset, category/group budget updates, flexible budget updates, and flex rollover settings.
+- **Category workflows** - Added category groups, create, and guarded single/bulk delete commands.
+- **Reports workflows** - Added detailed cashflow, transactions summary, recurring transactions, credit history, subscription details, and linked institutions commands.
+- **Idempotent manual transactions** - `transactions create` now supports repeatable `--tag` and optional `--dedupe-key`; `transactions upsert` creates only when the default dedupe key does not match an existing row.
+
+#### Agent Ergonomics
+- **Capabilities manifest** - Added `monarch capabilities --json` with deterministic command, flag, argument, exit code, environment variable, and config/session file metadata.
+- **Non-interactive mode** - Added global `--non-interactive`, `MONARCH_NON_INTERACTIVE`, and `CI` prompt guards. Commands that would prompt now fail fast with exit code `4`.
+- **Exit-code contract** - Documented `0` success, `1` general error, `2` usage error, and `4` input needed in help, docs, and the capabilities manifest.
+- **JSON auth errors** - Auth commands with explicit `--json` now emit structured JSON errors on stdout instead of leaving stdout empty.
+
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
   - TTY: Human-friendly output with emoji icons
   - Piped/redirected: Automatic JSON output (backwards compatible)
+- **Transaction create output** - `transactions create --json` now normalizes the upstream `createTransaction.transaction.id` response to a top-level `id` and includes normalized readback fields for safer scripts.
+- **Mutation output schemas** - Account, budget, category, and transaction write commands now accept subcommand-local `--json`/`--format` flags and return normalized envelopes with `status`, `entity`, top-level `id`/`ids`, and `result`.
 
 ### Fixed
 
 - **Color auto-detection** - `NO_COLOR`, `TERM=dumb`, and non-TTY now properly disable color
   - Previously, color settings bypassed auto-detection, causing ANSI codes in piped output
 - **Environment variables** - `MONARCH_TIMEOUT`, `MONARCH_MAX_RETRIES` were documented but non-functional; now wired up to actual API calls
+- **Manual transaction merchant readback** - Created manual transactions preserve the requested merchant name in normalized output when Monarch returns a blank `plaidName`.
+- **State-file diagnostics** - Corrupt config/session JSON or TOML files are copied to `*.corrupt.<timestamp>` with a warning instead of being silently ignored.
 
 ## [0.1.0] - 2026-01-18
 
