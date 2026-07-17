@@ -15,7 +15,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, TypeGuard
 
 import platformdirs
 
@@ -314,6 +314,11 @@ def _load_from_env() -> dict[str, Any | None]:
     return result
 
 
+def _is_format(value: str) -> TypeGuard[FormatType]:
+    """Return whether a string is a supported output format."""
+    return value in VALID_FORMATS
+
+
 def _parse_format(value: Any) -> FormatType | None:
     """Parse format from config value.
 
@@ -326,8 +331,8 @@ def _parse_format(value: Any) -> FormatType | None:
     if not isinstance(value, str):
         return None
     value_lower = value.lower().strip()
-    if value_lower in VALID_FORMATS:
-        return cast(FormatType, value_lower)
+    if _is_format(value_lower):
+        return value_lower
     return None
 
 
