@@ -50,6 +50,7 @@
       "automerge": false
     }
   ],
-  "minimumReleaseAge": "3 days",
+  "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
   "osvVulnerabilityAlerts": true
 }
