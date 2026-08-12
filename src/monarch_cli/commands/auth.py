@@ -11,8 +11,10 @@ from monarchmoney import MonarchMoney, RequireMFAException  # type: ignore[impor
 
 from ..core.adapter import extract_token_from_client, get_authenticated_client, reset_client
 from ..core.async_utils import run_api_call, run_async
+from ..core.config import get_config
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, AuthenticationError
+from ..core.non_interactive import require_interactive
 from ..core.session import (
     StorageBackend,
     delete_session_token,
@@ -26,6 +28,10 @@ app = typer.Typer(
     help="Authentication management",
     no_args_is_help=True,
 )
+
+
+def _wants_json(json_output: bool) -> bool:
+    return json_output or get_config().format == "json"
 
 
 def _is_keyring_available() -> bool:
@@ -71,6 +77,7 @@ def _prompt_storage_backend() -> StorageBackend:
 
 
 @app.command()
+@handle_errors
 def login(
     storage: Annotated[
         str | None,
@@ -99,7 +106,9 @@ def login(
     console.print()
 
     # Get credentials
+    require_interactive("Email", fix="Use MONARCH_TOKEN or run `monarch auth login` in a TTY.")
     email = typer.prompt("Email")
+    require_interactive("Password", fix="Use MONARCH_TOKEN or run `monarch auth login` in a TTY.")
     password = getpass.getpass("Password: ")
 
     # Determine storage backend
@@ -117,6 +126,7 @@ def login(
             console.print("  Valid options: keyring, file")
             raise typer.Exit(1)
     else:
+        require_interactive("storage backend", fix="Pass `--storage keyring` or `--storage file`.")
         backend = _prompt_storage_backend()
 
     # Attempt login
@@ -130,6 +140,7 @@ def login(
         # MFA required - prompt for code
         console.print()
         console.print("[yellow]MFA required[/yellow]")
+        require_interactive("MFA Code", fix="Run `monarch auth login` in a TTY.")
         mfa_code = typer.prompt("MFA Code")
         try:
             run_async(mm.multi_factor_authenticate(email, password, mfa_code))
@@ -187,7 +198,7 @@ def status(
     storage_info = get_storage_info()
     is_authenticated = storage_info["active_backend"] is not None
 
-    if json_output:
+    if _wants_json(json_output):
         result = {
             "authenticated": is_authenticated,
             "storage_backend": storage_info["active_backend"],
@@ -354,7 +365,7 @@ def ping(
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 
-        if json_output:
+        if _wants_json(json_output):
             result = {
                 "status": "ok",
                 "message": f"Connected successfully. {account_count} accounts available.",

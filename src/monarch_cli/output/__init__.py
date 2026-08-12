@@ -286,7 +286,7 @@ def output(
         print(json.dumps(data, indent=2, default=str))
 
 
-def output_error(error: MonarchCLIError) -> None:
+def output_error(error: MonarchCLIError, *, stdout: bool = False) -> None:
     """Output structured error for AI agent consumption.
 
     Outputs error as JSON to stderr for consistent machine-readable output.
@@ -294,7 +294,8 @@ def output_error(error: MonarchCLIError) -> None:
     Args:
         error: MonarchCLIError instance with to_dict() method.
     """
-    print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
+    stream = sys.stdout if stdout else sys.stderr
+    print(json.dumps(error.to_dict(), indent=2), file=stream)
 
 
 __all__ = [
