@@ -28,14 +28,16 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 console = Console(stderr=True)  # Progress to stderr
 
+
 def is_interactive() -> bool:
     """Check if we're in an interactive terminal."""
     return sys.stderr.isatty()
 
+
 @contextmanager
 def spinner(message: str) -> Generator[None, None, None]:
     """Show a spinner while an operation is in progress.
-    
+
     Only shows spinner in interactive terminals.
     """
     if not is_interactive():

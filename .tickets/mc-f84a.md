@@ -36,14 +36,13 @@ runner = CliRunner()
 
 
 class TestAccountsCLI:
-
     def test_list_returns_json(self):
         mock_accounts = [{"id": "ACC1", "name": "Checking"}]
-        
+
         with patch("monarch_cli.services.accounts.list_accounts") as mock:
             mock.return_value = mock_accounts
             result = runner.invoke(app, ["accounts", "list"])
-        
+
         assert result.exit_code == 0
         assert json.loads(result.stdout) == mock_accounts
 
@@ -51,17 +50,18 @@ class TestAccountsCLI:
         with patch("monarch_cli.services.accounts.list_accounts") as mock:
             mock.return_value = [{"id": "ACC1", "name": "Checking"}]
             result = runner.invoke(app, ["accounts", "list", "-f", "table"])
-        
+
         assert result.exit_code == 0
         assert "Checking" in result.stdout
 
     def test_list_requires_auth(self):
         with patch("monarch_cli.services.accounts.list_accounts") as mock:
             from monarch_cli.core.exceptions import AuthenticationError
+
             mock.side_effect = AuthenticationError()
-            
+
             result = runner.invoke(app, ["accounts", "list"])
-        
+
         assert result.exit_code == 1
         assert "AUTH_REQUIRED" in result.stdout or "not authenticated" in result.stdout.lower()
 ```

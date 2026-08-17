@@ -25,6 +25,7 @@ raise AuthenticationError()  # Has default message, code, exit_code
 ```python
 # Always use run_async() for monarchmoney calls
 from .async_utils import run_async
+
 result = run_async(client.get_accounts())
 ```
 

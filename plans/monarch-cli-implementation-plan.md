@@ -164,9 +164,11 @@ accounts = await client.get_accounts()  # User thinks it's frozen
 import signal
 import sys
 
+
 def handle_sigint(signum, frame):
     print("\nInterrupted.", file=sys.stderr)
     sys.exit(130)
+
 
 signal.signal(signal.SIGINT, handle_sigint)
 ```
@@ -328,6 +330,7 @@ All `__init__.py` files should be minimal. Use explicit imports from submodules:
 ```python
 # src/monarch_cli/__init__.py
 """Monarch CLI - AI agent friendly access to Monarch Money."""
+
 __version__ = "0.1.0"
 
 # src/monarch_cli/commands/__init__.py
@@ -688,18 +691,27 @@ chmod +x scripts/run-parallel.py
 ```python
 #!/usr/bin/env -S uv run --script
 """Run all verification checks in parallel."""
+
 import subprocess
 import sys
 
 # Use run-parallel for parallel execution with pretty output
-result = subprocess.run([
-    "uv", "run", "scripts/run-parallel.py",
-    "--fail-fast",
-    "format",    "uv run ruff format --check .",
-    "lint",      "uv run ruff check .",
-    "typecheck", "uv run mypy src/",
-    "test",      "uv run pytest -x",
-])
+result = subprocess.run(
+    [
+        "uv",
+        "run",
+        "scripts/run-parallel.py",
+        "--fail-fast",
+        "format",
+        "uv run ruff format --check .",
+        "lint",
+        "uv run ruff check .",
+        "typecheck",
+        "uv run mypy src/",
+        "test",
+        "uv run pytest -x",
+    ]
+)
 sys.exit(result.returncode)
 ```
 
@@ -782,9 +794,7 @@ class TestAccountsCLI:
 
     def test_accounts_list_json_output(self):
         """Should output accounts as JSON."""
-        mock_accounts = [
-            {"id": "ACC1", "name": "Checking", "balance": 1000.00}
-        ]
+        mock_accounts = [{"id": "ACC1", "name": "Checking", "balance": 1000.00}]
 
         with patch("monarch_cli.services.accounts.list_accounts") as mock_svc:
             mock_svc.return_value = mock_accounts
@@ -798,6 +808,7 @@ class TestAccountsCLI:
         """Should error when not authenticated."""
         with patch("monarch_cli.services.accounts.list_accounts") as mock_svc:
             from monarch_cli.core.exceptions import AuthenticationError
+
             mock_svc.side_effect = AuthenticationError()
 
             result = runner.invoke(app, ["accounts", "list"])
@@ -811,6 +822,7 @@ class TestAccountsCLI:
 ```python
 # tests/test_schemas.py
 """Ensure output schemas remain stable for AI agents."""
+
 
 def test_account_schema_has_required_fields():
     """Account output must have these fields for agent compatibility."""
@@ -871,8 +883,6 @@ def sample_accounts():
             },
         ]
     }
-
-
 ```
 
 #### Live Tests (Local Development Only)
@@ -1076,9 +1086,10 @@ from typing import TypeVar, Coroutine, Any
 
 T = TypeVar("T")
 
+
 def run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run async coroutine in sync context.
-    
+
     Uses asyncio.run() which is the standard approach for CLI applications.
     Properly handles cleanup and exception propagation.
     """
@@ -1104,6 +1115,7 @@ from typing import Any
 
 class ErrorCode(str, Enum):
     """Error codes for AI agent consumption."""
+
     AUTH_REQUIRED = "AUTH_REQUIRED"
     AUTH_EXPIRED = "AUTH_EXPIRED"
     AUTH_FAILED = "AUTH_FAILED"
@@ -1231,7 +1243,7 @@ R = TypeVar("R")
 
 def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator that catches exceptions and outputs consistent errors.
-    
+
     Uses typer.Exit() instead of sys.exit() for better testability.
     """
 
@@ -1248,6 +1260,7 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
         except Exception as e:
             if is_verbose():
                 import traceback
+
                 traceback.print_exc()
             output_error(MonarchCLIError(f"Unexpected error: {e}"))
             raise typer.Exit(1)
@@ -1271,14 +1284,17 @@ from typing import Optional
 import keyring
 import platformdirs
 
+
 class StorageBackend(str, Enum):
     KEYRING = "keyring"
-    FILE = "file"              # Safe JSON with 0600 perms
+    FILE = "file"  # Safe JSON with 0600 perms
     FILE_COMPAT = "file-compat"  # Legacy pickle (opt-in only)
+
 
 # Keyring constants
 KEYRING_SERVICE = "com.monarch-cli"
 KEYRING_USERNAME = "monarch-token"
+
 
 # File paths via platformdirs
 def get_config_dir() -> Path:
@@ -1288,12 +1304,14 @@ def get_config_dir() -> Path:
         return Path(override)
     return Path(platformdirs.user_config_dir("monarch-cli"))
 
+
 def get_session_path() -> Path:
     """Get session file path."""
     override = os.environ.get("MONARCH_SESSION_PATH")
     if override:
         return Path(override)
     return get_config_dir() / "session.json"
+
 
 # Legacy compat path (pickle, unsafe)
 COMPAT_SESSION_PATH = Path.home() / ".mm" / "mm_session.pickle"
@@ -1307,7 +1325,7 @@ def save_session_token(token: str, backend: StorageBackend = StorageBackend.KEYR
         # Safe JSON with atomic write and strict permissions
         session_path = get_session_path()
         session_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Atomic write: write to temp, then rename
         fd, tmp_path = tempfile.mkstemp(dir=session_path.parent, suffix=".tmp")
         try:
@@ -1322,6 +1340,7 @@ def save_session_token(token: str, backend: StorageBackend = StorageBackend.KEYR
     elif backend == StorageBackend.FILE_COMPAT:
         # Legacy pickle - explicit opt-in only
         import pickle
+
         COMPAT_SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(COMPAT_SESSION_PATH, "wb") as f:
             pickle.dump({"token": token}, f)
@@ -1362,6 +1381,7 @@ def get_session_token() -> str | None:
     # Fall back to legacy compat pickle (only if it exists)
     if COMPAT_SESSION_PATH.exists():
         import pickle
+
         try:
             with open(COMPAT_SESSION_PATH, "rb") as f:
                 data = pickle.load(f)
@@ -1375,7 +1395,7 @@ def get_session_token() -> str | None:
 def get_storage_info() -> dict:
     """Get info about where token is stored."""
     env_token = os.environ.get("MONARCH_TOKEN")
-    
+
     keyring_token = None
     try:
         keyring_token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
@@ -1524,7 +1544,7 @@ async def with_retry(
             if attempt == max_retries:
                 break
 
-            delay = min(base_delay * (2 ** attempt), max_delay)
+            delay = min(base_delay * (2**attempt), max_delay)
             if jitter:
                 delay = delay * (0.75 + random.random() * 0.5)
 
@@ -1547,6 +1567,7 @@ from enum import Enum
 
 class DatePreset(str, Enum):
     """Common date range presets."""
+
     TODAY = "today"
     YESTERDAY = "yesterday"
     THIS_WEEK = "this-week"
@@ -1605,7 +1626,7 @@ def parse_date_range(
     end: str | None = None,
 ) -> tuple[str | None, str | None]:
     """Parse date range from preset or explicit dates.
-    
+
     Explicit dates take precedence over preset.
     """
     if start is not None or end is not None:
@@ -1635,21 +1656,26 @@ from rich.console import Console
 
 from ..core.exceptions import MonarchCLIError
 
+
 class OutputFormat(str, Enum):
     JSON = "json"
     TABLE = "table"
     CSV = "csv"
     COMPACT = "compact"
 
+
 console = Console()
 _verbose = False
+
 
 def set_verbose(v: bool) -> None:
     global _verbose
     _verbose = v
 
+
 def is_verbose() -> bool:
     return _verbose
+
 
 def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
     """Output data in specified format. Table/CSV support added in Phase 2."""
@@ -1657,6 +1683,7 @@ def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
         print(json.dumps(data, default=str))
     else:
         print(json.dumps(data, indent=2, default=str))
+
 
 def output_error(error: MonarchCLIError) -> None:
     """Output structured error for AI agents to stderr."""
@@ -1679,6 +1706,7 @@ app = typer.Typer(
 
 # Phase 1: Only auth commands registered
 from .commands import auth
+
 app.add_typer(auth.app, name="auth")
 
 # Phase 3 will add: accounts, transactions, budgets, cashflow, categories, config
@@ -1694,8 +1722,11 @@ if __name__ == "__main__":
 import typer
 from getpass import getpass
 from ..core.session import (
-    has_valid_session, delete_session_token, save_session_token,
-    get_storage_info, StorageBackend
+    has_valid_session,
+    delete_session_token,
+    save_session_token,
+    get_storage_info,
+    StorageBackend,
 )
 from ..core.adapter import extract_token_from_client, reset_client
 from ..core.async_utils import run_async
@@ -1710,12 +1741,13 @@ app = typer.Typer(help="Authentication management")
 def login(
     storage: StorageBackend = typer.Option(
         None,
-        "--storage", "-s",
-        help="Token storage backend: keyring (secure, default), file (portable), or file-compat (legacy pickle)"
+        "--storage",
+        "-s",
+        help="Token storage backend: keyring (secure, default), file (portable), or file-compat (legacy pickle)",
     ),
 ):
     """Interactive login to Monarch Money.
-    
+
     Examples:
         monarch auth login
         monarch auth login --storage file
@@ -1762,16 +1794,16 @@ def login(
 
 @app.command()
 @handle_errors
-def status(
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
-):
+def status(format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")):
     """Check authentication status."""
     is_authenticated = has_valid_session()
     storage_info = get_storage_info()
     result = {
         "authenticated": is_authenticated,
         "storage_backend": storage_info["active_backend"],
-        "message": "Ready to use" if is_authenticated else "Run 'monarch auth login' to authenticate"
+        "message": "Ready to use"
+        if is_authenticated
+        else "Run 'monarch auth login' to authenticate",
     }
     output(result, format)
 
@@ -1779,13 +1811,11 @@ def status(
 @app.command()
 def logout(
     storage: StorageBackend = typer.Option(
-        None,
-        "--storage", "-s",
-        help="Only clear token from specific backend. Default: clear all."
+        None, "--storage", "-s", help="Only clear token from specific backend. Default: clear all."
     ),
 ):
     """Remove stored authentication token.
-    
+
     Examples:
         monarch auth logout              # Clear all stored tokens
         monarch auth logout -s keyring   # Only clear keyring
@@ -1802,7 +1832,7 @@ def logout(
 @app.command()
 def doctor():
     """Diagnose environment and auth storage.
-    
+
     Checks keyring availability, session files, and token validity.
     """
     console.print("\n[bold]Monarch CLI Doctor[/bold]\n")
@@ -1810,6 +1840,7 @@ def doctor():
     # Check keyring
     try:
         import keyring
+
         backend = keyring.get_keyring()
         console.print(f"[green]✓[/green] Keyring available: {type(backend).__name__}")
     except Exception as e:
@@ -1818,10 +1849,18 @@ def doctor():
     # Check storage info
     info = get_storage_info()
     console.print(f"\n[bold]Token Storage:[/bold]")
-    console.print(f"  Env var: {'[green]set[/green]' if info['has_env_token'] else '[dim]not set[/dim]'} (MONARCH_TOKEN)")
-    console.print(f"  Keyring: {'[green]present[/green]' if info['has_keyring_token'] else '[dim]empty[/dim]'}")
-    console.print(f"  File: {'[green]present[/green]' if info['has_file_token'] else '[dim]empty[/dim]'} ({info['file_path']})")
-    console.print(f"  Compat: {'[yellow]present[/yellow]' if info['has_compat_token'] else '[dim]empty[/dim]'} ({info['compat_path']})")
+    console.print(
+        f"  Env var: {'[green]set[/green]' if info['has_env_token'] else '[dim]not set[/dim]'} (MONARCH_TOKEN)"
+    )
+    console.print(
+        f"  Keyring: {'[green]present[/green]' if info['has_keyring_token'] else '[dim]empty[/dim]'}"
+    )
+    console.print(
+        f"  File: {'[green]present[/green]' if info['has_file_token'] else '[dim]empty[/dim]'} ({info['file_path']})"
+    )
+    console.print(
+        f"  Compat: {'[yellow]present[/yellow]' if info['has_compat_token'] else '[dim]empty[/dim]'} ({info['compat_path']})"
+    )
     console.print(f"  Active: {info['active_backend'] or '[red]none[/red]'}")
 
     # Test API connectivity if authenticated
@@ -1829,6 +1868,7 @@ def doctor():
         console.print(f"\n[bold]API Connectivity:[/bold]")
         try:
             from ..core.adapter import get_authenticated_client
+
             client = get_authenticated_client()
             accounts = run_async(client.get_accounts())
             count = len(accounts.get("accounts", []))
@@ -1928,25 +1968,31 @@ from rich.table import Table
 
 from ..core.exceptions import MonarchCLIError
 
+
 class OutputFormat(str, Enum):
     JSON = "json"
     TABLE = "table"
     CSV = "csv"
     COMPACT = "compact"
 
+
 console = Console()
 _verbose = False
+
 
 def set_verbose(v: bool) -> None:
     global _verbose
     _verbose = v
 
+
 def is_verbose() -> bool:
     return _verbose
+
 
 def is_interactive() -> bool:
     """Check if we're in an interactive terminal."""
     return sys.stdout.isatty()
+
 
 def output(
     data: Any,
@@ -1981,6 +2027,7 @@ def output(
         else:
             print_csv([data] if isinstance(data, dict) else [{"value": data}])
 
+
 def print_table(items: list[dict]) -> None:
     """Print list of dicts as rich table."""
     if not items:
@@ -1996,6 +2043,7 @@ def print_table(items: list[dict]) -> None:
 
     console.print(table)
 
+
 def print_csv(items: list[dict]) -> None:
     """Print list of dicts as CSV."""
     if not items:
@@ -2007,9 +2055,10 @@ def print_csv(items: list[dict]) -> None:
     writer.writerows(items)
     print(output_io.getvalue(), end="")
 
+
 def output_error(error: MonarchCLIError) -> None:
     """Output structured error for AI agents to stderr.
-    
+
     Errors go to stderr to preserve clean stdout for piping.
     """
     print(json.dumps(error.to_dict(), indent=2), file=sys.stderr)
@@ -2162,26 +2211,23 @@ def get_account_ids() -> list[str]:
 
 def refresh_accounts(account_ids: list[str] | None = None) -> dict:
     """Request account refresh from financial institutions.
-    
+
     Note: The upstream library requires account_ids. If not provided,
     we fetch all account IDs first.
     """
     client = get_authenticated_client()
-    
+
     if account_ids is None:
         account_ids = get_account_ids()
-    
+
     if not account_ids:
-        return {
-            "status": "no_accounts",
-            "message": "No accounts found to refresh."
-        }
-    
+        return {"status": "no_accounts", "message": "No accounts found to refresh."}
+
     run_async(client.request_accounts_refresh(account_ids))
     return {
         "status": "refresh_requested",
         "account_count": len(account_ids),
-        "message": f"Refresh requested for {len(account_ids)} accounts. Balances will update shortly."
+        "message": f"Refresh requested for {len(account_ids)} accounts. Balances will update shortly.",
     }
 ```
 
@@ -2207,7 +2253,7 @@ def list_accounts(
     raw: bool = typer.Option(False, "--raw", help="Output raw API response"),
 ):
     """List all linked financial accounts.
-    
+
     Examples:
         monarch accounts list
         monarch accounts list -f table
@@ -2217,6 +2263,7 @@ def list_accounts(
         if raw:
             from ..core.adapter import get_authenticated_client
             from ..core.async_utils import run_async
+
             client = get_authenticated_client()
             result = run_async(client.get_accounts())
         else:
@@ -2233,7 +2280,7 @@ def refresh(
     ),
 ):
     """Trigger account refresh from financial institutions.
-    
+
     Examples:
         monarch accounts refresh                    # Refresh all accounts
         monarch accounts refresh -a ACC123          # Refresh specific account
@@ -2287,7 +2334,7 @@ def list_transactions(
     raw: bool = typer.Option(False, "--raw", help="Output raw API response"),
 ):
     """List transactions with optional filters.
-    
+
     Examples:
         monarch transactions list
         monarch transactions list --preset this-month
@@ -2299,14 +2346,16 @@ def list_transactions(
 
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
-        result = run_async(client.get_transactions(
-            limit=limit,
-            offset=offset,
-            start_date=resolved_start,
-            end_date=resolved_end,
-            search=search or "",
-            account_ids=[account_id] if account_id else [],
-        ))
+        result = run_async(
+            client.get_transactions(
+                limit=limit,
+                offset=offset,
+                start_date=resolved_start,
+                end_date=resolved_end,
+                search=search or "",
+                account_ids=[account_id] if account_id else [],
+            )
+        )
 
     if not raw:
         result = transform_transactions(result)
@@ -2325,7 +2374,7 @@ def update(
     format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f"),
 ):
     """Update an existing transaction.
-    
+
     Examples:
         monarch transactions update TXN123 --category CAT456
         monarch transactions update TXN123 --amount -50.00 --dry-run
@@ -2339,22 +2388,28 @@ def update(
         update_kwargs["category_id"] = category_id
 
     if dry_run:
-        output({
-            "dry_run": True,
-            "operation": "update_transaction",
-            "transaction_id": transaction_id,
-            "changes": update_kwargs,
-            "message": "No changes made (dry run)"
-        }, format)
+        output(
+            {
+                "dry_run": True,
+                "operation": "update_transaction",
+                "transaction_id": transaction_id,
+                "changes": update_kwargs,
+                "message": "No changes made (dry run)",
+            },
+            format,
+        )
         return
 
     client = get_authenticated_client()
     run_async(client.update_transaction(transaction_id=transaction_id, **update_kwargs))
-    output({
-        "status": "updated",
-        "transaction_id": transaction_id,
-        "changes": update_kwargs,
-    }, format)
+    output(
+        {
+            "status": "updated",
+            "transaction_id": transaction_id,
+            "changes": update_kwargs,
+        },
+        format,
+    )
 ```
 
 **CLI Usage:**
@@ -2387,9 +2442,7 @@ app = typer.Typer(help="Budget tracking")
 
 @app.command("list")
 @handle_errors
-def list_budgets(
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
-):
+def list_budgets(format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")):
     """Get budget status with spent/remaining amounts."""
     with spinner("Fetching budgets..."):
         client = get_authenticated_client()
@@ -2397,13 +2450,15 @@ def list_budgets(
 
     result = []
     for budget in budgets.get("budgetData", {}).get("budgetItems", []):
-        result.append({
-            "id": budget.get("id"),
-            "category": budget.get("category", {}).get("name"),
-            "budgeted": budget.get("budgetAmount"),
-            "spent": abs(budget.get("spentAmount", 0)),
-            "remaining": budget.get("remainingAmount"),
-        })
+        result.append(
+            {
+                "id": budget.get("id"),
+                "category": budget.get("category", {}).get("name"),
+                "budgeted": budget.get("budgetAmount"),
+                "spent": abs(budget.get("spentAmount", 0)),
+                "remaining": budget.get("remainingAmount"),
+            }
+        )
 
     output(result, format)
 ```
@@ -2430,10 +2485,10 @@ def cashflow_summary(
     start_date: Optional[str] = typer.Option(None, "--start", "-s", help="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = typer.Option(None, "--end", "-e", help="End date (YYYY-MM-DD)"),
     preset: Optional[DatePreset] = typer.Option(None, "--preset", "-p", help="Date range preset"),
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
+    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f"),
 ):
     """Get income/expense analysis for date range.
-    
+
     Examples:
         monarch cashflow summary
         monarch cashflow summary --preset this-month
@@ -2443,10 +2498,12 @@ def cashflow_summary(
 
     with spinner("Calculating cashflow..."):
         client = get_authenticated_client()
-        cashflow = run_async(client.get_cashflow_summary(
-            start_date=resolved_start,
-            end_date=resolved_end,
-        ))
+        cashflow = run_async(
+            client.get_cashflow_summary(
+                start_date=resolved_start,
+                end_date=resolved_end,
+            )
+        )
 
     output(cashflow, format)
 ```
@@ -2467,11 +2524,9 @@ app = typer.Typer(help="Category management")
 
 @app.command("list")
 @handle_errors
-def list_categories(
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
-):
+def list_categories(format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")):
     """List all transaction categories.
-    
+
     Examples:
         monarch categories list
         monarch categories list -f table
@@ -2484,12 +2539,14 @@ def list_categories(
     result = []
     for group in data.get("categories", []):
         for cat in group.get("children", []):
-            result.append({
-                "id": cat.get("id"),
-                "name": cat.get("name"),
-                "group": group.get("name"),
-                "icon": cat.get("icon"),
-            })
+            result.append(
+                {
+                    "id": cat.get("id"),
+                    "name": cat.get("name"),
+                    "group": group.get("name"),
+                    "icon": cat.get("icon"),
+                }
+            )
 
     output(result, format)
 ```

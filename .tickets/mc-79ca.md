@@ -31,6 +31,7 @@ RETRYABLE_EXCEPTIONS = (
     OSError,
 )
 
+
 async def with_retry(
     coro_factory: Callable[[], Awaitable[T]],
     max_retries: int = 3,
@@ -39,7 +40,7 @@ async def with_retry(
     jitter: bool = True,
 ) -> T:
     """Execute an async operation with exponential backoff retry.
-    
+
     Args:
         coro_factory: Callable that creates a new coroutine each attempt
         max_retries: Maximum retry attempts (default 3)
@@ -48,7 +49,7 @@ async def with_retry(
         jitter: Add randomness to prevent thundering herd (default True)
     """
     last_exception = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             return await coro_factory()
@@ -56,11 +57,11 @@ async def with_retry(
             last_exception = e
             if attempt == max_retries:
                 break
-            delay = min(base_delay * (2 ** attempt), max_delay)
+            delay = min(base_delay * (2**attempt), max_delay)
             if jitter:
                 delay = delay * (0.75 + random.random() * 0.5)
             await asyncio.sleep(delay)
-    
+
     raise NetworkError(f"Operation failed after {max_retries} retries: {last_exception}")
 ```
 

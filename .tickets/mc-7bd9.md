@@ -24,9 +24,10 @@ The adapter pattern creates a boundary between our CLI code and the upstream lib
 ```python
 _client: MonarchMoney | None = None
 
+
 def get_authenticated_client() -> MonarchMoney:
     """Get authenticated MonarchMoney client.
-    
+
     Uses the library's constructor token= parameter for clean initialization.
     The library handles setting _headers["Authorization"] = "Token {token}".
     """
@@ -42,12 +43,14 @@ def get_authenticated_client() -> MonarchMoney:
     _client = MonarchMoney(token=token)
     return _client
 
+
 def extract_token_from_client(client: MonarchMoney) -> str | None:
     """Extract token from client after login.
-    
+
     The library exposes a `token` property, so we use that instead of _token.
     """
     return client.token
+
 
 def reset_client() -> None:
     """Reset cached client (for logout)."""

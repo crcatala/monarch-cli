@@ -30,11 +30,13 @@ from ..output import output_error, is_verbose
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator that catches exceptions and outputs consistent errors.
-    
+
     Uses typer.Exit() instead of sys.exit() for better testability.
     """
+
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
@@ -48,9 +50,11 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:
         except Exception as e:
             if is_verbose():
                 import traceback
+
                 traceback.print_exc()
             output_error(MonarchCLIError(f"Unexpected error: {e}"))
             raise typer.Exit(1)
+
     return wrapper
 ```
 

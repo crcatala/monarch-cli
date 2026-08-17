@@ -40,12 +40,14 @@ import platformdirs
 
 from ..output import OutputFormat
 
+
 def get_config_dir() -> Path:
     """Get config directory via platformdirs."""
     override = os.environ.get("MONARCH_CONFIG_DIR")
     if override:
         return Path(override)
     return Path(platformdirs.user_config_dir("monarch-cli"))
+
 
 @dataclass
 class Config:
@@ -60,23 +62,25 @@ class Config:
     def load(cls) -> "Config":
         """Load config from environment variables."""
         config = cls()
-        
+
         if fmt := os.environ.get("MONARCH_FORMAT"):
             try:
                 config.format = OutputFormat(fmt.lower())
             except ValueError:
                 pass
-        
+
         if os.environ.get("NO_COLOR") or os.environ.get("MONARCH_NO_COLOR") == "1":
             config.color = False
-        
+
         if os.environ.get("MONARCH_VERBOSE") == "1":
             config.verbose = True
-        
+
         # Parse timeout and retries...
         return config
 
+
 _config: Config | None = None
+
 
 def get_config() -> Config:
     """Get the global config instance."""

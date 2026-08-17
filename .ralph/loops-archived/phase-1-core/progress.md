@@ -15,11 +15,7 @@ from monarch_cli.core.exceptions import AuthenticationError, ValidationError
 raise AuthenticationError()  # Uses default message
 
 # Raising with details:
-raise NotFoundError(
-    message="Account not found",
-    resource_type="account",
-    resource_id="abc123"
-)
+raise NotFoundError(message="Account not found", resource_type="account", resource_id="abc123")
 
 # Exit codes: 1 for auth/api/network errors, 2 for validation/usage errors
 ```
@@ -71,13 +67,15 @@ from monarch_cli.core.async_utils import run_async
 result = run_async(with_retry(lambda: client.get_accounts()))
 
 # Custom retry settings
-result = run_async(with_retry(
-    lambda: client.get_accounts(),
-    max_retries=5,
-    base_delay=0.5,
-    max_delay=60.0,
-    jitter=True,
-))
+result = run_async(
+    with_retry(
+        lambda: client.get_accounts(),
+        max_retries=5,
+        base_delay=0.5,
+        max_delay=60.0,
+        jitter=True,
+    )
+)
 
 # Note: coro_factory is a lambda/callable that RETURNS a coroutine
 # This allows fresh coroutine creation for each retry attempt
@@ -86,7 +84,9 @@ result = run_async(with_retry(
 ### Adapter Pattern (Monarch Client Access)
 ```python
 from monarch_cli.core.adapter import (
-    get_authenticated_client, extract_token_from_client, reset_client
+    get_authenticated_client,
+    extract_token_from_client,
+    reset_client,
 )
 
 # Get authenticated client (cached, raises AuthenticationError if no token)
@@ -95,6 +95,7 @@ client = get_authenticated_client()
 # Use with async bridge and retry
 from monarch_cli.core.async_utils import run_async
 from monarch_cli.core.retry import with_retry
+
 result = run_async(with_retry(lambda: client.get_accounts()))
 
 # Extract token from client (for saving after login)

@@ -62,7 +62,8 @@ def main(
     ),
     verbose: bool = typer.Option(
         False,
-        "-v", "--verbose",  # -v is standard for verbose
+        "-v",
+        "--verbose",  # -v is standard for verbose
         help="Show operational progress messages.",
     ),
     debug: bool = typer.Option(
@@ -91,8 +92,10 @@ def main(
         set_default_format(OutputFormat.JSON)
     if no_color:
         from rich.console import Console
+
         # Rich respects NO_COLOR env, but we also need explicit flag
         import os
+
         os.environ["NO_COLOR"] = "1"
 ```
 
@@ -104,16 +107,20 @@ Add these to `src/monarch_cli/output/__init__.py`:
 _debug = False
 _default_format = OutputFormat.JSON
 
+
 def set_debug(d: bool) -> None:
     global _debug
     _debug = d
 
+
 def is_debug() -> bool:
     return _debug
+
 
 def set_default_format(fmt: OutputFormat) -> None:
     global _default_format
     _default_format = fmt
+
 
 def get_default_format() -> OutputFormat:
     return _default_format

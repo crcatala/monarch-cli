@@ -24,13 +24,14 @@ When testing against the live API:
 ```python
 import time
 
+
 def test_multiple_endpoints():
     # Test accounts
     accounts = run_async(client.get_accounts())
     assert "accounts" in accounts
-    
+
     time.sleep(1)  # Throttle between calls
-    
+
     # Test transactions
     txns = run_async(client.get_transactions(limit=5))
     assert "allTransactions" in txns
