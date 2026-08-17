@@ -26,9 +26,10 @@ from typing import TypeVar, Coroutine, Any
 
 T = TypeVar("T")
 
+
 def run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run async coroutine in sync context.
-    
+
     Uses asyncio.run() which is the standard approach for CLI applications.
     Properly handles cleanup and exception propagation.
     """

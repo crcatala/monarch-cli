@@ -310,18 +310,19 @@ monarch accounts list --quiet
 import subprocess
 import json
 
+
 def get_transactions(preset="this-month"):
     result = subprocess.run(
         ["monarch", "transactions", "list", "--preset", preset, "--json"],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     return json.loads(result.stdout)
 
+
 def categorize_transaction(transaction_id, category_id):
-    subprocess.run([
-        "monarch", "transactions", "update",
-        transaction_id, "--category", category_id
-    ])
+    subprocess.run(["monarch", "transactions", "update", transaction_id, "--category", category_id])
+
 
 # Get this month's transactions for analysis
 transactions = get_transactions("this-month")

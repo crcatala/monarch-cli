@@ -48,8 +48,7 @@ Trigger account refresh from financial institutions.
 @handle_errors
 def refresh(
     account_id: Optional[list[str]] = typer.Option(
-        None, "--account", "-a",
-        help="Specific account ID(s) to refresh. Default: all."
+        None, "--account", "-a", help="Specific account ID(s) to refresh. Default: all."
     ),
 ):
     """Trigger account refresh from financial institutions."""

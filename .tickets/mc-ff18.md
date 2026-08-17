@@ -25,9 +25,7 @@ Get budget status with spent/remaining amounts.
 ```python
 @app.command("list")
 @handle_errors
-def list_budgets(
-    format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")
-):
+def list_budgets(format: OutputFormat = typer.Option(OutputFormat.JSON, "--format", "-f")):
     """Get budget status with spent/remaining amounts."""
     with spinner("Fetching budgets..."):
         client = get_authenticated_client()
@@ -36,13 +34,15 @@ def list_budgets(
     # Simple inline transformation (no separate transformer needed)
     result = []
     for budget in budgets.get("budgetData", {}).get("budgetItems", []):
-        result.append({
-            "id": budget.get("id"),
-            "category": budget.get("category", {}).get("name"),
-            "budgeted": budget.get("budgetAmount"),
-            "spent": abs(budget.get("spentAmount", 0)),  # Abs for readability
-            "remaining": budget.get("remainingAmount"),
-        })
+        result.append(
+            {
+                "id": budget.get("id"),
+                "category": budget.get("category", {}).get("name"),
+                "budgeted": budget.get("budgetAmount"),
+                "spent": abs(budget.get("spentAmount", 0)),  # Abs for readability
+                "remaining": budget.get("remainingAmount"),
+            }
+        )
 
     output(result, format)
 ```

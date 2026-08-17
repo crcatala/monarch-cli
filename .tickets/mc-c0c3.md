@@ -39,13 +39,14 @@ Common date ranges for financial queries:
 def resolve_preset(preset: DatePreset) -> tuple[date | None, date | None]:
     """Convert a preset to (start_date, end_date) tuple."""
 
+
 def parse_date_range(
     preset: DatePreset | None = None,
     start: str | None = None,
     end: str | None = None,
 ) -> tuple[str | None, str | None]:
     """Parse date range from preset or explicit dates.
-    
+
     Explicit dates take precedence over preset.
     Returns ISO format strings (YYYY-MM-DD) or None.
     """

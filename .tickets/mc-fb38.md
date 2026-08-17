@@ -38,11 +38,14 @@ tests/
 def test_run_async_returns_result():
     async def coro():
         return 42
+
     assert run_async(coro()) == 42
+
 
 def test_run_async_propagates_exception():
     async def coro():
         raise ValueError("test")
+
     with pytest.raises(ValueError):
         run_async(coro())
 ```
@@ -54,6 +57,7 @@ def test_error_to_dict():
     d = error.to_dict()
     assert d["code"] == "AUTH_REQUIRED"
     assert d["error"] is True
+
 
 def test_error_codes_are_unique():
     # Verify no duplicate error codes
@@ -69,6 +73,7 @@ def test_this_month_preset():
     assert start == date(2024, 6, 1)
     assert end == date(2024, 6, 15)
 
+
 def test_all_presets_return_valid_dates():
     for preset in DatePreset:
         start, end = resolve_preset(preset)
@@ -83,10 +88,12 @@ def test_config_defaults():
     assert config.format == OutputFormat.JSON
     assert config.timeout_seconds == 30
 
+
 def test_config_from_env(monkeypatch):
     monkeypatch.setenv("MONARCH_FORMAT", "table")
     config = Config.load()
     assert config.format == OutputFormat.TABLE
+
 
 def test_no_color_env(monkeypatch):
     monkeypatch.setenv("NO_COLOR", "1")
@@ -101,6 +108,7 @@ def test_output_json(capsys):
     captured = capsys.readouterr()
     assert json.loads(captured.out) == [{"id": "1"}]
 
+
 def test_output_compact(capsys):
     output([{"id": "1"}], OutputFormat.COMPACT)
     captured = capsys.readouterr()
@@ -114,6 +122,7 @@ def mock_monarch_client():
     client = AsyncMock()
     client.get_accounts.return_value = {"accounts": []}
     return client
+
 
 @pytest.fixture
 def sample_accounts():

@@ -49,23 +49,28 @@ from rich.console import Console
 
 from ..core.exceptions import MonarchCLIError
 
+
 class OutputFormat(str, Enum):
     JSON = "json"
     TABLE = "table"
     CSV = "csv"
     COMPACT = "compact"
 
+
 # Rich console for styled output (uses stderr to keep stdout clean)
 console = Console(stderr=True)
 
 _verbose = False
 
+
 def set_verbose(v: bool) -> None:
     global _verbose
     _verbose = v
 
+
 def is_verbose() -> bool:
     return _verbose
+
 
 def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
     """Output data as JSON to stdout. Used when --json flag is passed."""
@@ -73,6 +78,7 @@ def output(data: Any, format: OutputFormat = OutputFormat.JSON) -> None:
         print(json.dumps(data, default=str))
     else:
         print(json.dumps(data, indent=2, default=str))
+
 
 def output_error(error: MonarchCLIError) -> None:
     """Output structured error for AI agents to stderr."""
