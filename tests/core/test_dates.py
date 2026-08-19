@@ -27,6 +27,8 @@ class TestDatePreset:
             "last-month",
             "last-30-days",
             "last-90-days",
+            "this-quarter",
+            "last-quarter",
             "this-year",
             "last-year",
             "ytd",
@@ -38,7 +40,7 @@ class TestDatePreset:
 
     def test_preset_count(self) -> None:
         """Should have exactly 12 presets."""
-        assert len(list(DatePreset)) == 12
+        assert len(list(DatePreset)) == 14
 
 
 class TestResolvePreset:
@@ -128,6 +130,24 @@ class TestResolvePreset:
         start, end = resolve_preset(DatePreset.LAST_90_DAYS)
         assert start == date(2025, 10, 20)
         assert end == date(2026, 1, 18)
+
+    @mock.patch("monarch_cli.core.dates.date")
+    def test_this_quarter(self, mock_date: mock.MagicMock) -> None:
+        """THIS_QUARTER should start on the quarter's first day."""
+        mock_date.today.return_value = date(2026, 8, 18)
+        mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+        start, end = resolve_preset(DatePreset.THIS_QUARTER)
+        assert start == date(2026, 7, 1)
+        assert end == date(2026, 8, 18)
+
+    @mock.patch("monarch_cli.core.dates.date")
+    def test_last_quarter_crosses_year_boundary(self, mock_date: mock.MagicMock) -> None:
+        """LAST_QUARTER should return the full prior quarter across years."""
+        mock_date.today.return_value = date(2026, 2, 18)
+        mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+        start, end = resolve_preset(DatePreset.LAST_QUARTER)
+        assert start == date(2025, 10, 1)
+        assert end == date(2025, 12, 31)
 
     @mock.patch("monarch_cli.core.dates.date")
     def test_this_year(self, mock_date: mock.MagicMock) -> None:

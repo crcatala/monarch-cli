@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import typer
 
@@ -21,6 +21,75 @@ app = typer.Typer(
     help="Transaction management",
     no_args_is_help=True,
 )
+
+_EDITABLE_FIELDS = ("amount", "merchant_name", "category_id", "notes", "date")
+
+
+def _build_transaction_preview(
+    transaction_id: str,
+    raw: dict[str, Any],
+    changes: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a stable before/after preview from live transaction details."""
+    transaction = raw.get("getTransaction") or {}
+    before = {
+        "amount": transaction.get("amount"),
+        "merchant_name": (transaction.get("merchant") or {}).get("name"),
+        "category_id": (transaction.get("category") or {}).get("id"),
+        "notes": transaction.get("notes"),
+        "date": transaction.get("date"),
+    }
+    after = dict(before)
+    after.update({key: value for key, value in changes.items() if key in _EDITABLE_FIELDS})
+    return {"id": transaction_id, "before": before, "after": after}
+
+
+def _invalid_preview_reason(
+    transaction_id: str,
+    raw: dict[str, Any],
+    changes: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return why a live transaction cannot be safely previewed."""
+    transaction = raw.get("getTransaction")
+    if not transaction:
+        return {"id": transaction_id, "reason": "not_found"}
+    if transaction.get("pending") or transaction.get("isPending"):
+        return {"id": transaction_id, "reason": "pending"}
+    if transaction.get("isSplitTransaction") or transaction.get("hasSplitTransactions"):
+        return {"id": transaction_id, "reason": "split_transaction"}
+    protected_fields = sorted(
+        field
+        for field in ("amount", "date")
+        if field in changes and not transaction.get("isManual")
+    )
+    if protected_fields:
+        return {
+            "id": transaction_id,
+            "reason": "protected_fields",
+            "fields": protected_fields,
+        }
+    return None
+
+
+async def _fetch_transaction_details(
+    client: Any,
+    transaction_ids: list[str],
+    max_concurrency: int,
+) -> list[dict[str, Any]]:
+    """Fetch live transaction details with bounded concurrency."""
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def fetch_one(transaction_id: str) -> dict[str, Any]:
+        async with semaphore:
+            return cast(
+                dict[str, Any],
+                await client.get_transaction_details(
+                    transaction_id=transaction_id,
+                    redirect_posted=False,
+                ),
+            )
+
+    return await asyncio.gather(*(fetch_one(transaction_id) for transaction_id in transaction_ids))
 
 
 def _parse_date(date_str: str | None) -> date | None:
@@ -103,6 +172,44 @@ def list_cmd(
             help="Search term for transaction description/merchant",
         ),
     ] = None,
+    category: Annotated[
+        str | None,
+        typer.Option(
+            "-c",
+            "--category",
+            help="Filter by category ID or case-insensitive name substring",
+        ),
+    ] = None,
+    min_amount: Annotated[
+        float | None,
+        typer.Option(
+            "--min-amount",
+            min=0,
+            help="Minimum absolute transaction amount",
+        ),
+    ] = None,
+    max_amount: Annotated[
+        float | None,
+        typer.Option(
+            "--max-amount",
+            min=0,
+            help="Maximum absolute transaction amount",
+        ),
+    ] = None,
+    expenses_only: Annotated[
+        bool,
+        typer.Option(
+            "--expenses-only",
+            help="Include only expenses (negative amounts)",
+        ),
+    ] = False,
+    income_only: Annotated[
+        bool,
+        typer.Option(
+            "--income-only",
+            help="Include only income (positive amounts)",
+        ),
+    ] = False,
     format: Annotated[
         OutputFormat | None,
         typer.Option(
@@ -162,9 +269,29 @@ def list_cmd(
     # Prepare account IDs
     account_ids = list(account) if account else []
 
+    if expenses_only and income_only:
+        raise typer.BadParameter("--expenses-only and --income-only cannot be used together")
+    if min_amount is not None and max_amount is not None and min_amount > max_amount:
+        raise typer.BadParameter("--min-amount cannot exceed --max-amount")
+
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
-        raw_data: Any = run_api_call(
+        category_ids: list[str] = []
+        if category:
+            category_data: dict[str, Any] = run_api_call(
+                lambda: client.get_transaction_categories()
+            )
+            category_lower = category.casefold()
+            category_ids = [
+                str(item["id"])
+                for item in category_data.get("categories", [])
+                if str(item.get("id", "")).casefold() == category_lower
+                or category_lower in str(item.get("name", "")).casefold()
+            ]
+            if not category_ids:
+                raise typer.BadParameter(f"No transaction category matches '{category}'")
+
+        raw_data: dict[str, Any] = run_api_call(
             lambda: client.get_transactions(
                 limit=limit,
                 offset=offset,
@@ -172,11 +299,35 @@ def list_cmd(
                 end_date=end_str,
                 search=search or "",
                 account_ids=account_ids,
+                category_ids=category_ids,
             )
         )
 
-        # Transform unless raw mode
-        data = raw_data if raw else transform_transactions(raw_data)
+        should_filter_amount = (
+            min_amount is not None or max_amount is not None or expenses_only or income_only
+        )
+        if raw:
+            data: Any = raw_data
+            transactions = (raw_data.get("allTransactions") or {}).get("results") or []
+        else:
+            transactions = transform_transactions(raw_data)
+
+        if should_filter_amount:
+            transactions = [
+                transaction
+                for transaction in transactions
+                if (min_amount is None or abs(transaction.get("amount") or 0) >= min_amount)
+                and (max_amount is None or abs(transaction.get("amount") or 0) <= max_amount)
+                and (not expenses_only or (transaction.get("amount") or 0) < 0)
+                and (not income_only or (transaction.get("amount") or 0) > 0)
+            ]
+        if raw:
+            all_transactions = raw_data.get("allTransactions")
+            if isinstance(all_transactions, dict) and should_filter_amount:
+                all_transactions["results"] = transactions
+                all_transactions["totalCount"] = len(transactions)
+        else:
+            data = transactions
 
     # Handle NDJSON output
     if ndjson:
@@ -283,11 +434,35 @@ def update(
 
     # Dry run mode
     if dry_run:
+        with spinner("Fetching transaction preview..."):
+            client = get_authenticated_client()
+            raw_data: dict[str, Any] = run_api_call(
+                lambda: client.get_transaction_details(
+                    transaction_id=transaction_id,
+                    redirect_posted=False,
+                )
+            )
+        invalid = _invalid_preview_reason(transaction_id, raw_data, changes)
+        if invalid:
+            output(
+                {
+                    "status": "error",
+                    "transaction_count": 0,
+                    "transaction_ids": [],
+                    "invalid_transactions": [invalid],
+                    "message": "Dry run refused; no changes applied.",
+                }
+            )
+            raise typer.Exit(1)
+        preview = _build_transaction_preview(transaction_id, raw_data, changes)
         output(
             {
                 "status": "dry_run",
                 "transaction_id": transaction_id,
+                "transaction_count": 1,
+                "transaction_ids": [transaction_id],
                 "changes": changes,
+                "transactions": [preview],
                 "message": "No changes applied (dry run mode)",
             }
         )
@@ -341,6 +516,7 @@ def batch_update(
         int,
         typer.Option(
             "--max-concurrency",
+            min=1,
             help="Maximum number of parallel API calls",
         ),
     ] = 4,
@@ -384,6 +560,8 @@ def batch_update(
             if line:  # Skip empty lines
                 ids.append(line)
 
+    ids = list(dict.fromkeys(ids))
+
     # Validate we have IDs to process
     if not ids:
         output(
@@ -410,14 +588,38 @@ def batch_update(
         )
         raise typer.Exit(1)
 
-    # Dry run mode - just show what would happen
+    # Dry run mode - fetch authoritative state and fail closed before any write.
     if dry_run:
+        with spinner("Fetching transaction previews..."):
+            client = get_authenticated_client()
+            details = run_api_call(lambda: _fetch_transaction_details(client, ids, max_concurrency))
+        invalid_transactions = [
+            invalid
+            for transaction_id, raw_data in zip(ids, details, strict=True)
+            if (invalid := _invalid_preview_reason(transaction_id, raw_data, changes))
+        ]
+        if invalid_transactions:
+            output(
+                {
+                    "status": "error",
+                    "transaction_count": 0,
+                    "transaction_ids": [],
+                    "invalid_transactions": invalid_transactions,
+                    "message": "Dry run refused; no changes applied.",
+                }
+            )
+            raise typer.Exit(1)
+        previews = [
+            _build_transaction_preview(transaction_id, raw_data, changes)
+            for transaction_id, raw_data in zip(ids, details, strict=True)
+        ]
         output(
             {
                 "status": "dry_run",
                 "transaction_count": len(ids),
                 "transaction_ids": ids,
                 "changes": changes,
+                "transactions": previews,
                 "message": f"Would update {len(ids)} transaction(s) (dry run mode)",
             }
         )

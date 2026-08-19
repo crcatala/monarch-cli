@@ -34,7 +34,7 @@ def transform_transaction(raw: dict[str, Any]) -> dict[str, Any]:
         "category_id": raw.get("category", {}).get("id"),
         "account": raw.get("account", {}).get("displayName"),
         "account_id": raw.get("account", {}).get("id"),
-        "is_pending": raw.get("isPending", False),
+        "is_pending": raw.get("pending", raw.get("isPending", False)),
         "notes": raw.get("notes"),
     }
 

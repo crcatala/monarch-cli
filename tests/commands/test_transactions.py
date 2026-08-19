@@ -276,6 +276,55 @@ class TestTransactionsList:
             assert result.exit_code == 0
             assert captured_kwargs["search"] == "coffee"
 
+    def test_list_resolves_category_name_and_filters_expense_amounts(
+        self,
+        mock_authenticated_client: MagicMock,
+        sample_transactions_response: dict,
+    ) -> None:
+        """Category names resolve server-side while amount filters use absolute values."""
+        captured_kwargs = {}
+
+        async def async_categories():
+            return {
+                "categories": [
+                    {"id": "cat_food", "name": "Food & Drink"},
+                    {"id": "cat_groceries", "name": "Groceries"},
+                ]
+            }
+
+        async def async_get_transactions(**kwargs):
+            captured_kwargs.update(kwargs)
+            return sample_transactions_response
+
+        mock_authenticated_client.get_transaction_categories = async_categories
+        mock_authenticated_client.get_transactions = async_get_transactions
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "list",
+                    "--category",
+                    "grocer",
+                    "--min-amount",
+                    "100",
+                    "--max-amount",
+                    "150",
+                    "--expenses-only",
+                    "--json",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert captured_kwargs["category_ids"] == ["cat_groceries"]
+            assert [item["id"] for item in json.loads(result.stdout)] == ["txn_456"]
+
     def test_list_raw_returns_api_response(
         self,
         mock_authenticated_client: MagicMock,
@@ -536,17 +585,143 @@ class TestTransactionsUpdate:
             assert output["changes"]["merchant_name"] == "Lunch"
             assert output["changes"]["notes"] == "Team lunch"
 
-    def test_update_dry_run(self) -> None:
-        """Update with --dry-run shows changes without applying."""
-        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+    def test_update_dry_run_fetches_live_before_and_after_state(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Dry-run reports authoritative state and never calls the mutation."""
+        update_calls = []
+        detail_calls = []
+
+        async def async_get_transaction_details(**kwargs):
+            detail_calls.append(kwargs)
+            return {
+                "getTransaction": {
+                    "id": "txn_123",
+                    "amount": 20.0,
+                    "date": "2024-01-15",
+                    "pending": False,
+                    "isManual": True,
+                    "isSplitTransaction": False,
+                    "hasSplitTransactions": False,
+                    "merchant": {"name": "Old Merchant"},
+                    "category": {"id": "cat_old"},
+                    "notes": "Old note",
+                }
+            }
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        mock_authenticated_client.update_transaction = async_update_transaction
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
             result = runner.invoke(app, ["update", "txn_123", "--amount", "25.50", "--dry-run"])
 
-            assert result.exit_code == 0
-            output = json.loads(result.stdout)
-            assert output["status"] == "dry_run"
-            assert output["transaction_id"] == "txn_123"
-            assert output["changes"]["amount"] == 25.50
-            assert "No changes applied" in output["message"]
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert output["status"] == "dry_run"
+        assert output["transaction_count"] == 1
+        assert output["transaction_ids"] == ["txn_123"]
+        assert output["transactions"] == [
+            {
+                "id": "txn_123",
+                "before": {
+                    "amount": 20.0,
+                    "merchant_name": "Old Merchant",
+                    "category_id": "cat_old",
+                    "notes": "Old note",
+                    "date": "2024-01-15",
+                },
+                "after": {
+                    "amount": 25.5,
+                    "merchant_name": "Old Merchant",
+                    "category_id": "cat_old",
+                    "notes": "Old note",
+                    "date": "2024-01-15",
+                },
+            }
+        ]
+        assert detail_calls == [{"transaction_id": "txn_123", "redirect_posted": False}]
+        assert update_calls == []
+
+    def test_update_dry_run_fails_closed_for_pending_transaction(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Pending transactions cannot produce an update-ready preview."""
+
+        async def async_get_transaction_details(**_kwargs):
+            return {"getTransaction": {"id": "txn_123", "pending": True, "isManual": True}}
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["update", "txn_123", "--notes", "Later", "--dry-run"],
+            )
+
+        assert result.exit_code == 1
+        output = json.loads(result.stdout)
+        assert output["status"] == "error"
+        assert output["invalid_transactions"] == [{"id": "txn_123", "reason": "pending"}]
+
+    def test_update_dry_run_fails_closed_for_protected_fields(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Synced transactions cannot preview manual-only amount/date edits."""
+
+        async def async_get_transaction_details(**_kwargs):
+            return {
+                "getTransaction": {
+                    "id": "txn_123",
+                    "pending": False,
+                    "isManual": False,
+                }
+            }
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "update",
+                    "txn_123",
+                    "--amount",
+                    "25",
+                    "--date",
+                    "2026-08-18",
+                    "--dry-run",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["invalid_transactions"] == [
+            {
+                "id": "txn_123",
+                "reason": "protected_fields",
+                "fields": ["amount", "date"],
+            }
+        ]
 
     def test_update_no_changes_shows_error(self) -> None:
         """Update without any change flags shows error."""
@@ -719,21 +894,100 @@ class TestTransactionsBatchUpdate:
             assert output["success_count"] == 2
             assert len(update_calls) == 2
 
-    def test_batch_update_dry_run(self) -> None:
-        """Batch update dry-run shows preview without applying."""
-        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+    def test_batch_update_dry_run_fetches_each_live_transaction(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch preview reports exact targets and authoritative before/after values."""
+        update_calls = []
+
+        async def async_get_transaction_details(transaction_id, **_kwargs):
+            return {
+                "getTransaction": {
+                    "id": transaction_id,
+                    "pending": False,
+                    "isManual": False,
+                    "isSplitTransaction": False,
+                    "hasSplitTransactions": False,
+                    "amount": -10.0,
+                    "date": "2026-08-01",
+                    "merchant": {"name": f"Merchant {transaction_id}"},
+                    "category": {"id": "cat_old"},
+                    "notes": None,
+                }
+            }
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs)
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        mock_authenticated_client.update_transaction = async_update_transaction
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
             result = runner.invoke(
                 app,
                 ["batch-update", "txn_123", "txn_456", "--category", "cat_food", "--dry-run"],
             )
 
-            assert result.exit_code == 0
-            output = json.loads(result.stdout)
-            assert output["status"] == "dry_run"
-            assert output["transaction_count"] == 2
-            assert output["transaction_ids"] == ["txn_123", "txn_456"]
-            assert output["changes"]["category_id"] == "cat_food"
-            assert "Would update 2 transaction(s)" in output["message"]
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert output["status"] == "dry_run"
+        assert output["transaction_count"] == 2
+        assert output["transaction_ids"] == ["txn_123", "txn_456"]
+        assert output["changes"]["category_id"] == "cat_food"
+        assert [item["after"]["category_id"] for item in output["transactions"]] == [
+            "cat_food",
+            "cat_food",
+        ]
+        assert update_calls == []
+
+    def test_batch_update_dry_run_fails_closed_when_any_id_is_missing(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """A missing target invalidates the entire batch preview."""
+
+        async def async_get_transaction_details(transaction_id, **_kwargs):
+            if transaction_id == "missing":
+                return {"getTransaction": None}
+            return {
+                "getTransaction": {
+                    "id": transaction_id,
+                    "pending": False,
+                    "isManual": False,
+                }
+            }
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "batch-update",
+                    "txn_123",
+                    "missing",
+                    "--notes",
+                    "Reviewed",
+                    "--dry-run",
+                ],
+            )
+
+        assert result.exit_code == 1
+        output = json.loads(result.stdout)
+        assert output["transaction_count"] == 0
+        assert output["transaction_ids"] == []
+        assert output["invalid_transactions"] == [{"id": "missing", "reason": "not_found"}]
 
     def test_batch_update_handles_partial_failures(
         self,

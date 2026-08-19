@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Financial Read Commands
+- **`monarch net-worth show`** - Assets, liabilities, and net worth from included accounts
+- **`monarch recurring list`** - Flattened upcoming recurring transactions with optional dates
+- **`monarch summary show`** - Net worth and month-to-date cashflow in one response
+- **`monarch holdings list`** - Per-account positions and cross-account security aggregation
+  with ticker, text, account, and minimum-value filters
+- **Quarter presets** - Added `this-quarter` and `last-quarter` to shared date presets
+- **Transaction filters** - Added fuzzy category-name resolution, absolute minimum/maximum
+  amount filters, and income-only/expenses-only direction filters
+
 #### Layered Configuration System
 - **Config file support** - Create `~/.config/monarch-cli/config.toml` for persistent settings
 - **Layered precedence** - Config file → Environment variables → CLI flags (highest priority)
@@ -22,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Transaction dry runs** - Update and batch-update previews now fetch live transaction state,
+  report exact IDs/counts and before/after values, and fail closed for missing, pending, split,
+  or protected manual-only edits
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
   - TTY: Human-friendly output with emoji icons
   - Piped/redirected: Automatic JSON output (backwards compatible)
@@ -96,6 +109,8 @@ Initial release of Monarch CLI - a command-line interface for Monarch Money.
 
 ### Security
 
+- Browser cookie sessions are intentionally not imported; authentication continues to use the
+  upstream token client and existing keyring/file protections without exposing cookie material
 - Session tokens stored securely in `~/.config/monarch/session.json`
 - No credentials stored after authentication
 - Token refresh handled automatically

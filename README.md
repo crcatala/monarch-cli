@@ -14,7 +14,8 @@ A command-line interface for [Monarch Money](https://www.monarchmoney.com/), a p
 - 📊 **Multiple output formats** (plain, JSON, table, CSV, NDJSON) for flexible processing
 - 🔧 **Scriptable** - structured JSON output auto-detected when piped
 - 📅 **Smart date presets** (`--preset this-month`, `--preset ytd`)
-- ✏️ **Transaction updates** with dry-run preview support
+- 📈 **Financial snapshots** for net worth, cashflow, recurring activity, and holdings
+- ✏️ **Transaction updates** with live-state, fail-closed dry-run previews
 - 🔄 **Account refresh** to sync latest data from institutions
 
 ## Installation
@@ -140,6 +141,8 @@ monarch transactions list --preset this-month
 monarch transactions list --start 2024-01-01 --end 2024-01-31
 monarch transactions list --account ACC123
 monarch transactions list --search "grocery"
+monarch transactions list --category groceries --expenses-only
+monarch transactions list --min-amount 100 --max-amount 500
 
 # Update a transaction
 monarch transactions update TXN123 --amount 25.50
@@ -147,17 +150,27 @@ monarch transactions update TXN123 --description "Coffee Shop"
 monarch transactions update TXN123 --category CAT456
 monarch transactions update TXN123 --notes "Business expense"
 monarch transactions update TXN123 --date 2024-01-15
-monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
+monarch transactions update TXN123 --dry-run --amount 30.00  # Live before/after preview
 
 # Batch update multiple transactions
 monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
+monarch transactions batch-update TXN1 TXN2 --category CAT456 --dry-run
 ```
+
+`--category` accepts an exact category ID or a case-insensitive category-name substring and
+resolves matching IDs before fetching transactions. `--min-amount` and `--max-amount` compare
+absolute values; combine them with `--expenses-only` or `--income-only` to select a direction.
+
+Dry runs fetch every target from Monarch and return exact IDs, counts, and per-transaction
+`before`/`after` values. They fail without writing if a transaction is missing, pending, split,
+or if an amount/date edit targets a synced transaction.
 
 **Date Presets:**
 - `today`, `yesterday`
 - `this-week`, `last-week`
 - `this-month`, `last-month`
 - `last-30-days`, `last-90-days`
+- `this-quarter`, `last-quarter`
 - `this-year`, `last-year`, `ytd`
 - `all`
 
@@ -184,6 +197,46 @@ monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
 monarch categories list          # All transaction categories
 monarch categories list --json   # JSON format
 ```
+
+### net-worth
+
+```bash
+monarch net-worth show
+monarch net-worth show --json
+```
+
+Returns `net_worth`, `total_assets`, `total_liabilities`, and `account_count`. Only accounts
+with `includeBalanceInNetWorth` enabled are included; liabilities are a positive magnitude.
+
+### recurring
+
+```bash
+monarch recurring list
+monarch recurring list --start 2026-08-01 --end 2026-08-31 --json
+```
+
+Returns stable flattened rows with transaction and stream IDs, date, amount, merchant,
+frequency, category, account, and past/upcoming status.
+
+### summary
+
+```bash
+monarch summary show --json
+```
+
+Combines current net worth with month-to-date cashflow in one structured response.
+
+### holdings
+
+```bash
+monarch holdings list --json
+monarch holdings list --ticker MSFT
+monarch holdings list --search microsoft --account retirement --min-value 1000
+```
+
+Returns per-account `positions`, cross-account `by_security` aggregation, totals, cost basis,
+unrealized gain, and each value's fraction of net worth. Filters support an exact ticker,
+security-name/ticker substring, account-name substring, and minimum position value.
 
 ## Output Formats
 
@@ -336,6 +389,12 @@ These output fields are guaranteed stable across versions:
 **Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
 
 **Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `notes`
+
+**Recurring:** `id`, `stream_id`, `date`, `amount`, `merchant`, `frequency`, `category`,
+`category_id`, `account`, `account_id`, `is_past`
+
+**Holdings positions:** `account`, `ticker`, `name`, `quantity`, `price`, `value`, `basis`,
+`gain`, `gain_percent`, `pct_of_net_worth`
 
 ## Shell Completions
 

@@ -15,6 +15,8 @@ class DatePreset(StrEnum):
     LAST_MONTH = "last-month"
     LAST_30_DAYS = "last-30-days"
     LAST_90_DAYS = "last-90-days"
+    THIS_QUARTER = "this-quarter"
+    LAST_QUARTER = "last-quarter"
     THIS_YEAR = "this-year"
     LAST_YEAR = "last-year"
     YTD = "ytd"
@@ -75,6 +77,17 @@ def resolve_preset(preset: DatePreset) -> tuple[date | None, date | None]:
         case DatePreset.LAST_90_DAYS:
             start = today - timedelta(days=90)
             return (start, today)
+
+        case DatePreset.THIS_QUARTER:
+            start_month = 3 * ((today.month - 1) // 3) + 1
+            return (date(today.year, start_month, 1), today)
+
+        case DatePreset.LAST_QUARTER:
+            this_quarter_month = 3 * ((today.month - 1) // 3) + 1
+            this_quarter_start = date(today.year, this_quarter_month, 1)
+            end = this_quarter_start - timedelta(days=1)
+            start_month = 3 * ((end.month - 1) // 3) + 1
+            return (date(end.year, start_month, 1), end)
 
         case DatePreset.THIS_YEAR | DatePreset.YTD:
             # YTD is alias for THIS_YEAR

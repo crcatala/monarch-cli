@@ -80,6 +80,10 @@ class TestTransformTransaction:
         result = transform_transaction(SAMPLE_TRANSACTION_NO_MERCHANT)
         assert result["is_pending"] is True
 
+    def test_is_pending_supports_upstream_pending_field(self):
+        result = transform_transaction({"id": "txn-current", "pending": True})
+        assert result["is_pending"] is True
+
     def test_notes_extracted(self):
         result = transform_transaction(SAMPLE_TRANSACTION_FULL)
         assert result["notes"] == "Morning coffee"
