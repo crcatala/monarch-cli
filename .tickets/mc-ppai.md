@@ -31,3 +31,9 @@ Create an investment-focused service and command surface that can discover eligi
 - [ ] The implementation respects adapter/service/transformer boundaries and does not add direct upstream imports to command handlers.
 - [ ] User-facing documentation and repository verification are complete.
 
+
+## Notes
+
+**2026-09-11T01:47:49Z**
+
+P3 planning: during implementation, evaluate whether the minimum supported dependency offers a stable bulk holdings operation. Prefer that through the adapter when it meets filtering and bounded-concurrency needs; do not duplicate upstream orchestration unnecessarily. Keep any fallback explicit and tested, and do not depend on an unreleased source revision.

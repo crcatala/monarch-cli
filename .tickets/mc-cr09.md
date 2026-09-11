@@ -2,7 +2,7 @@
 id: mc-cr09
 status: open
 deps: []
-links: []
+links: [mc-3437]
 created: 2026-09-11T01:15:13Z
 type: epic
 priority: 0
