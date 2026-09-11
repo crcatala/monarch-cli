@@ -12,28 +12,44 @@ tags: [p2, receipts, uploads, automation, mutations, safety]
 ---
 # Add secure receipt-inbox upload
 
-Allow a receipt to be submitted to the household receipt inbox for automated processing and matching when the target transaction is not yet known. This supports capture-first workflows that differ from attaching a document to an existing transaction and can reduce manual receipt categorization.
+Allow a receipt to be submitted to the household receipt inbox when the target transaction is not yet known. This capture-first workflow is distinct from attaching a document to an existing transaction and may trigger asynchronous categorization or matching.
 
-Receipt contents are sensitive financial documents, and upload processing may continue asynchronously after the initial request. The command therefore needs clear file policy, mutation authorization, retry behavior, and honest processing-status semantics.
+Receipt contents are sensitive, and the verified upstream workflow has multiple remote stages with no supported post-start status lookup. The CLI must validate locally before any remote action, avoid unsafe retries, and report only what it can actually observe.
 
 ## Design
 
-Model inbox upload as its own receipt workflow rather than an attachment mode requiring a transaction ID. Reuse shared file-validation and upload primitives where appropriate, but keep result semantics distinct: acceptance for processing is not the same as successful categorization or transaction matching.
+Model inbox submission as its own three-stage remote workflow: create a retail-sync session, upload one file to the Monarch retail-sync endpoint, then start processing. Reuse the shared file-validation primitives established by `mc-2v9a`, while keeping transaction attachment and receipt-sync result semantics separate. The dependency on `mc-2v9a` is intentionally conservative even though its Cloudinary-specific transport is not used here.
 
-Validate metadata before reading or transmitting content. Avoid exposing local paths or contents in output. Disable unsafe automatic retries, and return any remote receipt/sync identifier and observed processing state needed for later inspection. A dry-run, if supported, must not read or upload file bytes unnecessarily.
+Open and validate the file before authentication or creation of the retail-sync session. Execution opens the file once, validates that descriptor as a readable regular non-empty file under the documented cap, and uploads from the same descriptor. Derive a sanitized remote basename and never expose a local directory path or file contents. Required dry-run performs metadata validation only and makes no authentication or network call.
+
+The verified 1.5.2 client returns the retail-sync identity and status observed when processing starts, but provides no public method to retrieve that sync later or determine whether categorization/matching completed. Stable output therefore distinguishes local validation, session creation, file transfer, and processing-start acceptance, and reports only the returned initial sync status. Later processing or matching is `unknown`; polling and inbox inspection are separate future work.
+
+No remote stage is automatically retried after its request may have been dispatched. Every invocation creates a new sync/order identity, so an ambiguous failure can produce a duplicate if the user reruns it. Recovery guidance instructs the user to inspect the receipt inbox manually rather than implying that retry is safe.
+
+## Key Decisions
+
+- **Three explicit stages.** Session creation, file transfer, and processing start have separate outcomes.
+- **Initial status only.** This ticket does not poll or claim completed categorization/matching.
+- **Validation before all remote work.** Invalid input cannot create an orphan retail-sync session.
+- **Mandatory offline dry-run.** Preview does not authenticate, read file contents, or call the network.
+- **No automatic retry.** Ambiguous receipt uploads require manual inbox inspection.
+- **Conservative prerequisite.** Reuse `mc-2v9a` file primitives even though receipt upload does not use its Cloudinary transport.
 
 ## Acceptance Criteria
 
-- [ ] A user can submit a supported readable receipt file without specifying a transaction ID.
-- [ ] The workflow is clearly distinct from attaching a file to an existing transaction.
-- [ ] Upload is blocked by default and requires shared mutation authorization.
-- [ ] Nonexistent, unreadable, directory, empty, unsupported, and policy-exceeding files fail before any remote mutation.
-- [ ] Validation defines supported file types, size policy, filename handling, and the limits of content validation.
-- [ ] Output never includes receipt contents, credentials, or unintended local path information.
-- [ ] The command distinguishes upload acceptance, processing in progress, completed/matched states when observable, rejection, ambiguous transport failure, and unknown status.
-- [ ] A potentially successful upload is not automatically repeated after timeout or disconnect.
-- [ ] Stable output includes available remote receipt/sync identity, safe filename metadata, size, and processing status without claiming categorization or matching prematurely.
-- [ ] A dry-run, if implemented, performs no remote call and does not unnecessarily read file contents.
-- [ ] Tests cover authorization, validation, success, asynchronous status, rejection, ambiguity, redaction, dry-run, and output modes without live financial API access.
-- [ ] The required upstream-client compatibility floor is declared and covered by clean-install verification.
-- [ ] Privacy/safety documentation and repository verification are complete.
+- [ ] A user can submit one supported readable receipt file without specifying a transaction ID.
+- [ ] The command and output clearly distinguish inbox submission from attaching a file to an existing transaction.
+- [ ] The operation is classified `remote_mutation`, blocked by default, and requires shared per-invocation mutation authorization.
+- [ ] Required dry-run validates safe metadata without authentication lookup, client creation, file-content reads, retail-sync creation, upload, or any network call.
+- [ ] Execution opens the file once and rejects nonexistent, unreadable, non-regular, empty, unsupported, policy-exceeding, and disallowed-symlink inputs before authentication or any remote mutation.
+- [ ] Supported extensions/types, size cap, basename length/character policy, symlink behavior, and limits of filename/MIME validation are documented and tested.
+- [ ] The same validated descriptor supplies uploaded bytes, reducing path/symlink races.
+- [ ] Output and diagnostics never include receipt contents, credentials, or unintended local directory information.
+- [ ] `mutation-outcome.v1` represents retail-sync creation, file transfer, and processing-start effects distinctly enough to report definitive failure, ambiguity, partial completion, or accepted start without claiming rollback.
+- [ ] Stable success output includes sanitized filename metadata, size, returned retail-sync ID, and the status observed at processing start.
+- [ ] Output explicitly states that later processing, categorization, and transaction matching are unknown because the supported client has no status-read capability.
+- [ ] No polling, completed/matched claim, or synthetic final status is introduced by this ticket.
+- [ ] No remote stage is automatically retried after dispatch may have occurred; ambiguous outcomes warn that rerunning may duplicate the receipt and recommend manual inbox inspection.
+- [ ] Tests cover authorization, offline dry-run, descriptor validation, every stage's success/failure/ambiguous paths, partial completion, redaction, duplicate-risk guidance, and output modes without live financial API access.
+- [ ] Project metadata requires the verified upstream floor exposing `upload_receipt_to_inbox`; client-interface and clean-install tests enforce it.
+- [ ] Privacy, safety, status-limit, and recovery documentation is complete and repository verification passes.

@@ -46,5 +46,5 @@ Inspect payload-level `updateTransactionSplit.errors` as definitive failures and
 - [ ] A successful response is compared with a read of the resulting splits; mismatch is passed to the shared verification/ambiguity contract.
 - [ ] Server-specific unsupported cases such as pending transactions or clearing an unsplit transaction are surfaced honestly without fabricated local semantics.
 - [ ] Unit/CLI tests cover inspection, both input sources, source conflicts, validation, shared-policy integration, replacement, clearing, payload rejection, ambiguity, verification, and output modes.
-- [ ] User-facing safety documentation and repository verification are complete; optional live API contract coverage remains owned by `mc-vcbk`.
+- [ ] User-facing safety documentation and repository verification are complete; live split-mutation coverage is deferred to a separate disposable-fixture design and is explicitly outside the read-only `mc-vcbk` smoke suite.
 
