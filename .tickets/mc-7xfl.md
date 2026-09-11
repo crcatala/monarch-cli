@@ -2,7 +2,7 @@
 id: mc-7xfl
 status: open
 deps: [mc-h3cl]
-links: []
+links: [mc-4edf]
 created: 2026-09-11T01:47:48Z
 type: feature
 priority: 2

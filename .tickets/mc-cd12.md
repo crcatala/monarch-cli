@@ -1,6 +1,6 @@
 ---
 id: mc-cd12
-status: open
+status: closed
 deps: [mc-f84a]
 links: [mc-h3cl, mc-c165]
 created: 2026-01-18T16:09:27Z
@@ -145,3 +145,9 @@ If a contract test must change, update:
 - [ ] Tests verify field types
 - [ ] Documentation in test file about contract rules
 
+
+## Notes
+
+**2026-09-11T12:20:08Z**
+
+Closing as stale: the account, transaction, collection, and error schema contract tests described here already exist. Remaining normalization robustness is superseded by mc-h3cl; formal schema publication and compatibility policy are owned by mc-cpzi.
