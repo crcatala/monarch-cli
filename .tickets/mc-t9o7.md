@@ -18,7 +18,7 @@ This ticket extends the operation descriptor from `mc-k48z` with safe retry sema
 
 ## Design
 
-Inventory the current remote mutation call sites: account refresh, transaction update, and transaction batch update. Record remote login/session establishment as reviewed but outside the financial mutation executor, and record local credential writes/deletes as out of scope.
+Inventory the current remote mutation call sites: account refresh, transaction update, and transaction batch update. Authentication is explicitly a composite `remote_authentication` plus `local_credential_change` operation under the `mc-k48z` taxonomy, but it remains outside this financial mutation executor and outcome contract. Local credential writes/deletes are likewise outside this ticket's execution scope. This is an intentional policy boundary, not a claim that login is purely local.
 
 Separate read and mutation execution APIs. Reads retain bounded retry behavior from configuration. All current remote mutations default to zero automatic retries after timeout, disconnect, or other ambiguous transport failure. Even an absolute-value update must not be assumed retry-safe based only on final-state intuition because the upstream service may have undocumented audit, timestamp, notification, or job-trigger effects.
 
@@ -31,7 +31,44 @@ Once remote execution is attempted, return a shared mutation outcome envelope. P
 - `ambiguous`: no effect is known to have succeeded, but at least one request may have changed remote state.
 - `partial`: a multi-step operation contains a mixture of succeeded, failed, or ambiguous item outcomes.
 
-Per-item statuses are `succeeded`, `failed`, or `ambiguous`. Preserve input order and include stable operation, entity, identifier, status, result/error metadata, summary counts, and a safe verification instruction where needed. Errors must be structured and sanitized rather than copied from arbitrary exception strings. Do not claim rollback or transactionality that the upstream API does not provide.
+Per-item statuses are `succeeded`, `failed`, or `ambiguous`. Preserve input order and use the following normative v1 envelope for both single and batch mutations:
+
+```json
+{
+  "schema_version": "mutation-outcome.v1",
+  "operation": "transactions.update",
+  "status": "succeeded",
+  "summary": {
+    "total": 1,
+    "succeeded": 1,
+    "failed": 0,
+    "ambiguous": 0
+  },
+  "items": [
+    {
+      "entity": "transaction",
+      "id": "txn_123",
+      "status": "succeeded",
+      "result": {},
+      "error": null
+    }
+  ],
+  "verification": null
+}
+```
+
+The contract rules are:
+
+- `schema_version`, `operation`, `status`, `summary`, `items`, and `verification` are always present.
+- `operation` is a stable namespaced identifier; it is not inferred from an upstream method or GraphQL operation name.
+- Single-item operations still use an `items` array containing exactly one item. Batch items preserve normalized input order.
+- Every item always contains `entity`, `id`, `status`, `result`, and `error`.
+- `result` is a normalized JSON object on success and `null` otherwise. `error` is `null` on success and otherwise contains stable `code`, `message`, and object-valued `details`; `result` and `error` must never both be non-null.
+- `summary.total` equals `len(items)`, and each status count exactly matches `items`.
+- `verification` is `null` when no follow-up is needed. If any outcome is ambiguous it is an object containing `required: true`, an actionable `message`, and a tokenized `command` array when the CLI can provide a safe verification command.
+- Additional fields require an additive contract change; changing/removing required fields, status values, or their semantics requires a new schema version.
+
+Errors must be structured and sanitized rather than copied from arbitrary exception strings. Do not claim rollback or transactionality that the upstream API does not provide. `mc-cpzi` will publish the formal machine-readable schema for this contract rather than redesigning it.
 
 Treat timeout, disconnect, cancellation after request invocation, and similar transport failures as ambiguous unless there is affirmative evidence that no request could have reached the service. A definite GraphQL/application rejection may be reported as failed.
 
@@ -48,12 +85,14 @@ Exit behavior is part of the contract: all-succeeded outcomes exit `0`; definiti
 ## Acceptance Criteria
 
 - [ ] Account refresh, transaction update, and transaction batch update have documented retry/idempotency classifications in the shared operation model.
-- [ ] Remote login/session establishment and local credential changes are explicitly inventoried as outside the financial mutation executor so the scope is not ambiguous.
+- [ ] Authentication is recorded as a composite `remote_authentication` plus `local_credential_change` operation that is intentionally outside the financial mutation executor and v1 outcome contract.
 - [ ] Reads retain appropriate configured bounded retries.
 - [ ] All current remote mutations make only one attempt after timeout, disconnect, cancellation-after-invocation, or another ambiguous transport failure.
 - [ ] Any future retry-enabled mutation must select a named idempotency-key or verified read-after-write policy with operation-specific tests; no generic unsafe boolean override exists.
 - [ ] Shared execution APIs default mutations to no retry and make it difficult to route a remote mutation through the read retry policy.
-- [ ] Once remote execution is attempted, single and multi-step mutations return the shared outcome envelope with stable operation, entity, identifier, status, result/error, summary, and verification metadata as applicable.
+- [ ] Once remote execution is attempted, single and multi-step mutations return the normative `mutation-outcome.v1` envelope with every required top-level and item field present.
+- [ ] Contract tests enforce nullable/mutually-exclusive `result` and `error` semantics, summary-count consistency, single-item array behavior, and stable input ordering.
+- [ ] Ambiguous outcomes include the required verification object and tokenized command when a safe verification command is available; non-ambiguous outcomes use `null` when no verification is needed.
 - [ ] Top-level status aggregation is deterministic: all succeeded → `succeeded`; no success and only definitive failures → `failed`; no success with any ambiguous item → `ambiguous`; mixed item outcomes → `partial`.
 - [ ] Batch results preserve input order and include identifiers for succeeded, failed, and ambiguous items, not only failures.
 - [ ] Transport uncertainty is reported as `ambiguous`, states that remote state may have changed, and provides a domain-appropriate safe verification step.

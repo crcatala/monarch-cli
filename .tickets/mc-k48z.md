@@ -18,15 +18,16 @@ The goal is a single enforceable trust boundary that future commands inherit aut
 
 ## Design
 
-Inventory every registered command and give it explicit operation metadata. The initial effect taxonomy is:
+Inventory every registered command and give it explicit operation metadata. A command may declare more than one effect when an invocation crosses boundaries. The initial effect taxonomy is:
 
 - `read_only`: no local or remote state change.
 - `preview`: a validated invocation that performs no state change, such as `--dry-run`.
-- `remote_mutation`: creates, updates, deletes, uploads, refreshes, or otherwise initiates a state-changing remote service action.
+- `remote_authentication`: establishes or changes a remote authentication/session relationship without changing financial data.
+- `remote_mutation`: creates, updates, deletes, uploads, refreshes, or otherwise initiates a state-changing remote financial or service action.
 - `local_credential_change`: writes or removes local authentication state.
 - `local_config_change`: writes or removes non-secret local CLI configuration.
 
-`--allow-mutations` gates `remote_mutation` only. `auth login` and `auth logout` must be classified as local credential changes but remain available without the flag so users can authenticate and recover access. Local configuration changes are likewise outside this authorization flag; they may receive separate safeguards where appropriate.
+`--allow-mutations` is required when an invocation's effect set contains `remote_mutation`; other effects do not imply authorization. `auth login` declares both `remote_authentication` and `local_credential_change`, while `auth logout` declares `local_credential_change`. Both remain available without the flag so users can authenticate and recover access. Local configuration changes are likewise outside this authorization flag; they may receive separate safeguards where appropriate.
 
 Add a global, CLI-only `--allow-mutations` option. It is false by default, applies only to the current process invocation, and must appear in the documented global-option position before the command path. Do not support persistent configuration or an environment variable for mutation authorization.
 
@@ -43,7 +44,7 @@ The shared operation descriptor established here must be extensible by `mc-t9o7`
 
 ## Key Decisions
 
-- **Gate remote effects, not credential recovery.** Login and logout are explicitly classified but do not require `--allow-mutations`.
+- **Gate remote financial/service mutations, not credential recovery.** Login declares both remote-authentication and local-credential effects, but login and logout do not require `--allow-mutations`.
 - **Include service actions such as refresh.** Read-only means observationally read-only, not merely “does not directly edit a transaction.”
 - **Per-invocation authorization only.** Persistent or inherited authorization would make accidental mutation too easy.
 - **Preview remains available safely.** A proven no-effect dry run does not require mutation authorization.
@@ -52,9 +53,10 @@ The shared operation descriptor established here must be extensible by `mc-t9o7`
 
 ## Acceptance Criteria
 
-- [ ] Every registered command has explicit reviewed operation metadata using the shared effect taxonomy.
-- [ ] Current `transactions update`, `transactions batch-update`, and `accounts refresh` invocations are classified as remote mutations.
-- [ ] `auth login` and `auth logout` are classified as local credential changes and remain usable without `--allow-mutations`.
+- [ ] Every registered command has explicit reviewed operation metadata using one or more values from the shared effect taxonomy.
+- [ ] Policy tests cover a synthetic or real multi-effect command so metadata and authorization do not silently collapse to a single effect.
+- [ ] Current `transactions update`, `transactions batch-update`, and `accounts refresh` invocations include `remote_mutation` in their effect sets.
+- [ ] `auth login` declares `remote_authentication` and `local_credential_change`; `auth logout` declares `local_credential_change`; both remain usable without `--allow-mutations`.
 - [ ] Read-only commands remain usable without mutation authorization.
 - [ ] Validated transaction `--dry-run` invocations remain usable without mutation authorization and cannot create an authenticated client or make a mutation API call.
 - [ ] The CLI defaults to read-only and blocks every remote mutation before authentication lookup, client creation, API calls, confirmation, or other prompts.
