@@ -26,7 +26,7 @@ Provide one initial secret-safe input surface: `auth login --cookie-file PATH`, 
 
 Use upstream cookie login/verification only with persistence disabled (`save_session=False`), then persist through the CLI's keyring or JSON backend. POSIX JSON writes are atomic and mode `0600`; Windows behavior follows the accurate platform limitations established by `mc-2nj4`.
 
-Verification can reliably distinguish malformed/missing fields, unsupported session data, network failure, and invalid-or-expired credentials. It must not claim to distinguish expiration from invalidity when the upstream service does not. Cookie rotation/refresh is not supported by the verified client and is out of scope; users re-import cookies when authentication fails.
+Locally detectable malformed/missing fields and unsupported session records fail before verification. During verification, recognizable network failures are reported separately; other authentication failures are reported as invalid-or-expired because the upstream service does not reliably distinguish those states. Cookie rotation/refresh is not supported by the verified client and is out of scope; users re-import cookies when authentication fails.
 
 ## Key Decisions
 
@@ -50,7 +50,7 @@ Verification can reliably distinguish malformed/missing fields, unsupported sess
 - [ ] Cookie verification invokes the upstream client with `save_session=False`; tests prove no `~/.mm` pickle file is created, read, overwritten, or deleted.
 - [ ] Keyring and JSON storage, status, doctor/ping, logout, adapter reset, and backend-specific deletion handle both explicit modes consistently.
 - [ ] JSON persistence is atomic and mode `0600` on POSIX; Windows guarantees are documented without claiming POSIX owner-only semantics.
-- [ ] Authentication failures distinguish missing/malformed fields, unsupported session data, network failure, and invalid-or-expired cookies with stable sanitized errors and actionable re-import guidance.
+- [ ] Missing/malformed fields and unsupported session records fail locally; recognizable network failures are classified separately, while upstream authentication failures without a stronger signal are reported as invalid-or-expired with stable sanitized errors and actionable re-import guidance.
 - [ ] Cookie refresh/rotation is not claimed; failed validity requires explicit user re-import.
 - [ ] Interactive and non-interactive flows never hang and preserve documented stdout/stderr and exit-code contracts.
 - [ ] `auth status --json` exposes a documented stable `auth_mode` and storage-source contract without exposing credential values.
