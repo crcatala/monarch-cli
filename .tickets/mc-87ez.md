@@ -22,7 +22,7 @@ Use distinct commands: `transactions tags list`, `transactions tags show TRANSAC
 
 Tag creation accepts a non-empty trimmed name and a six-digit `#RRGGBB` color; dashboard-palette restriction and name uniqueness are not claimed. Inspect payload-level GraphQL `errors` for both create and set operations instead of treating every returned dictionary as success.
 
-Replace and clear are destructive full-set operations. They require the shared mutation authorization plus destructive confirmation or `--yes`, with deterministic non-interactive handling from `mc-2btg`. All mutations use the shared no-retry mutation executor and `mutation-outcome.v1` contract.
+Classify replace and clear as destructive full-set operations. Authorization, confirmation/non-interactive behavior, retry and ambiguity handling, mutation envelopes, verification guidance, and exit behavior are inherited from `mc-k48z`, `mc-2btg`, `mc-t9o7`, and `mc-ik8o`; this ticket defines no tag-specific variants.
 
 ## Key Decisions
 
@@ -40,11 +40,10 @@ Replace and clear are destructive full-set operations. They require the shared m
 - [ ] Incremental add/remove and multi-transaction batch tagging are not exposed by this ticket.
 - [ ] Duplicate requested IDs are removed deterministically in first-occurrence order; unknown IDs fail after read-only discovery and before mutation.
 - [ ] Pre-validation/read failure prevents mutation, and payload-level create/set `errors` are mapped to definitive structured failures.
-- [ ] Replace and clear are classified as destructive remote mutations, blocked by default, and require mutation authorization plus confirmation or `--yes` under deterministic non-interactive policy.
-- [ ] Tag mutations execute through the shared mutation executor with no unsafe automatic retry after dispatch uncertainty.
-- [ ] Mutation responses use `mutation-outcome.v1` with stable operation/entity identifiers and represent failed or ambiguous results honestly.
-- [ ] The returned tag-ID set is compared with the expected set; mismatch exits as ambiguous/verification-required and supplies a tokenized transaction-detail verification command.
+- [ ] Replace and clear are classified as destructive remote mutations and use the authorization and deterministic confirmation behavior defined by `mc-k48z` and `mc-2btg`.
+- [ ] Tag mutations use the retry/ambiguity and `mutation-outcome.v1` contracts from `mc-t9o7` and `mc-ik8o` without ticket-local status, envelope, verification-guidance, or exit-code variants.
+- [ ] The returned tag-ID set is compared with the expected set; mismatch is passed to the shared verification/ambiguity contract with transaction-detail guidance.
 - [ ] Existing/already-equal tag sets produce a documented deterministic no-op success without making unsupported atomicity claims.
-- [ ] Unit/CLI tests cover reads, creation, replacement, clearing, duplicate/unknown IDs, authorization, confirmation, non-interactive behavior, payload errors, verification mismatch, transport ambiguity, and output modes.
+- [ ] Unit/CLI tests cover reads, creation, replacement, clearing, duplicate/unknown IDs, shared-policy integration, payload errors, verification mismatch, transport ambiguity, and output modes.
 - [ ] User-facing safety and concurrent-modification limitation documentation is complete and repository verification passes.
 

@@ -16,7 +16,7 @@ Give users a useful portfolio view across investment accounts rather than requir
 
 ## Design
 
-Add `investments holdings` through an investment-focused service for normalized holdings across brokerage or similarly eligible accounts. Released `monarchmoneycommunity` 1.5.2 has no all-account holdings method: perform one account-discovery request, select eligible accounts, then issue per-account holdings reads with configurable bounded concurrency and per-call timeout/retry behavior in the service layer. Do not depend on the unreleased upstream `get_all_holdings` helper or use `typedmonarchmoney`, whose missing-number sentinel values can corrupt financial totals.
+Add `investments holdings` through an investment-focused service for normalized holdings across brokerage or similarly eligible accounts. Released `monarchmoneycommunity` 1.5.2 has no all-account holdings method: perform one account-discovery request, select eligible accounts, then issue per-account holdings reads in the service layer with a fixed maximum of four concurrent calls. Each call uses the shared read timeout/retry executor; v1 adds no holdings-specific concurrency or retry option/configuration. Do not depend on the unreleased upstream `get_all_holdings` helper or use `typedmonarchmoney`, whose missing-number sentinel values can corrupt financial totals.
 
 Annotate every non-aggregated row with the source account ID/name from the request context because the holdings payload response does not preserve it. Missing quantity, basis, price, or value remains `null`; never substitute sentinels or recompute authoritative value as quantity times price.
 
@@ -26,7 +26,8 @@ Default account discovery excludes hidden accounts; explicit account IDs are val
 
 ## Key Decisions
 
-- **Released fallback is bounded per-account fanout.** Bulk retrieval is not available in a released supported dependency.
+- **Released fallback is fixed bounded per-account fanout.** Bulk retrieval is unavailable; v1 permits at most four concurrent calls and adds no tuning surface.
+- **Multi-account reads fail as one operation.** If any account retrieval fails, emit the typed read error and no partial normalized holdings result rather than introducing a new partial-read envelope.
 - **Security ID is the sole cross-account aggregation key.** Missing identifiers never cause speculative ticker/name merging.
 - **No cross-account monetary totals in v1.** Currency compatibility cannot be established from the released upstream payload, so monetary fields remain per-account contributions.
 - **Missing financial values remain null.** The typed upstream wrapper and sentinel defaults are not used.
@@ -44,9 +45,10 @@ Default account discovery excludes hidden accounts; explicit account IDs are val
 - [ ] Aggregated quantity is summed only when all contributing quantities are available for the same security; otherwise it is `null`.
 - [ ] No aggregate basis, price, total value, or other cross-account monetary total is emitted because released upstream payloads provide no verifiable currency compatibility.
 - [ ] The absence of per-holding/account currency metadata is documented; the CLI does not assume currency compatibility or claim currency conversion.
-- [ ] Retrieval performs account discovery once and uses a tested configurable concurrency bound, per-call timeout/retry policy, deterministic output ordering, and documented partial/fail-fast behavior.
+- [ ] Retrieval performs account discovery once, never exceeds four concurrent holdings calls, uses the shared read timeout/retry executor, and exposes no holdings-specific concurrency or retry setting.
+- [ ] If any selected account retrieval fails, the command emits the typed read error and no partial normalized holdings result; successful multi-account output ordering is deterministic.
 - [ ] The implementation uses the base upstream client through adapter/service/transformer boundaries; command handlers perform no direct client calls and `typedmonarchmoney` is not used.
-- [ ] JSON, table/plain, empty-result, aggregation, missing-quantity, absent-currency, per-account failure, and raw-envelope behavior are tested; raw envelope values preserve each upstream response unchanged.
+- [ ] JSON, table/plain, empty-result, aggregation, missing-quantity, absent-currency, fail-whole-command behavior, fixed concurrency, and raw-envelope behavior are tested; raw envelope values preserve each upstream response unchanged.
 - [ ] The released dependency floor is verified and no unreleased source revision is required.
 - [ ] User-facing documentation and repository verification are complete.
 
