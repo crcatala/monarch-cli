@@ -2,13 +2,13 @@
 id: mc-7xfl
 status: open
 deps: [mc-h3cl]
-links: []
+links: [mc-4edf]
 created: 2026-09-11T01:47:48Z
 type: feature
-priority: 2
+priority: 1
 assignee: cc-vps
 parent: mc-cr09
-tags: [p3, accounts, discovery, read-only, automation]
+tags: [p1, accounts, discovery, read-only, automation]
 ---
 # Add read-only account type discovery
 
@@ -16,7 +16,11 @@ Expose the valid account groups, types, and subtypes accepted by account workflo
 
 ## Design
 
-Add the capability under the accounts domain and normalize the supported type hierarchy into a stable CLI contract. Preserve machine-usable identifiers and human-readable labels, define ordering, and handle partially populated or evolving upstream options without leaking raw response structure as the default. Keep dependency-specific calls and shapes behind the adapter/service boundary.
+Add the capability under the accounts domain and normalize the supported type hierarchy into a stable CLI contract. This is a P1 prerequisite for the account-type filter validation in `mc-4edf`, so it must land before that ticket rather than remaining later-stage automation ergonomics. Preserve machine-usable identifiers and human-readable labels, define ordering, and handle partially populated or evolving upstream options without leaking raw response structure as the default. Keep dependency-specific calls and shapes behind the adapter/service boundary.
+
+## Key Decisions
+
+- **Promoted to P1 prerequisite.** `mc-4edf` consumes this normalized hierarchy for account-type filter validation and depends on this ticket explicitly.
 
 ## Acceptance Criteria
 

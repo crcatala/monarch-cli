@@ -1,8 +1,8 @@
 ---
 id: mc-2v9a
 status: open
-deps: [mc-k48z, mc-ik8o, mc-hszv]
-links: []
+deps: [mc-k48z, mc-ik8o, mc-hszv, mc-sr92]
+links: [mc-sr92]
 created: 2026-09-11T01:21:50Z
 type: feature
 priority: 1
@@ -16,18 +16,37 @@ Allow receipts and supporting documents to be attached to a known transaction fr
 
 ## Design
 
-Implement attachment upload as a focused transaction workflow behind the shared mutation authorization and retry-safe execution layers. Validate the local path and file metadata before authentication or upload, preserve the chosen filename explicitly, and define practical file-size/type behavior without claiming stronger validation than is available. A dry-run may report intended metadata but must never read or transmit file contents unnecessarily. Keep optional follow-up transaction edits out of the first implementation unless partial-success semantics are fully supported.
+Add `transactions attachments add TRANSACTION_ID PATH` as a three-stage remote workflow: obtain transaction-specific signed upload parameters, upload the asset to the third-party media host, then register that asset on the transaction. Each stage has distinct definitive, ambiguous, and partial outcomes; successful media upload followed by failed registration may leave an orphaned asset, while a lost registration response may leave an attachment that exists remotely but is not yet known locally.
+
+Credential-safe third-party transport is owned by prerequisite `mc-sr92`. This ticket consumes that public adapter boundary and does not reproduce its header-isolation, redirect, or upstream-version logic.
+
+Make dry-run a required offline preview. It validates safe local metadata but performs no authentication lookup, transaction read, signed-parameter request, upload, or other network call. For execution, open the file once, validate the open descriptor as a regular readable non-empty file under the documented size cap, and read from that same descriptor to reduce path/symlink races. Derive the remote name from the basename unless an explicit sanitized filename is supplied. Extension/MIME checks are local policy based on filename and limited content checks; they do not guarantee server acceptance.
+
+Do not automatically retry any stage after bytes or a registration request may have been dispatched. Use transaction detail to verify the target before upload and for post-failure/post-success verification. An explicit attachment request may create another attachment with the same filename or size; filename/size heuristics do not establish duplicate identity. Keep receipt-inbox upload and follow-up transaction edits out of scope.
+
+## Key Decisions
+
+- **Credential isolation is a prerequisite.** `mc-sr92` must provide the public safe transport before this workflow can ship.
+- **Dry-run is mandatory and offline.** Preview never requests signed parameters or reads file contents.
+- **One open descriptor is validated and uploaded.** Validation must not inspect one path target and later upload another.
+- **Multi-stage outcomes are honest.** The contract distinguishes asset upload from transaction registration and never implies rollback.
 
 ## Acceptance Criteria
 
-- [ ] A user can attach a readable local file to an explicitly identified transaction.
-- [ ] Upload is blocked by default and requires the shared mutation authorization mechanism.
-- [ ] Nonexistent, unreadable, directory, empty, and policy-exceeding files fail before any remote mutation.
-- [ ] The local path is never exposed as the remote filename unless explicitly intended, and output does not include file contents or credentials.
-- [ ] A dry-run, if provided, performs no upload and reports only safe metadata needed to review the action.
-- [ ] Ambiguous timeout/disconnect behavior does not automatically repeat a potentially successful upload.
-- [ ] The stable mutation result reports transaction ID, remote attachment identity when available, filename, size, status, and any ambiguous/partial outcome.
-- [ ] Tests use mocked file and API boundaries and cover authorization, validation, dry-run, success, server rejection, timeout, and output modes.
-- [ ] No live financial API call is required by the default test suite.
-- [ ] User-facing safety documentation and repository verification are complete.
+- [ ] A user can attach one supported readable local file to one explicitly identified transaction.
+- [ ] The command is classified `remote_mutation`, is blocked by default, and requires the shared per-invocation mutation authorization mechanism.
+- [ ] Required dry-run performs no authentication lookup or network call and reports only target transaction ID, sanitized remote basename, local size, and locally inferred type.
+- [ ] Execution opens the file once and rejects nonexistent, unreadable, non-regular, empty, over-limit, or unsupported inputs before authentication or any remote operation.
+- [ ] Exact supported extensions/types, maximum size, filename length/character policy, symlink handling, and the limits of MIME/content validation are documented and tested.
+- [ ] The local directory path and file contents never appear in output, diagnostics, logs, or the remote filename unless the user explicitly supplies an independently validated name.
+- [ ] The command uses the credential-safe public upload adapter from completed prerequisite `mc-sr92` and contains no ticket-local header or upstream-private-method workaround.
+- [ ] Transaction existence is checked before upload; the workflow does not claim that filename/size matching can identify or prevent duplicate attachments.
+- [ ] No stage is automatically retried after an upload or registration request may have been dispatched; stage-specific timeout/disconnect paths are classified as ambiguous with safe verification guidance.
+- [ ] Cloud/media HTTP rejection and inner `addTransactionAttachment.errors` are sanitized and mapped to definitive structured failures rather than success.
+- [ ] `mutation-outcome.v1` represents media-upload and transaction-registration effects distinctly enough to report success, orphaned-asset partial completion, definitive failure, and ambiguity without claiming rollback.
+- [ ] Successful registration is verified through transaction detail; stable results include transaction ID, attachment ID and public ID when available, sanitized filename, and server-reported extension/size.
+- [ ] Dependency metadata satisfies the `mc-hszv` 1.5.2 floor and the transport compatibility contract selected by `mc-sr92`; clean-install compatibility is tested.
+- [ ] Tests mock file, transaction, upload, and registration boundaries and cover authorization, offline dry-run, descriptor validation, repeated explicit uploads, every stage outcome, verification, and output modes.
+- [ ] Receipt-inbox upload and follow-up transaction edits remain out of scope; no live financial API call is required by the default suite.
+- [ ] Privacy/safety documentation and repository verification are complete.
 

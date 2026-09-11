@@ -2,32 +2,42 @@
 id: mc-7wqj
 status: open
 deps: [mc-h3cl]
-links: []
+links: [mc-4edf, mc-kzp9, mc-nbvi, mc-oqc9]
 created: 2026-09-11T01:21:50Z
 type: feature
 priority: 1
 assignee: cc-vps
 parent: mc-cr09
-tags: [p1, reporting, cashflow, recurring, institutions, read-only]
+tags: [p1, reporting, cashflow, read-only]
 ---
-# Expand read-only reporting and service context
+# Add normalized cashflow detail
 
-Expose the read-only financial context needed for analysis and diagnostics beyond the current cashflow summary. Users should be able to inspect detailed cashflow, transaction aggregates, recurring activity, connected institutions, subscription state, and other supported summary information through predictable CLI contracts.
+Expose category, category-group, merchant, and overall cashflow detail beyond the existing summary while preserving one clear cashflow-domain command surface.
 
 ## Design
 
-Inventory the available read methods and organize commands according to user-facing domains rather than placing unrelated resources under a convenient existing group. Likely areas include cashflow detail, transaction summary, recurring transactions, institution status, subscription details, and credit history. A design pass should decide whether small top-level groups or existing domain groups produce the clearest long-term navigation. Reuse common date-range, pagination, normalization, and output behavior.
+Add `cashflow detail` under the existing cashflow group using the released upstream `get_cashflow` method. The response contains category, category-group, merchant, and overall summary blocks. Normalize those blocks into a stable documented contract without duplicating transaction summary, recurring activity, institution, subscription, or credit-history work now owned by `mc-nbvi`, `mc-oqc9`, and `mc-kzp9`.
+
+Use the shared date parser and require both explicit bounds or neither, with `start <= end`. Presets resolve through the same conventions as `cashflow summary`. The upstream method accepts a `limit` argument that is not used for pagination by its aggregate query, so do not expose or document pagination that does not exist.
+
+The detail response already includes the same overall summary concepts as the existing `cashflow summary` command. Reuse one summary normalizer so both commands have aligned field names and semantics; do not issue a second summary request from `cashflow detail`.
+
+## Key Decisions
+
+- **One cashflow-focused PR.** Other reporting and service domains were split into separate tickets.
+- **No fictional pagination.** Aggregate detail is returned as one response.
+- **Summary semantics are shared.** Existing summary and detail normalization must not drift.
 
 ## Acceptance Criteria
 
-- [ ] Detailed cashflow data is available for validated date ranges in addition to the existing summary.
-- [ ] Supported transaction aggregate/summary and recurring-activity reads are exposed with clear semantics.
-- [ ] Institution and subscription status are available through a discoverable command hierarchy.
-- [ ] Credit-history or similar read-only summary data is included only if its shape and user value can be documented reliably.
-- [ ] Command grouping is justified by the domain model and avoids turning an unrelated command group into a catch-all.
-- [ ] Shared date, pagination, normalization, and output utilities are reused.
-- [ ] Null, empty, partial, and unavailable responses produce stable non-misleading output.
-- [ ] No command in this ticket changes remote state.
-- [ ] Unit/CLI tests verify API mapping, date behavior, output contracts, and negative paths.
+- [ ] `cashflow detail` returns normalized category, category-group, merchant, and overall summary data for the default period.
+- [ ] Explicit start/end dates and shared presets are supported with the same inclusive-bound semantics as `cashflow summary`.
+- [ ] One-sided ranges, invalid dates, and `start > end` fail before client creation or an API request.
+- [ ] The command does not expose a pagination or limit option unsupported by the actual aggregate query.
+- [ ] Overall summary fields reuse the existing cashflow summary normalization and do not require an additional API request.
+- [ ] Null, empty, partial, and unavailable nested aggregate blocks produce stable non-misleading output under the `mc-h3cl` normalization rules.
+- [ ] Normalized JSON and human-readable output have documented stable shapes; explicit raw mode preserves the upstream response.
+- [ ] The command is classified read-only and performs no remote mutation.
+- [ ] Unit/CLI tests verify API mapping, default and explicit date behavior, presets, validation-before-call, null/empty payloads, output contracts, and errors.
 - [ ] User-facing documentation and repository verification are complete.
 

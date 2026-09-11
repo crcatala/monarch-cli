@@ -16,20 +16,37 @@ Provide enough read-only transaction coverage to locate, filter, and inspect the
 
 ## Design
 
-Design a cohesive transaction query surface that extends listing filters and adds single-transaction detail inspection without exposing raw upstream shapes as the default contract. Candidate filters include category IDs, tag IDs, attachment/note presence, report visibility, split/recurring/pending state, import or sync origin, review state, and visibility scope. Validate enums and mutually exclusive options locally. Include duplicate discovery only if it can be presented as a read-only diagnostic with well-defined matching semantics and bounded pagination.
+Add `transactions get TRANSACTION_ID` and extend `transactions list` with the filters supported by the released upstream client: repeatable category, account, and tag IDs; attachment, note, report-hidden, split, recurring, pending, import-origin, institution-sync, and needs-review tri-state filters; and transaction visibility scope. Boolean filters must distinguish omitted, true, and false rather than accepting string booleans.
+
+Pending/posted state and review state are orthogonal. Normalized list/detail output exposes them separately and maps pending from the upstream `pending` field. `get_transaction_details` may redirect a pending identifier to its posted replacement; retain the upstream default but expose a strict no-redirect option and always make requested-versus-returned identity observable.
+
+Validate complete date pairs, date ordering, enum values, positive bounded limits, and nonnegative offsets before client creation or API calls. Keep the existing bare-list normalized output backward compatible. Raw mode exposes untouched upstream pagination metadata; a new normalized metadata envelope is outside this ticket.
+
+Duplicate discovery is explicitly out of scope because it requires a separate match-key, scan-bound, and false-positive policy. Transaction aggregates and split/tag mutation workflows are also owned by separate tickets.
+
+## Key Decisions
+
+- **Ship the complete released filter surface.** The marginal implementation cost per filter is small, and documenting a partial arbitrary subset would make automation harder.
+- **Tri-state booleans are explicit.** Omission means no filter; positive and negative flags map to `True` and `False`.
+- **Identity redirects are visible.** Detail output never silently hides that a pending ID resolved to a posted transaction.
+- **Normalized pagination remains backward compatible.** Default output remains a list; callers needing upstream `totalCount` use explicit raw mode until a separately designed metadata envelope exists.
+- **No duplicate detector in this PR.** It is not a server capability and needs its own bounded diagnostic design.
 
 ## Acceptance Criteria
 
-- [ ] Users can fetch full read-only details for one transaction by ID.
-- [ ] Transaction listing supports the reviewed set of high-value filters with repeatable multi-ID options where appropriate.
-- [ ] Pending versus posted and needs-review versus reviewed semantics are explicit and tested.
-- [ ] Invalid filter values and incompatible combinations fail before an API request.
-- [ ] Normalized output is stable across JSON and human-readable formats, while an explicitly requested raw mode preserves upstream data.
-- [ ] Pagination and limits are bounded and documented.
-- [ ] If duplicate discovery is included, its match key, date/account scope, and false-positive limitations are documented and tested.
-- [ ] No command in this ticket changes remote state.
-- [ ] Unit/CLI tests verify API argument mapping, null response handling, empty results, output formats, and errors.
-- [ ] User-facing command documentation and repository verification are complete.
+- [ ] `transactions get TRANSACTION_ID` returns normalized read-only detail and supports an explicit strict/no-posted-redirect mode.
+- [ ] Detail output includes the requested ID, returned transaction ID, original transaction identity when available, pending state, review state, attachments, tags, and split summary without exposing raw upstream structure by default.
+- [ ] `transactions list` supports repeatable category, account, and tag filters and tri-state filters for attachment presence, note presence, report visibility, split, recurring, pending, import origin, institution sync, and needs-review state, plus the supported visibility enum.
+- [ ] Pending/posted, needs-review, and opaque upstream review status remain distinct normalized concepts and are tested in independent combinations.
+- [ ] The pending transformer uses the real upstream `pending` key and tests use representative upstream fixtures.
+- [ ] Omitted tri-state options are omitted from API filtering; positive and negative forms map deterministically to `True` and `False`.
+- [ ] One-sided ranges, `start > end`, invalid enums, nonpositive or over-cap limits, and negative offsets fail before client creation or an API request.
+- [ ] The maximum page size is documented; default normalized list output remains backward-compatible, and explicit raw mode preserves `totalCount` and the upstream envelope.
+- [ ] Null detail objects, null/empty result containers, not-found responses, redirect behavior, and malformed upstream payloads produce stable output or typed errors.
+- [ ] No command in this ticket changes remote state, discovers duplicates, mutates review state, or implements transaction aggregates.
+- [ ] The minimum dependency is raised to `monarchmoneycommunity>=1.5.2`, the lockfile is consistent, and client-interface tests require the new methods and pending-filter signature.
+- [ ] Unit/CLI tests verify every API argument mapping, validation-before-call behavior, output format, empty result, and negative path.
+- [ ] User-facing command and pagination documentation is complete and repository verification passes.
 
 
 ## Notes

@@ -16,19 +16,40 @@ Give users a useful portfolio view across investment accounts rather than requir
 
 ## Design
 
-Create an investment-focused service and command surface that can discover eligible accounts, fetch holdings efficiently, normalize security and value fields, and optionally aggregate the same holding across accounts. Avoid duplicating account-history commands. Preserve source account context in non-aggregated output, define the grouping key and limitations for aggregation, and avoid unbounded sequential API calls. Keep upstream-client details behind the adapter/service boundary.
+Add `investments holdings` through an investment-focused service for normalized holdings across brokerage or similarly eligible accounts. Released `monarchmoneycommunity` 1.5.2 has no all-account holdings method: perform one account-discovery request, select eligible accounts, then issue per-account holdings reads in the service layer with a fixed maximum of four concurrent calls. Each call uses the shared read timeout/retry executor; v1 adds no holdings-specific concurrency or retry option/configuration. Do not depend on the unreleased upstream `get_all_holdings` helper or use `typedmonarchmoney`, whose missing-number sentinel values can corrupt financial totals.
+
+Annotate every non-aggregated row with the source account ID/name from the request context because the holdings payload response does not preserve it. Missing quantity, basis, price, or value remains `null`; never substitute sentinels or recompute authoritative value as quantity times price.
+
+Optional aggregation groups only by non-null upstream security ID. Rows without a reliable security ID remain separate and retain source context rather than being merged by ticker or name. Because the released holdings and account responses expose no currency metadata, v1 must not sum basis, price, total value, or any other monetary field across accounts. An aggregated group may sum quantity only when every contributing quantity is available and represents the same security units; otherwise aggregate quantity is `null`. Preserve per-account monetary contributions and report distinct contributing account IDs/count. Keep ticker, name, and raw node ID as descriptive fields, not fallback cross-account identity.
+
+Default account discovery excludes hidden accounts; explicit account IDs are validated and retain deliberate caller selection semantics. Document separately that the released upstream method always includes hidden holdings within a selected account and offers no public switch. For multi-account raw mode, return a deterministic CLI envelope keyed by account ID whose payload values are untouched per-account upstream responses; do not call the composed envelope itself an upstream response.
+
+## Key Decisions
+
+- **Released fallback is fixed bounded per-account fanout.** Bulk retrieval is unavailable; v1 permits at most four concurrent calls and adds no tuning surface.
+- **Multi-account reads fail as one operation.** If any account retrieval fails, emit the typed read error and no partial normalized holdings result rather than introducing a new partial-read envelope.
+- **Security ID is the sole cross-account aggregation key.** Missing identifiers never cause speculative ticker/name merging.
+- **No cross-account monetary totals in v1.** Currency compatibility cannot be established from the released upstream payload, so monetary fields remain per-account contributions.
+- **Missing financial values remain null.** The typed upstream wrapper and sentinel defaults are not used.
+- **Raw multi-call output is a CLI envelope.** Each enclosed upstream payload remains unmodified.
 
 ## Acceptance Criteria
 
-- [ ] Users can list normalized holdings across eligible investment accounts.
-- [ ] Users can restrict holdings to one or more account IDs.
-- [ ] Hidden-account inclusion behavior is explicit and defaults safely.
-- [ ] Non-aggregated rows retain source account identity and relevant security identifiers.
-- [ ] Optional aggregation has a documented deterministic grouping key and reports how many accounts contributed.
-- [ ] Missing ticker, security metadata, quantity, basis, price, or value fields do not crash the command or create misleading values.
-- [ ] Multi-account retrieval uses a bounded, tested strategy and avoids unnecessary repeated account discovery.
-- [ ] JSON, table/plain, empty-result, and optional raw output behavior are tested.
-- [ ] The implementation respects adapter/service/transformer boundaries and does not add direct upstream imports to command handlers.
+- [ ] Users can list normalized holdings across accounts determined eligible from one account-discovery response.
+- [ ] Eligibility rules use released account metadata, are documented with representative brokerage/manual-investment cases, and avoid calls for accounts known to have zero holdings.
+- [ ] Users can restrict retrieval to one or more non-empty opaque account IDs; unknown-ID and ineligible-account behavior is explicit and tested.
+- [ ] Hidden accounts are excluded from automatic discovery by default and included only by explicit option/selection; documentation states that hidden holdings inside a selected account cannot be excluded through the released client.
+- [ ] Non-aggregated rows retain source account ID/name, upstream security ID, raw holding/node ID, descriptive security fields, quantity, basis, price, total value, and last-synced time where available.
+- [ ] Missing ticker, security metadata, quantity, basis, price, value, or timestamps remain null and never crash the command, become sentinel values, or trigger invented calculations.
+- [ ] Optional aggregation groups only rows with the same non-null security ID, leaves unkeyed rows separate, preserves per-account monetary contributions, and reports contributing account IDs/count.
+- [ ] Aggregated quantity is summed only when all contributing quantities are available for the same security; otherwise it is `null`.
+- [ ] No aggregate basis, price, total value, or other cross-account monetary total is emitted because released upstream payloads provide no verifiable currency compatibility.
+- [ ] The absence of per-holding/account currency metadata is documented; the CLI does not assume currency compatibility or claim currency conversion.
+- [ ] Retrieval performs account discovery once, never exceeds four concurrent holdings calls, uses the shared read timeout/retry executor, and exposes no holdings-specific concurrency or retry setting.
+- [ ] If any selected account retrieval fails, the command emits the typed read error and no partial normalized holdings result; successful multi-account output ordering is deterministic.
+- [ ] The implementation uses the base upstream client through adapter/service/transformer boundaries; command handlers perform no direct client calls and `typedmonarchmoney` is not used.
+- [ ] JSON, table/plain, empty-result, aggregation, missing-quantity, absent-currency, fail-whole-command behavior, fixed concurrency, and raw-envelope behavior are tested; raw envelope values preserve each upstream response unchanged.
+- [ ] The released dependency floor is verified and no unreleased source revision is required.
 - [ ] User-facing documentation and repository verification are complete.
 
 
@@ -36,4 +57,8 @@ Create an investment-focused service and command surface that can discover eligi
 
 **2026-09-11T01:47:49Z**
 
-P3 planning: during implementation, evaluate whether the minimum supported dependency offers a stable bulk holdings operation. Prefer that through the adapter when it meets filtering and bounded-concurrency needs; do not duplicate upstream orchestration unnecessarily. Keep any fallback explicit and tested, and do not depend on an unreleased source revision.
+P3 planning originally requested evaluation of a bulk holdings operation.
+
+**2026-09-11T12:20:08Z**
+
+Research decision: no released version through `monarchmoneycommunity` 1.5.2 provides an all-account holdings method. A bounded per-account service fanout is therefore the supported implementation. Do not depend on the unreleased `get_all_holdings` development method; reevaluate only after a compatible release exists.
