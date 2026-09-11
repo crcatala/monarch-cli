@@ -12,25 +12,36 @@ tags: [p2, accounts, transactions, household, ownership, read-only]
 ---
 # Expose household ownership in account and transaction output
 
-Make ownership attribution visible for shared households. Account and transaction records may belong to or be assigned to a specific household member, but dropping that metadata from normalized CLI output prevents users and automated workflows from separating activity by person, explaining shared records, or safely selecting records for later actions.
+Make ownership attribution visible for shared households. Account and transaction records may be assigned to a household member, but dropping that relationship from normalized CLI output prevents users and automated workflows from separating activity by person, explaining records, or safely selecting records for later actions.
 
-This ticket is read-only: it establishes clear ownership semantics in the stable output contract. Changing ownership is outside scope until a supported mutation workflow is designed separately.
+This ticket is read-only. Changing ownership remains outside scope until a supported mutation workflow is designed separately.
 
 ## Design
 
-Model ownership as an optional relationship at the normalization boundary. Preserve both a stable identifier and a display value when available, and distinguish unavailable/unassigned/shared ownership from malformed data without inventing an owner. Account and transaction representations should use consistent naming and null semantics where the underlying concepts align.
+Normalize the optional upstream `ownedByUser` relationship consistently across accounts and transactions. Expose stable `owner_id` and `owner_name` fields; adapt the upstream account `displayName` and transaction `name` variants at the transformer boundary. Transactions additionally expose `ownership_overridden_at` when returned upstream.
 
-Review the impact on compact, table/plain, JSON, CSV, quiet, and raw output. Raw output must remain untouched. Keep household-specific upstream response shapes behind adapters/services and transformers rather than branching in command handlers.
+A missing, null, or malformed owner relationship produces null normalized owner fields. It must not be labeled “shared” or “unassigned,” because the released upstream response has no field that distinguishes those meanings. Likewise, `ownership_overridden_at` proves only that an override timestamp exists; it does not identify the actor, previous owner, or direction of reassignment.
+
+Review compact, table/plain, JSON, CSV, quiet, and raw output deliberately. Machine-readable normalized formats preserve stable owner fields. Human formats may show a concise owner name where legible; quiet remains ID-only. Raw output remains untouched. Keep upstream shape differences behind services/transformers rather than command-handler branches.
+
+## Key Decisions
+
+- **No invented shared state.** Null owner fields mean only that owner identity was not provided by the upstream response.
+- **One normalized naming convention.** Account `displayName` and transaction `name` both map to `owner_name`.
+- **Override metadata remains literal.** Expose the timestamp without inferring who changed ownership or what it changed from.
+- **Read-only scope.** This ticket neither mutates ownership nor adds remote state changes.
 
 ## Acceptance Criteria
 
-- [ ] Normalized account output exposes optional owner identity using documented stable fields.
-- [ ] Normalized transaction list and detail output expose optional owner identity and ownership-override metadata where available.
-- [ ] Unassigned, shared, unavailable, null, and partially populated owner data have explicit non-misleading semantics.
-- [ ] Account and transaction fields use a consistent naming convention without collapsing distinct domain meanings.
-- [ ] Existing normalized fields remain backward compatible and raw output remains unmodified.
-- [ ] Human-readable formats include ownership only where it remains useful and legible; machine-readable formats preserve stable values.
+- [ ] Normalized account output always includes nullable `owner_id` and `owner_name` fields sourced from `ownedByUser.id` and `ownedByUser.displayName` when valid.
+- [ ] Normalized transaction list and detail output always include nullable `owner_id`, `owner_name`, and `ownership_overridden_at` fields when available.
+- [ ] Missing, null, non-object, and partially populated owner payloads produce documented null fields or typed malformed-payload handling without crashes or invented identities.
+- [ ] Documentation states that null ownership does not distinguish shared, unassigned, unavailable, or unsupported upstream states.
+- [ ] Account and transaction outputs use the same public owner naming despite their different upstream display-field names.
+- [ ] Existing normalized fields remain backward compatible and raw output remains byte-for-structure unmodified.
+- [ ] JSON and CSV preserve stable owner values; table/plain/compact add only a concise useful owner display; quiet remains ID-only.
 - [ ] No command added or changed by this ticket mutates ownership or any remote state.
-- [ ] Unit and CLI tests cover complete, null, missing, shared/unassigned, and malformed nested owner payloads for accounts and transactions.
+- [ ] Unit and CLI tests cover complete, null, missing, non-object, and partially populated owner payloads for account list, transaction list, and transaction detail.
+- [ ] Tests prove `ownership_overridden_at` is passed through without deriving an actor, previous owner, or boolean shared state.
 - [ ] The required upstream-client compatibility floor is declared and covered by clean-install/contract verification.
 - [ ] Output-contract documentation is updated and repository verification passes.

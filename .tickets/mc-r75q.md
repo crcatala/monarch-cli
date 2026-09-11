@@ -1,7 +1,7 @@
 ---
 id: mc-r75q
 status: open
-deps: [mc-4edf]
+deps: [mc-h3cl, mc-7xfl]
 links: []
 created: 2026-09-11T01:36:40Z
 type: feature
@@ -12,26 +12,49 @@ tags: [p2, accounts, liabilities, debt, read-only, normalization]
 ---
 # Expose liability and debt-service account metadata
 
-Provide the account metadata needed to understand liabilities and debt obligations from the CLI. A balance alone is insufficient for credit and loan accounts: users may need to distinguish liabilities from assets and inspect credit limits, rates, minimum payments, planned payments, and debt-paydown participation for analysis and planning.
+Provide the account metadata needed to understand liabilities and debt obligations from the CLI. A balance alone is insufficient for credit and loan accounts: users need to distinguish liabilities from assets and inspect available limits, rates, payments, and debt-paydown participation without depending on raw upstream field names.
 
-The goal is a stable read-only representation that enables debt summaries and automation without forcing callers to depend on raw upstream payload names or infer financially meaningful values from missing data.
+This is a stable read-only representation. It does not calculate payoff schedules, provide financial advice, or mutate liability settings.
 
 ## Design
 
-Inventory the liability fields reliably returned for each relevant account type and decide whether they belong in the common account schema, a detailed account view, or a dedicated liability view. Prefer optional values over fabricated zeros. Preserve units and semantics for rates, limits, and payments, and document whether values are current snapshots or settings.
+Normalize liability metadata already present in the released `get_accounts` response. Use upstream `isAsset` as the direct asset/liability signal and reuse the stable account type/subtype names established by `mc-7xfl`; do not infer liability solely from localized display labels.
 
-Keep normalization in the account domain boundary and avoid making the default table excessively wide. Raw output remains opt-in and unmodified. This ticket should establish data access and semantics, not calculate payoff schedules or financial advice.
+Preserve distinct upstream concepts rather than selecting or merging them:
+
+- `credit_limit` from `limit`;
+- `provider_credit_limit` from `dataProviderCreditLimit`;
+- `apr` from `apr`;
+- `interest_rate` from `interestRate`;
+- `minimum_payment` from `minimumPayment`;
+- `planned_payment` from `plannedPayment`;
+- `excluded_from_debt_paydown` from `excludeFromDebtPaydown`.
+
+All fields are nullable and remain distinguishable from zero, negative, or inapplicable values. Numeric rate values are passed through without scaling until an authoritative unit is established. Documentation labels rate units as upstream units unless a controlled live observation provides stronger evidence. Likewise, documentation must not claim that planned payments, provider limits, or minimum payments are current snapshots versus settings unless verified.
+
+Because the released account-list response already contains these fields, add them to normalized machine-readable account output rather than inventing a new liability endpoint. Keep default human tables concise by showing only the direct asset/liability classification and a small useful subset; JSON/CSV retain the complete stable fields. Raw output remains untouched.
+
+## Key Decisions
+
+- **Use the direct upstream classification.** `isAsset` determines asset versus liability; display names do not.
+- **Never merge provider and user-facing values.** Limits and rates remain separate fields.
+- **Pass numeric values through.** No rate scaling, currency conversion, payoff math, or invented precision.
+- **Use the existing account response.** No new endpoint or account-detail command is required.
+- **Nullable means unavailable/inapplicable.** Missing values never become fabricated zeroes.
 
 ## Acceptance Criteria
 
-- [ ] Users can reliably distinguish liability accounts from assets in normalized output.
-- [ ] Supported liability metadata includes documented stable fields for credit limit, APR/interest rate, minimum payment, planned payment, and debt-paydown exclusion or equivalent available concepts.
-- [ ] The design explicitly decides which fields appear in account list output versus a detail/liability-specific view.
-- [ ] Missing, null, zero, negative, and inapplicable values remain distinguishable and do not produce invented financial values.
-- [ ] Rate and currency-like fields have documented units, precision, and display behavior.
-- [ ] Manual, hidden, deactivated, credit, loan, and ordinary asset accounts normalize without crashes or misleading liability fields.
-- [ ] JSON and human-readable output are useful and stable; raw output remains unmodified.
-- [ ] No payoff projections, recommendations, or unsupported derived financial claims are introduced.
-- [ ] Unit and CLI tests cover representative liability types, non-liability accounts, partial payloads, and output formats.
-- [ ] The required upstream-client compatibility floor is declared and covered by clean-install/contract verification.
+- [ ] Normalized account output includes a documented direct asset/liability indicator sourced from `isAsset` and stable type/subtype identifiers coordinated with `mc-7xfl`.
+- [ ] Normalized machine-readable output exposes distinct nullable `credit_limit`, `provider_credit_limit`, `apr`, `interest_rate`, `minimum_payment`, `planned_payment`, and `excluded_from_debt_paydown` fields.
+- [ ] No precedence, fallback, or merging occurs between the two limit fields or between APR and interest rate.
+- [ ] Missing, null, zero, negative, and inapplicable values remain distinguishable; unavailable financial values are never fabricated.
+- [ ] Rate values preserve upstream numeric units without scaling unless authoritative evidence and fixtures establish a documented conversion.
+- [ ] Currency-like values preserve upstream precision in JSON; any human formatting is documented and does not alter machine-readable values.
+- [ ] Documentation accurately distinguishes confirmed fields from unknown snapshot/setting semantics and makes no unsupported financial claim.
+- [ ] Manual, hidden, deactivated, credit, loan, ordinary asset, and partially populated accounts normalize without crashes or misleading liability defaults.
+- [ ] JSON and CSV retain all stable liability fields; table/plain/compact remain concise according to an explicit column/display decision; quiet remains ID-only.
+- [ ] Raw account output remains unmodified and no new liability endpoint, polling workflow, or remote mutation is introduced.
+- [ ] Unit and CLI tests cover representative credit, loan, manual liability, non-liability, null/partial, zero/negative, hidden, and deactivated payloads across output formats.
+- [ ] A controlled live observation, if used to clarify units, is separately opt-in, read-only, redacted, and records no household-specific values in fixtures or logs.
+- [ ] The required upstream-client compatibility floor is declared and covered by client-interface and clean-install verification.
 - [ ] Output-contract and user documentation are updated and repository verification passes.
