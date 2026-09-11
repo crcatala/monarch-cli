@@ -47,8 +47,7 @@ Keep member discovery separate from ownership mutation so it can land and be rev
 - [ ] Unknown role values are preserved as unknown upstream values and are not mapped to fabricated permissions or known roles.
 - [ ] Pending invitations are not returned as members; missing/null data is never labeled pending, invited, Shared, unassigned, or unavailable without upstream evidence.
 - [ ] Documentation reiterates mc-8dfd's contract that null account/transaction ownership cannot be resolved into Shared versus unassigned state by this directory.
-- [ ] Normalized and human output exclude profile URLs, raw-name duplication, email/authentication/invitation metadata, credit/Spinwheel data, onboarding/error details, and unrelated member-profile fields.
-- [ ] The command exposes no raw mode, and tests prove sensitive extra upstream fields cannot appear in JSON, compact, table/plain, CSV, quiet, or error output.
+- [ ] Every renderer and error path consumes only the normalized `{id, display_name, role}` allowlisted model; raw mode is unavailable, and negative sentinel tests prove extra upstream fields cannot leak through any supported output or diagnostic path.
 - [ ] JSON and human-readable formats preserve upstream member order and serialize the same normalized response deterministically; quiet output remains ID-only.
 - [ ] Adapter/service/transformer boundaries isolate the upstream shape, and the implementation never calls `get_credit_history()` or performs extra profile/onboarding requests.
 - [ ] Tests cover complete, single-member, empty, missing/null users, null/partial members, missing/duplicate/invalid IDs, unknown/null roles, non-object entries, malformed roots, format behavior, privacy exclusions, authentication errors, API errors, and command discovery.
