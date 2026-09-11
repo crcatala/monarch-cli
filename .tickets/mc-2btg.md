@@ -16,7 +16,7 @@ Ensure every command can run safely in CI, scripts, and agent workflows without 
 
 ## Design
 
-Introduce one shared non-interactive policy driven by a global flag and documented environment/config behavior. Inventory all present and near-term prompt sites rather than guarding only login. Keep mutation authorization and destructive confirmation as separate safety concepts: non-interactive mode controls whether prompting is allowed, not whether a mutation is authorized. Define a stable exit code and preserve stdout/stderr contracts for JSON and human-readable modes.
+Introduce one shared non-interactive policy driven by a global flag and documented environment/config behavior. Inventory every current prompt site and migrate it to one shared guard; document that future prompts must use the same guard. Keep mutation authorization and destructive confirmation as separate safety concepts: non-interactive mode controls whether prompting is allowed, not whether a mutation is authorized. Define a stable exit code and preserve stdout/stderr contracts for JSON and human-readable modes.
 
 ## Key Decisions
 
@@ -27,7 +27,7 @@ Introduce one shared non-interactive policy driven by a global flag and document
 ## Acceptance Criteria
 
 - [ ] A global non-interactive mode is available through a documented CLI flag and automation-friendly configuration source.
-- [ ] Every command that may prompt checks the shared policy before attempting input.
+- [ ] Every current prompt site uses the shared policy before attempting input, and contributor guidance requires future prompts to use the same guard.
 - [ ] A blocked prompt fails promptly with a stable non-zero exit code and identifies the missing input and non-interactive remedy.
 - [ ] JSON mode emits a valid structured error on the documented stream with no surrounding prose or ANSI escapes.
 - [ ] Human-readable mode remains concise and actionable.

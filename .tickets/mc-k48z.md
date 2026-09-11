@@ -12,7 +12,7 @@ tags: [p0, safety, mutations, cli, agents]
 ---
 # Establish a centralized read-only-by-default mutation policy
 
-Protect remote financial and service state by making the CLI read-only unless the caller explicitly authorizes mutations for that invocation. Today safeguards are command-specific and can be bypassed as the command surface grows. Humans and automated agents need one predictable contract that distinguishes reads, previews, remote mutations, local credential changes, local configuration changes, and destructive operations.
+Protect remote financial and service state by making the CLI read-only unless the caller explicitly authorizes mutations for that invocation. Today safeguards are command-specific and can be bypassed as the command surface grows. Humans and automated agents need one predictable contract that distinguishes reads, previews, remote mutations, local credential changes, and destructive operations.
 
 The goal is a single enforceable trust boundary that future commands inherit automatically, not a collection of ad hoc confirmation checks.
 
@@ -25,9 +25,8 @@ Inventory every registered command and give it explicit operation metadata. A co
 - `remote_authentication`: establishes or changes a remote authentication/session relationship without changing financial data.
 - `remote_mutation`: creates, updates, deletes, uploads, refreshes, or otherwise initiates a state-changing remote financial or service action.
 - `local_credential_change`: writes or removes local authentication state.
-- `local_config_change`: writes or removes non-secret local CLI configuration.
 
-`--allow-mutations` is required when an invocation's effect set contains `remote_mutation`; other effects do not imply authorization. `auth login` declares both `remote_authentication` and `local_credential_change`, while `auth logout` declares `local_credential_change`. Both remain available without the flag so users can authenticate and recover access. Local configuration changes are likewise outside this authorization flag; they may receive separate safeguards where appropriate.
+`--allow-mutations` is required when an invocation's effect set contains `remote_mutation`; other effects do not imply authorization. `auth login` declares both `remote_authentication` and `local_credential_change`, while `auth logout` declares `local_credential_change`. Both remain available without the flag so users can authenticate and recover access.
 
 Add a global, CLI-only `--allow-mutations` option. It is false by default, applies only to the current process invocation, and must appear in the documented global-option position before the command path. Do not support persistent configuration or an environment variable for mutation authorization.
 
@@ -40,7 +39,7 @@ Do not infer effect from CLI command names, upstream client method names, or Gra
 
 A statically mutating command may declare a validated preview mode. The policy may classify that parsed invocation as `preview` only after confirming the no-effect option, and must still prevent API/client mutation calls. Mutation authorization must be checked before authentication lookup, API-client creation, destructive confirmation, or any other prompt. Destructive confirmation or `--yes` is a separate second layer applied only after mutation authorization succeeds.
 
-The shared operation descriptor established here must be extensible by `mc-t9o7` with retry/idempotency and outcome behavior, and reusable by a future raw API command after that command parses and classifies an operation.
+The shared operation descriptor established here is consumed by `mc-t9o7` for retry and ambiguity behavior. Future command classes can extend the taxonomy when they are introduced rather than adding speculative categories here.
 
 ## Key Decisions
 

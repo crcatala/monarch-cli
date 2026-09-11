@@ -1,7 +1,7 @@
 ---
 id: mc-cpzi
 status: open
-deps: [mc-cd12, mc-h3cl, mc-t9o7]
+deps: [mc-cd12, mc-h3cl, mc-ik8o]
 links: []
 created: 2026-09-11T01:47:48Z
 type: feature
@@ -20,7 +20,7 @@ Choose a standard machine-readable schema format and a maintainable source of tr
 
 ## Key Decisions
 
-- The shared mutation envelope is defined by `mc-t9o7`; this ticket publishes and validates that contract rather than designing a competing schema.
+- The shared mutation envelope is defined by `mc-ik8o`; this ticket publishes and validates that contract rather than designing a competing schema.
 
 ## Acceptance Criteria
 
