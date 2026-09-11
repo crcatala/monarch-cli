@@ -20,7 +20,7 @@ This epic is the umbrella for the full P0-P3 roadmap. Child-ticket priority comm
 Organize work as small, independently reviewable tickets and PRs. Cross-cutting safety primitives should land before commands that depend on them. Feature tickets should use shared policy and service boundaries rather than reimplementing guards in individual commands.
 
 Expected roadmap lanes:
-- P0: mutation authorization, safe mutation execution, secure session compatibility, and dependency/install reproducibility.
+- P0: mutation authorization, retry-safe execution, shared mutation outcomes, deterministic non-interactive behavior, removal of unsafe legacy session compatibility, and dependency/install reproducibility.
 - P1: focused read-only and mutation command expansion built on the P0 foundation.
 - P2: authentication modes and richer account/transaction semantics.
 - P3: configuration UX, schemas, capability discovery, documentation, and other automation ergonomics.
