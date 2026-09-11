@@ -20,7 +20,7 @@ Add `investments holdings` through an investment-focused service for normalized 
 
 Annotate every non-aggregated row with the source account ID/name from the request context because the holdings payload response does not preserve it. Missing quantity, basis, price, or value remains `null`; never substitute sentinels or recompute authoritative value as quantity times price.
 
-Optional aggregation groups only by non-null upstream security ID. Rows without a reliable security ID remain separate and retain source context rather than being merged by ticker or name. Aggregate authoritative total values only when the payload's household-display-currency assumption is applicable, and report distinct contributing account IDs/count. Keep ticker, name, and raw node ID as descriptive fields, not fallback cross-account identity.
+Optional aggregation groups only by non-null upstream security ID. Rows without a reliable security ID remain separate and retain source context rather than being merged by ticker or name. Because the released holdings and account responses expose no currency metadata, v1 must not sum basis, price, total value, or any other monetary field across accounts. An aggregated group may sum quantity only when every contributing quantity is available and represents the same security units; otherwise aggregate quantity is `null`. Preserve per-account monetary contributions and report distinct contributing account IDs/count. Keep ticker, name, and raw node ID as descriptive fields, not fallback cross-account identity.
 
 Default account discovery excludes hidden accounts; explicit account IDs are validated and retain deliberate caller selection semantics. Document separately that the released upstream method always includes hidden holdings within a selected account and offers no public switch. For multi-account raw mode, return a deterministic CLI envelope keyed by account ID whose payload values are untouched per-account upstream responses; do not call the composed envelope itself an upstream response.
 
@@ -28,6 +28,7 @@ Default account discovery excludes hidden accounts; explicit account IDs are val
 
 - **Released fallback is bounded per-account fanout.** Bulk retrieval is not available in a released supported dependency.
 - **Security ID is the sole cross-account aggregation key.** Missing identifiers never cause speculative ticker/name merging.
+- **No cross-account monetary totals in v1.** Currency compatibility cannot be established from the released upstream payload, so monetary fields remain per-account contributions.
 - **Missing financial values remain null.** The typed upstream wrapper and sentinel defaults are not used.
 - **Raw multi-call output is a CLI envelope.** Each enclosed upstream payload remains unmodified.
 
@@ -39,11 +40,13 @@ Default account discovery excludes hidden accounts; explicit account IDs are val
 - [ ] Hidden accounts are excluded from automatic discovery by default and included only by explicit option/selection; documentation states that hidden holdings inside a selected account cannot be excluded through the released client.
 - [ ] Non-aggregated rows retain source account ID/name, upstream security ID, raw holding/node ID, descriptive security fields, quantity, basis, price, total value, and last-synced time where available.
 - [ ] Missing ticker, security metadata, quantity, basis, price, value, or timestamps remain null and never crash the command, become sentinel values, or trigger invented calculations.
-- [ ] Optional aggregation groups only rows with the same non-null security ID, leaves unkeyed rows separate, sums only authoritative compatible values, and reports contributing account IDs/count.
-- [ ] Household display-currency limitations and the absence of per-holding currency metadata are documented; the CLI does not claim currency conversion.
+- [ ] Optional aggregation groups only rows with the same non-null security ID, leaves unkeyed rows separate, preserves per-account monetary contributions, and reports contributing account IDs/count.
+- [ ] Aggregated quantity is summed only when all contributing quantities are available for the same security; otherwise it is `null`.
+- [ ] No aggregate basis, price, total value, or other cross-account monetary total is emitted because released upstream payloads provide no verifiable currency compatibility.
+- [ ] The absence of per-holding/account currency metadata is documented; the CLI does not assume currency compatibility or claim currency conversion.
 - [ ] Retrieval performs account discovery once and uses a tested configurable concurrency bound, per-call timeout/retry policy, deterministic output ordering, and documented partial/fail-fast behavior.
 - [ ] The implementation uses the base upstream client through adapter/service/transformer boundaries; command handlers perform no direct client calls and `typedmonarchmoney` is not used.
-- [ ] JSON, table/plain, empty-result, aggregation, per-account failure, and raw-envelope behavior are tested; raw envelope values preserve each upstream response unchanged.
+- [ ] JSON, table/plain, empty-result, aggregation, missing-quantity, absent-currency, per-account failure, and raw-envelope behavior are tested; raw envelope values preserve each upstream response unchanged.
 - [ ] The released dependency floor is verified and no unreleased source revision is required.
 - [ ] User-facing documentation and repository verification are complete.
 
