@@ -31,3 +31,9 @@ Design a cohesive transaction query surface that extends listing filters and add
 - [ ] Unit/CLI tests verify API argument mapping, null response handling, empty results, output formats, and errors.
 - [ ] User-facing command documentation and repository verification are complete.
 
+
+## Notes
+
+**2026-09-11T01:36:40Z**
+
+P2 planning clarification: this ticket owns the read-only pending/posted filter and the distinction between pending state and review state. Ensure the implementation maps the supported upstream pending filter explicitly, updates the minimum compatible dependency metadata when needed, and tests both positive and negative forms. Do not create a separate pending-filter ticket.
