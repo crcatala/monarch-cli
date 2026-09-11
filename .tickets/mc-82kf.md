@@ -18,14 +18,14 @@ Provide a machine-readable inventory of the installed CLI so automation can disc
 
 Add a side-effect-free command that emits a versioned JSON manifest. Explicit command and operation metadata is authoritative for effects, safety policy, interactivity, feature availability, output stability, and contract references; none of those properties may be inferred from command, framework, upstream method, or GraphQL names.
 
-Framework introspection may enumerate registered command paths, arguments, and options, but the public manifest shape is owned by CLI code and protected by deterministic fixture/golden tests rather than exposing Typer internals. Completeness tests compare the registered command tree with explicit metadata and reject an empty or partial inventory.
+Framework introspection may enumerate registered command paths, arguments, and options, but the public manifest shape is owned by CLI code and protected by one canonical fixture test rather than exposing Typer internals. Completeness checks compare the registered command tree with explicit metadata and reject an empty or partial inventory.
 
-Model output behavior accurately: global formats and quiet behavior are distinct from command-specific support such as NDJSON and raw passthrough. Raw output is explicitly unstable. Stable schema identifiers and contract versions come from the registry published by `mc-cpzi` rather than duplicated constants. Compatibility testing is limited to the supported Typer range established by `mc-43s0`; this ticket does not widen that range.
+Model output behavior accurately: global formats and quiet behavior are distinct from command-specific support such as NDJSON and raw passthrough. Raw output is explicitly unstable. Stable schema identifiers and contract versions come from the lightweight mapping published by `mc-cpzi` rather than duplicated constants. Compatibility testing is limited to the supported Typer range established by `mc-43s0`; this ticket does not widen that range.
 
 ## Key Decisions
 
 - **Explicit metadata owns behavior.** Introspection discovers syntax only; it never determines whether an operation is safe or state-changing.
-- **Schemas have one registry.** `mc-cpzi` owns stable schema identifiers and versions; this ticket consumes them.
+- **Schemas have one lightweight mapping.** `mc-cpzi` owns stable schema identifiers and versions in an ordinary module-level mapping; this ticket consumes it.
 - **Output support is per command.** Global rendering formats, quiet output, NDJSON, and raw passthrough are represented separately.
 - **Framework support is bounded.** Compatibility tests target only the dependency range established by `mc-43s0`.
 
@@ -36,10 +36,9 @@ Model output behavior accurately: global formats and quiet behavior are distinct
 - [ ] Read-only, preview, remote authentication, remote mutation, local credential/config changes, destructive, and potentially interactive behavior is classified through explicit shared metadata, including future taxonomy extensions.
 - [ ] Mutation authorization, destructive confirmation, and non-interactive requirements are represented accurately and separately.
 - [ ] Global output formats and quiet behavior are distinct from per-command NDJSON and raw support; stable normalized output and unstable raw passthrough are clearly identified.
-- [ ] Stable schema identifiers and contract versions exactly match the registry published by `mc-cpzi`.
-- [ ] Manifest ordering and serialization are byte-for-byte deterministic across repeated runs.
+- [ ] Stable schema identifiers and contract versions exactly match the mapping published by `mc-cpzi`.
+- [ ] One canonical fixture test verifies stable manifest shape, ordering, byte-for-byte serialization, and protection from framework-introspection drift across repeated runs.
 - [ ] Generation performs no authentication lookup, client construction, network request, prompt, config/session creation or write, or other local/remote mutation.
-- [ ] Tests fail when a registered command is missing metadata, metadata disagrees with shared execution policy, schema references are unknown, or the generated inventory is unexpectedly empty or partial.
-- [ ] Golden/fixture tests protect the public manifest from framework-introspection drift.
+- [ ] Completeness tests fail when a registered command is missing metadata, metadata disagrees with shared execution policy, schema references are unknown, or the generated inventory is unexpectedly empty or partial.
 - [ ] Compatibility tests cover the supported Typer range established by `mc-43s0` without widening dependency constraints.
 - [ ] User-facing and integration documentation explains discovery, versioning, stability, and raw-output caveats; repository verification passes.

@@ -29,7 +29,7 @@ Do not automatically retry any stage after bytes or a registration request may h
 - **Credential isolation is a prerequisite.** `mc-sr92` must provide the public safe transport before this workflow can ship.
 - **Dry-run is mandatory and offline.** Preview never requests signed parameters or reads file contents.
 - **One open descriptor is validated and uploaded.** Validation must not inspect one path target and later upload another.
-- **Multi-stage outcomes are honest.** The contract distinguishes asset upload from transaction registration and never implies rollback.
+- **Multi-stage outcomes are honest.** A signed-parameter failure before any mutation uses the structured error contract; following `mc-ik8o`, attempted media upload and transaction registration are ordered effect items and never imply rollback.
 
 ## Acceptance Criteria
 
@@ -43,7 +43,7 @@ Do not automatically retry any stage after bytes or a registration request may h
 - [ ] Transaction existence is checked before upload; the workflow does not claim that filename/size matching can identify or prevent duplicate attachments.
 - [ ] No stage is automatically retried after an upload or registration request may have been dispatched; stage-specific timeout/disconnect paths are classified as ambiguous with safe verification guidance.
 - [ ] Cloud/media HTTP rejection and inner `addTransactionAttachment.errors` are sanitized and mapped to definitive structured failures rather than success.
-- [ ] `mutation-outcome.v1` represents media-upload and transaction-registration effects distinctly enough to report success, orphaned-asset partial completion, definitive failure, and ambiguity without claiming rollback.
+- [ ] A signed-parameter failure before mutation uses the structured error contract; following `mc-ik8o`, each attempted or observable state-changing stage is an ordered effect item in `mutation-outcome.v1`, and mixed outcomes report orphaned-asset partial completion without a command-specific envelope or rollback claim.
 - [ ] Successful registration is verified through transaction detail; stable results include transaction ID, attachment ID and public ID when available, sanitized filename, and server-reported extension/size.
 - [ ] Dependency metadata satisfies the `mc-hszv` 1.5.2 floor and the transport compatibility contract selected by `mc-sr92`; clean-install compatibility is tested.
 - [ ] Tests mock file, transaction, upload, and registration boundaries and cover authorization, offline dry-run, descriptor validation, repeated explicit uploads, every stage outcome, verification, and output modes.

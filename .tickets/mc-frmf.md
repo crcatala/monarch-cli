@@ -28,7 +28,7 @@ No remote stage is automatically retried after its request may have been dispatc
 
 ## Key Decisions
 
-- **Three explicit stages.** Session creation, file transfer, and processing start have separate outcomes.
+- **Three explicit stages.** Following `mc-ik8o`, attempted session creation, file transfer, and processing start are ordered effect items with separate outcomes.
 - **Initial status only.** This ticket does not poll or claim completed categorization/matching.
 - **Validation before all remote work.** Invalid input cannot create an orphan retail-sync session.
 - **Mandatory offline dry-run.** Preview does not authenticate, read file contents, or call the network.
@@ -45,7 +45,7 @@ No remote stage is automatically retried after its request may have been dispatc
 - [ ] Supported extensions/types, size cap, basename length/character policy, symlink behavior, and limits of filename/MIME validation are documented and tested.
 - [ ] The same validated descriptor supplies uploaded bytes, reducing path/symlink races.
 - [ ] Output and diagnostics never include receipt contents, credentials, or unintended local directory information.
-- [ ] `mutation-outcome.v1` represents retail-sync creation, file transfer, and processing-start effects distinctly enough to report definitive failure, ambiguity, partial completion, or accepted start without claiming rollback.
+- [ ] Following `mc-ik8o`, each attempted or observable remote stage is an ordered effect item in `mutation-outcome.v1`; mixed outcomes report partial completion without a command-specific envelope or rollback claim.
 - [ ] Stable success output includes sanitized filename metadata, size, returned retail-sync ID, and the status observed at processing start.
 - [ ] Output explicitly states that later processing, categorization, and transaction matching are unknown because the supported client has no status-read capability.
 - [ ] No polling, completed/matched claim, or synthetic final status is introduced by this ticket.
