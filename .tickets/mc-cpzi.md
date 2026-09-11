@@ -1,7 +1,7 @@
 ---
 id: mc-cpzi
 status: open
-deps: [mc-cd12, mc-h3cl]
+deps: [mc-cd12, mc-h3cl, mc-t9o7]
 links: []
 created: 2026-09-11T01:47:48Z
 type: feature
@@ -17,6 +17,10 @@ Make normalized CLI output contracts directly consumable by users, agents, and i
 ## Design
 
 Choose a standard machine-readable schema format and a maintainable source of truth for stable normalized resources, mutation envelopes, and structured errors. Generated artifacts must not drift from runtime serializers and contract tests. Define contract versioning and compatibility rules for additive fields, removals, type changes, nullability changes, and raw passthrough output. Scope initial coverage to established public contracts and provide a clear extension path rather than attempting to describe arbitrary upstream raw payloads.
+
+## Key Decisions
+
+- The shared mutation envelope is defined by `mc-t9o7`; this ticket publishes and validates that contract rather than designing a competing schema.
 
 ## Acceptance Criteria
 

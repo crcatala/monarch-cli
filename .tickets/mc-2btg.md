@@ -5,10 +5,10 @@ deps: [mc-k48z]
 links: []
 created: 2026-09-11T01:21:50Z
 type: feature
-priority: 1
+priority: 0
 assignee: cc-vps
 parent: mc-cr09
-tags: [p1, automation, non-interactive, cli, agents]
+tags: [p0, automation, non-interactive, cli, agents]
 ---
 # Define deterministic non-interactive CLI behavior
 
@@ -17,6 +17,12 @@ Ensure every command can run safely in CI, scripts, and agent workflows without 
 ## Design
 
 Introduce one shared non-interactive policy driven by a global flag and documented environment/config behavior. Inventory all present and near-term prompt sites rather than guarding only login. Keep mutation authorization and destructive confirmation as separate safety concepts: non-interactive mode controls whether prompting is allowed, not whether a mutation is authorized. Define a stable exit code and preserve stdout/stderr contracts for JSON and human-readable modes.
+
+## Key Decisions
+
+- **P0 foundation.** Prompt safety is required before the CLI can be considered safe for unattended agents and CI, and it completes the execution-mode contract established by `mc-k48z`.
+- **Separate policies.** Non-interactive mode controls whether input may be requested; it does not authorize mutations or satisfy destructive confirmation.
+- **Fail before reading input.** Policy checks happen before `stdin`, `/dev/tty`, password, MFA, storage-choice, or confirmation reads.
 
 ## Acceptance Criteria
 
