@@ -2,7 +2,7 @@
 id: mc-cd12
 status: open
 deps: [mc-f84a]
-links: []
+links: [mc-h3cl, mc-c165]
 created: 2026-01-18T16:09:27Z
 type: task
 priority: 1

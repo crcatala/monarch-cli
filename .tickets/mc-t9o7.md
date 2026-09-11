@@ -35,3 +35,9 @@ Define a structured outcome for multi-step workflows that distinguishes success,
 - [ ] Regression tests cover current single and batch mutation commands.
 - [ ] Retry, timeout, and partial-success behavior is documented for human and automated callers.
 
+
+## Notes
+
+**2026-09-11T01:21:50Z**
+
+P1 planning clarification: this ticket should establish the shared mutation outcome envelope for both single-step and multi-step writes (including stable entity/id/status/result/error metadata and explicit ambiguous or partial outcomes). Domain feature tickets should consume that contract rather than invent command-specific mutation response shapes.
