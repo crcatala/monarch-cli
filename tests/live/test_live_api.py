@@ -3,17 +3,17 @@
 ⚠️ WARNING: These tests hit the real Monarch Money API!
 ⚠️ They require valid credentials and are NOT for CI.
 
-These tests verify that the actual CLI commands work end-to-end:
+These tests verify that the actual read-only CLI commands work end-to-end:
 1. CLI spawns and authenticates correctly
-2. Commands produce valid output in all formats
-3. Write operations work and are safely reverted
+2. Commands produce valid output in supported formats
+3. Read-only responses retain their normalized shape
 
-To run:
+To run locally (never in CI):
     MONARCH_LIVE_TESTS=1 make test-live
 
 Environment variables:
     MONARCH_LIVE_TESTS=1     Required to enable these tests
-    MONARCH_LIVE_DELAY=2.0   Delay between API calls in seconds (default: 2.0)
+    MONARCH_LIVE_DELAY=1.0   Delay between API calls in seconds (default: 1.0)
 
 Prerequisites:
     - Valid Monarch Money credentials stored via `monarch auth login`
@@ -31,11 +31,14 @@ from typing import Any
 
 import pytest
 
-# Skip all tests in this module unless MONARCH_LIVE_TESTS=1
-LIVE_ENABLED = os.environ.get("MONARCH_LIVE_TESTS", "").lower() in ("1", "true", "yes")
+# Skip all tests in this module unless MONARCH_LIVE_TESTS=1.  Keep this exact,
+# deliberate opt-in separate from any future mutation-test opt-in.
+LIVE_ENABLED = os.environ.get("MONARCH_LIVE_TESTS") == "1"
 
-# Configurable delay between API calls (seconds)
-LIVE_DELAY = float(os.environ.get("MONARCH_LIVE_DELAY", "2.0"))
+# Configurable delay between API calls (seconds).  A one-second default keeps
+# local runs below the API's throttling threshold without making CI opt in.
+LIVE_DELAY = float(os.environ.get("MONARCH_LIVE_DELAY", "1.0"))
+_last_call_at: float | None = None
 
 pytestmark = [
     pytest.mark.live,
@@ -43,20 +46,14 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def rate_limit_delay():
-    """Auto-applied delay between tests to avoid rate limiting.
-
-    This runs after each test to ensure we don't hammer the API.
-    """
-    yield
-    if LIVE_DELAY > 0:
-        time.sleep(LIVE_DELAY)
+def _wait_for_api_throttle() -> None:
+    """Wait between subprocess calls so consecutive API requests are spaced."""
+    global _last_call_at
+    if _last_call_at is not None and LIVE_DELAY > 0:
+        elapsed = time.monotonic() - _last_call_at
+        if elapsed < LIVE_DELAY:
+            time.sleep(LIVE_DELAY - elapsed)
+    _last_call_at = time.monotonic()
 
 
 def run_cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -70,7 +67,8 @@ def run_cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         CompletedProcess with stdout, stderr, returncode
     """
     cmd = ["uv", "run", "monarch", *args]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    _wait_for_api_throttle()
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=30)
 
     if check and result.returncode != 0:
         pytest.fail(
@@ -209,29 +207,27 @@ class TestLiveAccounts:
 
 
 # ---------------------------------------------------------------------------
-# Transactions Tests
+# Transactions Tests (read-only)
 # ---------------------------------------------------------------------------
 
 
 class TestLiveTransactions:
-    """Live tests for transaction commands."""
+    """Live tests for bounded, read-only transaction commands."""
 
     def test_transactions_list_json(self):
-        """Verify transactions list returns valid JSON array."""
+        """Verify transactions list returns a normalized JSON array."""
         data = run_cli_json("transactions", "list", "--limit", "5")
         assert isinstance(data, list)
 
         if data:
             txn = data[0]
-            # Verify our transformed schema
             assert "id" in txn
             assert "date" in txn
             assert "amount" in txn
             assert "description" in txn
 
     def test_transactions_list_with_filters(self):
-        """Verify transaction filters work."""
-        # Just verify the command doesn't error with filters
+        """Verify a bounded transaction list accepts read-only filters."""
         data = run_cli_json("transactions", "list", "--limit", "3")
         assert isinstance(data, list)
 
@@ -246,93 +242,6 @@ class TestLiveTransactions:
         assert result.returncode == 0
         lines = result.stdout.strip().split("\n")
         assert len(lines) >= 1  # At least header
-
-
-class TestLiveTransactionUpdate:
-    """Live tests for transaction update commands.
-
-    These tests modify real data but always restore original values.
-    """
-
-    @pytest.fixture
-    def test_transaction(self):
-        """Get a transaction to use for update tests.
-
-        Returns the transaction data and ensures we can restore it.
-        """
-        # Get a recent transaction
-        transactions = run_cli_json("transactions", "list", "--limit", "10")
-
-        if not transactions:
-            pytest.skip("No transactions available for update test")
-
-        # Use the first transaction
-        txn = transactions[0]
-        return txn
-
-    def test_transaction_update_notes_roundtrip(self, test_transaction):
-        """Test updating transaction notes and restoring original value."""
-        txn_id = test_transaction["id"]
-        original_notes = test_transaction.get("notes") or ""
-
-        # Use a unique test marker
-        test_notes = f"[LIVE TEST] {time.time()}"
-
-        try:
-            # Update notes (no --json flag for update command)
-            result = run_cli(
-                "transactions",
-                "update",
-                txn_id,
-                "--notes",
-                test_notes,
-            )
-            assert result.returncode == 0
-
-            # Verify the update took effect by fetching transactions
-            time.sleep(LIVE_DELAY)
-            transactions = run_cli_json("transactions", "list", "--limit", "20")
-            updated = next((t for t in transactions if t["id"] == txn_id), None)
-
-            if updated:
-                assert updated.get("notes") == test_notes
-
-        finally:
-            # Always restore original notes
-            time.sleep(LIVE_DELAY)  # Rate limit before restore
-            run_cli(
-                "transactions",
-                "update",
-                txn_id,
-                "--notes",
-                original_notes,
-                check=False,  # Don't fail test if restore fails
-            )
-
-    def test_transaction_update_dry_run(self, test_transaction):
-        """Test that dry-run doesn't actually modify the transaction."""
-        txn_id = test_transaction["id"]
-        original_notes = test_transaction.get("notes") or ""
-
-        # Dry-run an update
-        result = run_cli(
-            "transactions",
-            "update",
-            txn_id,
-            "--notes",
-            "[DRY RUN TEST] should not persist",
-            "--dry-run",
-        )
-        assert result.returncode == 0
-
-        # Verify the transaction wasn't actually changed
-        time.sleep(LIVE_DELAY)
-        transactions = run_cli_json("transactions", "list", "--limit", "20")
-        current_txn = next((t for t in transactions if t["id"] == txn_id), None)
-
-        if current_txn:
-            current_notes = current_txn.get("notes") or ""
-            assert current_notes == original_notes, "Dry-run should not modify transaction"
 
 
 # ---------------------------------------------------------------------------
@@ -407,14 +316,6 @@ class TestLiveCashflow:
 
 class TestLiveErrorHandling:
     """Live tests for error handling."""
-
-    def test_invalid_transaction_id_error(self):
-        """Verify invalid transaction ID returns proper error."""
-        result = run_cli(
-            "transactions", "update", "invalid-id-12345", "--notes", "test", check=False
-        )
-        # Should fail gracefully
-        assert result.returncode != 0
 
     def test_help_works(self):
         """Verify --help works for all commands."""

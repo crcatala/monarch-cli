@@ -436,11 +436,32 @@ uv sync --all-extras
 ### Testing
 
 ```bash
-make test          # Run tests
-make test-cov      # Tests with coverage
+make test          # Run tests (live tests excluded)
 make lint          # Lint and type check
-make verify        # All checks (pre-commit)
+make verify        # All checks (format, lint, types, tests)
 ```
+
+#### Local live API tests
+
+The live suite is an opt-in, read-only smoke test for local development. It
+requires an authenticated Monarch account and an active internet connection;
+use a dedicated test account rather than personal financial data. Credentials
+and API responses must never be committed or used in CI.
+
+The suite runs bounded checks for authentication status/ping, accounts,
+transactions (limited to five records), categories, budgets, and cashflow:
+
+```bash
+# Authenticate first with `monarch auth login`, then:
+MONARCH_LIVE_TESTS=1 make test-live
+```
+
+`make test-live` is the only supported runner. Tests are marked `live`, are
+skipped unless `MONARCH_LIVE_TESTS=1` is set, and wait at least one second
+between API calls by default (`MONARCH_LIVE_DELAY` can increase that delay).
+The ordinary `make test` and CI command explicitly select `-m "not live"`.
+Live failures usually indicate missing/expired authentication or API contract
+drift; do not rerun repeatedly when a service or rate-limit error occurs.
 
 ### Pre-commit hooks
 
