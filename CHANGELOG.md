@@ -23,8 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Mutation Retry Safety
 - **Remote mutations never retry automatically** - Account refresh, transaction update, and each batch-update item execute exactly once; the configured retry behavior now applies to read commands only (a timed-out write may already have been applied)
 - **Ambiguity is distinct from failure** - When a mutation request may have been dispatched but its outcome is unknown (timeout, disconnect, cancellation after invocation, or Ctrl-C), the CLI emits the structured `MUTATION_AMBIGUOUS` error with exit code `4`, identifying the operation and affected record ID(s) with a safe verification step instead of claiming the operation failed
-- **Batch update per-item outcomes** - `transactions batch-update` reports an ordered per-item result for every input ID with `success`/`error`/`ambiguous` status and exits nonzero when any item is failed or ambiguous
+- **Batch update per-item outcomes** - `transactions batch-update` reports an ordered `mutation-outcome.v1` item for every input ID and exits nonzero when any item is failed or ambiguous
 - **No generic retry override** - Any future mutation retry must select a named, operation-specific mechanism (`idempotency_key` or `read_after_write`) with operation-specific tests before the executor accepts it
+
+#### Mutation Outcome Contract (`mutation-outcome.v1`)
+- **One shared envelope for every remote mutation** - Account refresh, transaction update, and each batch-update item return the versioned `mutation-outcome.v1` envelope (`schema_version`, `operation`, `status`, `summary`, `items`, `verification`) on stdout after the request is attempted; see `docs/mutation-outcomes.md`
+- **Deterministic top-level statuses** - `succeeded` (exit 0), `failed` (normal nonzero error exit), `ambiguous` (exit 4), and `partial` for mixed item outcomes (exit 4); batch items preserve input order and multi-stage workflows preserve remote-effect order
+- **Required verification for ambiguity** - Any ambiguous item forces a `verification` object with `required: true`, an actionable message, and a tokenized safe command when one exists
+- **Sanitized structured errors** - Item error objects carry stable `code`, `message`, and object-valued `details`; raw exception text, request bodies, and credentials never reach the contract
+- **Breaking changes need a new version** - Envelope fields, status values, and exit-code semantics are additive only; removals or semantic changes require `mutation-outcome.v2` or later
 
 ### Changed
 

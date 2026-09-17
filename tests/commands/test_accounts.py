@@ -265,9 +265,21 @@ class TestAccountsRefresh:
     def test_refresh_all_accounts(self) -> None:
         """Refresh without args refreshes all accounts."""
         refresh_result = {
-            "status": "ok",
-            "account_count": 3,
-            "message": "Refresh requested for 3 account(s)",
+            "schema_version": "mutation-outcome.v1",
+            "operation": "accounts.refresh",
+            "status": "succeeded",
+            "summary": {"total": 3, "succeeded": 3, "failed": 0, "ambiguous": 0},
+            "items": [
+                {
+                    "entity": "account",
+                    "id": f"acc_{i}",
+                    "status": "succeeded",
+                    "result": {},
+                    "error": None,
+                }
+                for i in range(3)
+            ],
+            "verification": None,
         }
 
         with (
@@ -288,8 +300,9 @@ class TestAccountsRefresh:
                 ),
             )
             output = json.loads(result.stdout)
-            assert output["status"] == "ok"
-            assert output["account_count"] == 3
+            assert output["schema_version"] == "mutation-outcome.v1"
+            assert output["status"] == "succeeded"
+            assert output["summary"]["total"] == 3
 
     def test_refresh_specific_accounts(self) -> None:
         """Refresh with -a flags refreshes specific accounts."""
@@ -340,6 +353,84 @@ class TestAccountsRefresh:
             assert result.exit_code == 0
             output = json.loads(result.stdout)
             assert output["status"] == "no_accounts"
+
+    def test_refresh_ambiguous_outcome_exits_four(self) -> None:
+        """An ambiguous refresh outcome exits 4 with the envelope on stdout."""
+        refresh_result = {
+            "schema_version": "mutation-outcome.v1",
+            "operation": "accounts.refresh",
+            "status": "ambiguous",
+            "summary": {"total": 1, "succeeded": 0, "failed": 0, "ambiguous": 1},
+            "items": [
+                {
+                    "entity": "account",
+                    "id": "acc_123",
+                    "status": "ambiguous",
+                    "result": None,
+                    "error": {
+                        "code": "MUTATION_AMBIGUOUS",
+                        "message": "outcome unknown",
+                        "details": {},
+                    },
+                }
+            ],
+            "verification": {
+                "required": True,
+                "message": "Verify the account in the Monarch web UI.",
+                "command": None,
+            },
+        }
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.refresh_accounts",
+                return_value=refresh_result,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["refresh"])
+
+            assert result.exit_code == 4
+            output = json.loads(result.stdout)
+            assert output["status"] == "ambiguous"
+            assert output["verification"]["required"] is True
+
+    def test_refresh_failed_outcome_exits_one(self) -> None:
+        """A definitive refresh failure exits with the normal error code."""
+        refresh_result = {
+            "schema_version": "mutation-outcome.v1",
+            "operation": "accounts.refresh",
+            "status": "failed",
+            "summary": {"total": 1, "succeeded": 0, "failed": 1, "ambiguous": 0},
+            "items": [
+                {
+                    "entity": "account",
+                    "id": "acc_123",
+                    "status": "failed",
+                    "result": None,
+                    "error": {
+                        "code": "API_ERROR",
+                        "message": "The refresh request was not accepted by the service.",
+                        "details": {},
+                    },
+                }
+            ],
+            "verification": None,
+        }
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.refresh_accounts",
+                return_value=refresh_result,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["refresh"])
+
+            assert result.exit_code == 1
+            output = json.loads(result.stdout)
+            assert output["status"] == "failed"
+            assert output["verification"] is None
 
     def test_refresh_help_shows_examples(self) -> None:
         """Refresh --help shows examples."""

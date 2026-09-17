@@ -159,9 +159,18 @@ class TestRefreshAccounts:
 
         result = refresh_accounts(account_ids=["acc-123", "acc-456"], operation=MUTATION_OPERATION)
 
-        assert result["status"] == "ok"
-        assert result["account_count"] == 2
-        assert "2 account(s)" in result["message"]
+        assert result["schema_version"] == "mutation-outcome.v1"
+        assert result["operation"] == "accounts.refresh"
+        assert result["status"] == "succeeded"
+        assert result["summary"] == {
+            "total": 2,
+            "succeeded": 2,
+            "failed": 0,
+            "ambiguous": 0,
+        }
+        assert [item["id"] for item in result["items"]] == ["acc-123", "acc-456"]
+        assert all(item["status"] == "succeeded" for item in result["items"])
+        assert result["verification"] is None
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")
@@ -178,8 +187,9 @@ class TestRefreshAccounts:
         result = refresh_accounts(account_ids=None, operation=MUTATION_OPERATION)
 
         mock_get_ids.assert_called_once()
-        assert result["status"] == "ok"
-        assert result["account_count"] == 3
+        assert result["status"] == "succeeded"
+        assert result["summary"]["total"] == 3
+        assert [item["id"] for item in result["items"]] == ["acc-123", "acc-456", "acc-789"]
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")
@@ -214,24 +224,47 @@ class TestRefreshAccounts:
         result = refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
 
         assert result["status"] == "failed"
-        assert result["account_count"] == 1
-        assert "failed" in result["message"].lower()
+        assert result["summary"] == {
+            "total": 1,
+            "succeeded": 0,
+            "failed": 1,
+            "ambiguous": 0,
+        }
+        (item,) = result["items"]
+        assert item["entity"] == "account"
+        assert item["id"] == "acc-123"
+        assert item["status"] == "failed"
+        assert item["result"] is None
+        assert item["error"]["code"] == "API_ERROR"
+        assert result["verification"] is None
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")
     def test_ambiguous_refresh_propagates_with_entity_ids(
         self, mock_run_mutation, _mock_get_client
     ):
-        """Refresh does not downgrade an ambiguous outcome to ordinary failure."""
+        """Refresh reports an ambiguous envelope, never an ordinary failure."""
         mock_run_mutation.side_effect = MutationAmbiguousError(
             details={"operation": "accounts refresh", "entity_ids": ["acc-123"]}
         )
 
-        with pytest.raises(MutationAmbiguousError):
-            refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
+        result = refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
 
         assert mock_run_mutation.call_args.kwargs["entity_ids"] == ("acc-123",)
         assert "verify" in mock_run_mutation.call_args.kwargs["verification"].lower()
+        assert result["schema_version"] == "mutation-outcome.v1"
+        assert result["status"] == "ambiguous"
+        (item,) = result["items"]
+        assert item["entity"] == "account"
+        assert item["id"] == "acc-123"
+        assert item["status"] == "ambiguous"
+        assert item["error"]["code"] == "MUTATION_AMBIGUOUS"
+        assert item["error"]["details"]["remote_state"] == "unknown"
+        # Ambiguity requires recovery guidance. No observational refresh-status
+        # read command exists yet, so no verification command is tokenized.
+        assert result["verification"]["required"] is True
+        assert "verify" in result["verification"]["message"].lower()
+        assert result["verification"]["command"] is None
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")
@@ -241,6 +274,11 @@ class TestRefreshAccounts:
 
         result = refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
 
+        # The mutation-outcome.v1 envelope always carries every required
+        # top-level field.
+        assert result["schema_version"] == "mutation-outcome.v1"
+        assert result["operation"] == "accounts.refresh"
         assert "status" in result
-        assert "account_count" in result
-        assert "message" in result
+        assert "summary" in result
+        assert "items" in result
+        assert "verification" in result

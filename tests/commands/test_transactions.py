@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.commands.transactions import _parse_date, app
+from monarch_cli.core.exceptions import APIError
 from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
 
 runner = CliRunner()
@@ -428,15 +429,29 @@ class TestTransactionsUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "updated"
-            assert output["transaction_id"] == "txn_123"
-            assert output["changes"]["amount"] == 25.50
+            # The normative mutation-outcome.v1 envelope (mc-ik8o).
+            assert output["schema_version"] == "mutation-outcome.v1"
+            assert output["operation"] == "transactions.update"
+            assert output["status"] == "succeeded"
+            assert output["summary"] == {
+                "total": 1,
+                "succeeded": 1,
+                "failed": 0,
+                "ambiguous": 0,
+            }
+            assert output["verification"] is None
+            (item,) = output["items"]
+            assert item["entity"] == "transaction"
+            assert item["id"] == "txn_123"
+            assert item["status"] == "succeeded"
+            assert item["result"] == {"changes": {"amount": 25.50}}
+            assert item["error"] is None
 
     def test_update_transport_ambiguity_is_exit_four(
         self,
         mock_authenticated_client: MagicMock,
     ) -> None:
-        """A failed transport does not retry and reports ambiguous state."""
+        """A failed transport does not retry and reports an ambiguous outcome."""
         attempts = 0
 
         async def async_update_transaction(**_kwargs):
@@ -457,14 +472,57 @@ class TestTransactionsUpdate:
 
         assert result.exit_code == 4
         assert attempts == 1
-        # Non-interactive progress is also written to stderr; parse the
-        # structured error object that follows it.
-        error = json.loads(result.stderr[result.stderr.index("{") :])
-        assert error["code"] == "MUTATION_AMBIGUOUS"
-        assert error["details"]["operation"] == "transactions update"
-        assert error["details"]["entity_ids"] == ["txn_123"]
-        assert "may have changed" in error["message"]
-        assert "secret transport detail" not in result.stderr
+        output = json.loads(result.stdout)
+        assert output["status"] == "ambiguous"
+        assert output["summary"]["ambiguous"] == 1
+        (item,) = output["items"]
+        assert item["status"] == "ambiguous"
+        assert item["result"] is None
+        assert item["error"]["code"] == "MUTATION_AMBIGUOUS"
+        assert item["error"]["details"]["remote_state"] == "unknown"
+        # Ambiguity requires recovery guidance with a safe tokenized command.
+        assert output["verification"]["required"] is True
+        assert "confirm whether the update was applied" in output["verification"]["message"].lower()
+        assert output["verification"]["command"] == ["monarch", "transactions", "list"]
+        # No raw upstream exception text leaks into the outcome.
+        assert "secret transport detail" not in result.stdout
+
+    def test_update_definite_api_failure_is_failed_envelope_exit_one(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """A definitive application rejection is a failed outcome, exit 1."""
+
+        async def async_update_transaction(**_kwargs):
+            raise APIError("transaction not found", status_code=404)
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["update", "txn_123", "--notes", "Review"])
+
+        assert result.exit_code == 1
+        output = json.loads(result.stdout)
+        assert output["status"] == "failed"
+        assert output["summary"] == {
+            "total": 1,
+            "succeeded": 0,
+            "failed": 1,
+            "ambiguous": 0,
+        }
+        (item,) = output["items"]
+        assert item["status"] == "failed"
+        assert item["result"] is None
+        assert item["error"]["code"] == "API_ERROR"
+        assert item["error"]["details"]["status_code"] == 404
+        # No follow-up verification is needed for a definitive failure.
+        assert output["verification"] is None
 
     def test_update_with_description(
         self,
@@ -491,8 +549,8 @@ class TestTransactionsUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "updated"
-            assert output["changes"]["merchant_name"] == "Coffee Shop"
+            assert output["status"] == "succeeded"
+            assert output["items"][0]["result"] == {"changes": {"merchant_name": "Coffee Shop"}}
 
     def test_update_with_category(
         self,
@@ -519,8 +577,8 @@ class TestTransactionsUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "updated"
-            assert output["changes"]["category_id"] == "cat_456"
+            assert output["status"] == "succeeded"
+            assert output["items"][0]["result"] == {"changes": {"category_id": "cat_456"}}
 
     def test_update_with_notes(
         self,
@@ -547,8 +605,8 @@ class TestTransactionsUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "updated"
-            assert output["changes"]["notes"] == "Business lunch"
+            assert output["status"] == "succeeded"
+            assert output["items"][0]["result"] == {"changes": {"notes": "Business lunch"}}
 
     def test_update_with_multiple_changes(
         self,
@@ -584,10 +642,10 @@ class TestTransactionsUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "updated"
-            assert output["changes"]["amount"] == 30.00
-            assert output["changes"]["merchant_name"] == "Lunch"
-            assert output["changes"]["notes"] == "Team lunch"
+            assert output["status"] == "succeeded"
+            assert output["items"][0]["result"]["changes"]["amount"] == 30.00
+            assert output["items"][0]["result"]["changes"]["merchant_name"] == "Lunch"
+            assert output["items"][0]["result"]["changes"]["notes"] == "Team lunch"
 
     def test_update_dry_run(self) -> None:
         """Update with --dry-run shows changes without applying."""
@@ -601,15 +659,18 @@ class TestTransactionsUpdate:
             assert output["changes"]["amount"] == 25.50
             assert "No changes applied" in output["message"]
 
-    def test_update_no_changes_shows_error(self) -> None:
-        """Update without any change flags shows error."""
+    def test_update_no_changes_uses_structured_error_contract(self) -> None:
+        """A pre-execution validation failure is a structured error, not an outcome."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
             result = runner.invoke(app, ["update", "txn_123"])
 
-            assert result.exit_code == 1
-            output = json.loads(result.stdout)
-            assert output["status"] == "error"
-            assert "No changes specified" in output["message"]
+            # Validation failures keep the structured error contract (exit 2
+            # on stderr); they are never misrepresented as mutation outcomes.
+            assert result.exit_code == 2
+            assert "mutation-outcome.v1" not in result.stdout
+            error = json.loads(result.stderr[result.stderr.index("{") :])
+            assert error["code"] == "INVALID_INPUT"
+            assert "No changes specified" in error["message"]
 
     def test_update_help_shows_examples(self) -> None:
         """Update --help shows examples."""
@@ -683,13 +744,19 @@ class TestTransactionsBatchUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "completed"
-            assert output["success_count"] == 2
-            assert output["failure_count"] == 0
-            assert output["ambiguous_count"] == 0
-            assert output["changes"]["category_id"] == "cat_food"
-            assert [item["id"] for item in output["results"]] == ["txn_123", "txn_456"]
-            assert [item["status"] for item in output["results"]] == ["success", "success"]
+            assert output["schema_version"] == "mutation-outcome.v1"
+            assert output["operation"] == "transactions.batch-update"
+            assert output["status"] == "succeeded"
+            assert output["summary"] == {
+                "total": 2,
+                "succeeded": 2,
+                "failed": 0,
+                "ambiguous": 0,
+            }
+            assert output["verification"] is None
+            assert [item["id"] for item in output["items"]] == ["txn_123", "txn_456"]
+            assert [item["status"] for item in output["items"]] == ["succeeded", "succeeded"]
+            assert output["items"][0]["result"] == {"changes": {"category_id": "cat_food"}}
             assert len(update_calls) == 2
 
     def test_batch_update_with_notes(
@@ -718,9 +785,9 @@ class TestTransactionsBatchUpdate:
             )
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["status"] == "completed"
-            assert output["success_count"] == 1
-            assert output["changes"]["notes"] == "Q1 Expenses"
+            assert output["status"] == "succeeded"
+            assert output["summary"]["succeeded"] == 1
+            assert output["items"][0]["result"] == {"changes": {"notes": "Q1 Expenses"}}
 
     def test_batch_update_with_stdin(
         self,
@@ -750,7 +817,8 @@ class TestTransactionsBatchUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["success_count"] == 3
+            assert output["summary"]["succeeded"] == 3
+            assert output["summary"]["total"] == 3
             assert len(update_calls) == 3
 
     def test_batch_update_stdin_skips_empty_lines(
@@ -781,7 +849,8 @@ class TestTransactionsBatchUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["success_count"] == 2
+            assert output["summary"]["succeeded"] == 2
+            assert output["summary"]["total"] == 2
             assert len(update_calls) == 2
 
     def test_batch_update_dry_run(self) -> None:
@@ -835,20 +904,30 @@ class TestTransactionsBatchUpdate:
                 ],
             )
 
-        assert result.exit_code == 1
+        assert result.exit_code == 4
         output = json.loads(result.stdout)
-        assert [item["id"] for item in output["results"]] == [
+        assert output["status"] == "partial"
+        assert output["summary"] == {
+            "total": 3,
+            "succeeded": 2,
+            "failed": 0,
+            "ambiguous": 1,
+        }
+        # Batch items preserve normalized input order.
+        assert [item["id"] for item in output["items"]] == [
             "txn_123",
             "txn_456",
             "txn_789",
         ]
-        assert [item["status"] for item in output["results"]] == [
-            "success",
+        assert [item["status"] for item in output["items"]] == [
+            "succeeded",
             "ambiguous",
-            "success",
+            "succeeded",
         ]
-        assert output["ambiguous_count"] == 1
-        assert output["ambiguous"][0]["error_code"] == "MUTATION_AMBIGUOUS"
+        assert output["items"][1]["error"]["code"] == "MUTATION_AMBIGUOUS"
+        # Mixed outcomes require recovery guidance before any retry.
+        assert output["verification"]["required"] is True
+        assert output["verification"]["command"] == ["monarch", "transactions", "list"]
         assert "secret transport detail" not in result.stdout
         assert attempts == ["txn_123", "txn_456", "txn_789"]
 
@@ -888,48 +967,56 @@ class TestTransactionsBatchUpdate:
                 ],
             )
 
-            # A definite per-item failure makes the invocation exit nonzero,
-            # while the ordered per-item results are still printed.
-            assert result.exit_code == 1
+            # A mixture of succeeded and failed items is a partial outcome:
+            # nonzero exit 4, with the ordered per-item outcomes printed and
+            # sanitized error objects.
+            assert result.exit_code == 4
             output = json.loads(result.stdout)
-            assert output["status"] == "completed"
-            assert output["success_count"] == 2
-            assert output["failure_count"] == 1
-            assert output["ambiguous_count"] == 0
-            assert [item["id"] for item in output["results"]] == [
+            assert output["status"] == "partial"
+            assert output["summary"] == {
+                "total": 3,
+                "succeeded": 2,
+                "failed": 1,
+                "ambiguous": 0,
+            }
+            assert [item["id"] for item in output["items"]] == [
                 "txn_123",
                 "txn_456",
                 "txn_789",
             ]
-            assert [item["status"] for item in output["results"]] == [
-                "success",
-                "error",
-                "success",
+            assert [item["status"] for item in output["items"]] == [
+                "succeeded",
+                "failed",
+                "succeeded",
             ]
-            assert output["failures"] is not None
-            assert len(output["failures"]) == 1
-            assert output["failures"][0]["id"] == "txn_456"
-            assert "API error" in output["failures"][0]["error"]
+            failed = output["items"][1]
+            assert failed["result"] is None
+            assert failed["error"]["code"] == "UNKNOWN"
+            # Raw exception text is never copied into the contract.
+            assert "API error: transaction not found" not in result.stdout
+            assert output["verification"] is None
 
-    def test_batch_update_no_ids_shows_error(self) -> None:
-        """Batch update with no IDs shows error."""
+    def test_batch_update_no_ids_uses_structured_error_contract(self) -> None:
+        """Missing IDs is a pre-execution validation failure, not an outcome."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
             result = runner.invoke(app, ["batch-update", "--category", "cat_123"])
 
-            assert result.exit_code == 1
-            output = json.loads(result.stdout)
-            assert output["status"] == "error"
-            assert "No transaction IDs provided" in output["message"]
+            assert result.exit_code == 2
+            assert "mutation-outcome.v1" not in result.stdout
+            error = json.loads(result.stderr[result.stderr.index("{") :])
+            assert error["code"] == "INVALID_INPUT"
+            assert "No transaction IDs provided" in error["message"]
 
-    def test_batch_update_no_changes_shows_error(self) -> None:
-        """Batch update without changes shows error."""
+    def test_batch_update_no_changes_uses_structured_error_contract(self) -> None:
+        """Missing changes is a pre-execution validation failure, not an outcome."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
             result = runner.invoke(app, ["batch-update", "txn_123"])
 
-            assert result.exit_code == 1
-            output = json.loads(result.stdout)
-            assert output["status"] == "error"
-            assert "No changes specified" in output["message"]
+            assert result.exit_code == 2
+            assert "mutation-outcome.v1" not in result.stdout
+            error = json.loads(result.stderr[result.stderr.index("{") :])
+            assert error["code"] == "INVALID_INPUT"
+            assert "No changes specified" in error["message"]
 
     def test_batch_update_both_args_and_stdin(
         self,
@@ -965,7 +1052,8 @@ class TestTransactionsBatchUpdate:
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
-            assert output["success_count"] == 3
+            assert output["summary"]["succeeded"] == 3
+            assert output["summary"]["total"] == 3
             assert len(update_calls) == 3
 
     def test_batch_update_help_shows_examples(self) -> None:
@@ -1013,11 +1101,12 @@ class TestTransactionsBatchUpdateInterrupt:
             )
 
         assert result.exit_code == 4
-        error = json.loads(result.stderr[result.stderr.index("{") :])
-        assert error["code"] == "MUTATION_AMBIGUOUS"
-        assert error["details"]["operation"] == "transactions batch-update"
-        assert error["details"]["entity_ids"] == ["txn_1", "txn_2"]
-        assert error["details"]["reason"] == "cancelled"
-        assert error["details"]["remote_state"] == "unknown"
-        assert "may have changed" in error["message"]
-        assert "verify" in error["details"]["verification"].lower()
+        output = json.loads(result.stdout)
+        assert output["status"] == "ambiguous"
+        assert output["operation"] == "transactions.batch-update"
+        assert [item["id"] for item in output["items"]] == ["txn_1", "txn_2"]
+        assert all(item["status"] == "ambiguous" for item in output["items"])
+        assert all(item["error"]["details"]["reason"] == "cancelled" for item in output["items"])
+        assert output["verification"]["required"] is True
+        assert "verify" in output["verification"]["message"].lower()
+        assert output["verification"]["command"] == ["monarch", "transactions", "list"]

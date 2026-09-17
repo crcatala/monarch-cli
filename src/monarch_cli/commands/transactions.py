@@ -13,7 +13,16 @@ from ..core.adapter import get_authenticated_client
 from ..core.async_utils import run_async
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
-from ..core.exceptions import MutationAmbiguousError
+from ..core.exceptions import MutationAmbiguousError, ValidationError
+from ..core.mutation_outcomes import (
+    ambiguous_item,
+    build_mutation_outcome,
+    error_from_exception,
+    failed_item,
+    outcome_exit_code,
+    succeeded_item,
+    verification_object,
+)
 from ..core.operations import (
     Effect,
     Operation,
@@ -211,6 +220,27 @@ def list_cmd(
     output(data, output_format, raw=False)
 
 
+UPDATE_VERIFICATION_COMMAND: list[str] = ["monarch", "transactions", "list"]
+UPDATE_VERIFICATION_MESSAGE = (
+    "Fetch the transaction (e.g. 'monarch transactions list --search' "
+    "or the Monarch web UI) and confirm whether the update was "
+    "applied before retrying."
+)
+BATCH_VERIFICATION_MESSAGE = (
+    "Verify each affected transaction (e.g. 'monarch transactions list --search' "
+    "or the Monarch web UI) and confirm whether each update was applied "
+    "before retrying any item."
+)
+
+
+def _finish_mutation(outcome: dict[str, Any]) -> None:
+    """Emit a mutation outcome envelope and exit with its status code."""
+    output(outcome)
+    code = outcome_exit_code(outcome["status"])
+    if code:
+        raise typer.Exit(code)
+
+
 @app.command()
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
@@ -288,17 +318,15 @@ def update(
     if date_value is not None:
         changes["date"] = date_value
 
-    # Require at least one change
+    # Require at least one change. This is a pre-execution input-validation
+    # failure: it uses the structured error contract, never a mutation
+    # outcome envelope.
     if not changes:
-        output(
-            {
-                "status": "error",
-                "transaction_id": transaction_id,
-                "message": "No changes specified. "
-                "Use --amount, --description, --category, --notes, or --date.",
-            }
+        raise ValidationError(
+            message="No changes specified. "
+            "Use --amount, --description, --category, --notes, or --date.",
+            details={"transaction_id": transaction_id},
         )
-        raise typer.Exit(1)
 
     # Classify this parsed invocation. A confirmed --dry-run is a validated
     # preview: no state change, no client creation, and no authorization
@@ -320,30 +348,72 @@ def update(
     # Authorize before authentication lookup, client creation, or any prompt.
     require_mutation_authorization(operation)
 
-    # Apply the update. Exactly one attempt: a timeout, disconnect, or
-    # cancellation after the request was invoked is reported as
-    # MUTATION_AMBIGUOUS (exit 4) — remote state may have changed — never as
-    # an ordinary failure, and never retried automatically.
-    with spinner("Updating transaction..."):
-        run_mutation_call(
-            lambda: get_authenticated_client().update_transaction(
-                transaction_id=transaction_id, **changes
-            ),
-            operation,
-            entity_ids=(transaction_id,),
-            verification=(
-                "Fetch the transaction (e.g. 'monarch transactions list --search' "
-                "or the Monarch web UI) and confirm whether the update was "
-                "applied before retrying."
-            ),
-        )
+    # Client creation happens before the mutation attempt: a pre-execution
+    # authentication failure must stay on the structured error path, never be
+    # misreported as a mutation outcome.
+    client = get_authenticated_client()
 
-    output(
-        {
-            "status": "updated",
-            "transaction_id": transaction_id,
-            "changes": changes,
-        }
+    # Apply the update. Exactly one attempt: a timeout, disconnect, or
+    # cancellation after the request was invoked is reported as an ambiguous
+    # mutation-outcome.v1 envelope (exit 4) — remote state may have changed —
+    # never as an ordinary failure, and never retried automatically.
+    # Definite application rejections produce a failed envelope on the normal
+    # operation/API nonzero exit.
+    with spinner("Updating transaction..."):
+        try:
+            run_mutation_call(
+                lambda: client.update_transaction(transaction_id=transaction_id, **changes),
+                operation,
+                entity_ids=(transaction_id,),
+                verification=UPDATE_VERIFICATION_MESSAGE,
+            )
+        except MutationAmbiguousError as e:
+            outcome = build_mutation_outcome(
+                operation.command,
+                [
+                    ambiguous_item(
+                        "transaction",
+                        transaction_id,
+                        message=e.message,
+                        details={
+                            "reason": e.details.get("reason"),
+                            "remote_state": "unknown",
+                        },
+                    )
+                ],
+                verification=verification_object(
+                    e.details.get("verification", UPDATE_VERIFICATION_MESSAGE),
+                    command=UPDATE_VERIFICATION_COMMAND,
+                ),
+            )
+            _finish_mutation(outcome)
+            return
+        except Exception as e:  # noqa: BLE001 - classified by the contract
+            # Definitive failure after the request was attempted: the update
+            # did not succeed and the rejection is not ambiguous. The error
+            # object is sanitized by the shared contract helper.
+            error = error_from_exception(e)
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        failed_item(
+                            "transaction",
+                            transaction_id,
+                            code=error["code"],
+                            message=error["message"],
+                            details=error["details"],
+                        )
+                    ],
+                )
+            )
+            return
+
+    _finish_mutation(
+        build_mutation_outcome(
+            operation.command,
+            [succeeded_item("transaction", transaction_id, {"changes": changes})],
+        )
     )
 
 
@@ -436,15 +506,12 @@ def batch_update(
             if line:  # Skip empty lines
                 ids.append(line)
 
-    # Validate we have IDs to process
+    # Validate we have IDs to process. Pre-execution input-validation
+    # failures use the structured error contract, never a mutation outcome.
     if not ids:
-        output(
-            {
-                "status": "error",
-                "message": "No transaction IDs provided. Pass IDs as arguments or use --stdin.",
-            }
+        raise ValidationError(
+            message="No transaction IDs provided. Pass IDs as arguments or use --stdin.",
         )
-        raise typer.Exit(1)
 
     # Validate we have at least one change
     changes: dict[str, Any] = {}
@@ -454,13 +521,9 @@ def batch_update(
         changes["notes"] = notes
 
     if not changes:
-        output(
-            {
-                "status": "error",
-                "message": "No changes specified. Use --category/-c or --notes/-n.",
-            }
+        raise ValidationError(
+            message="No changes specified. Use --category/-c or --notes/-n.",
         )
-        raise typer.Exit(1)
 
     # Dry run mode - just show what would happen
     if dry_run:
@@ -477,19 +540,12 @@ def batch_update(
 
     # Execute batch update. Each item runs through the single-attempt
     # mutation executor: transport uncertainty (timeout/disconnect/cancel
-    # after dispatch) is labeled "ambiguous" — the item may have been applied
-    # — while definite application rejections remain "error". Input order is
-    # preserved in the per-item results.
-    _BATCH_VERIFICATION = (
-        "Fetch the transaction (e.g. 'monarch transactions list --search' or "
-        "the Monarch web UI) and confirm whether the update was applied "
-        "before retrying this item."
-    )
-
-    async def do_batch_update() -> dict[str, Any]:
+    # after dispatch) is an ambiguous item — the update may have been applied
+    # — while definite application rejections remain failed items. Input
+    # order is preserved in the per-item outcomes.
+    async def do_batch_update() -> list[dict[str, Any]]:
         """Execute parallel batch updates with concurrency control."""
         semaphore = asyncio.Semaphore(max_concurrency)
-        results: list[dict[str, Any]] = []
 
         async def update_one(txn_id: str) -> dict[str, Any]:
             """Update a single transaction with bounded concurrency.
@@ -506,78 +562,73 @@ def batch_update(
                         ),
                         operation,
                         entity_ids=(txn_id,),
-                        verification=_BATCH_VERIFICATION,
+                        verification=BATCH_VERIFICATION_MESSAGE,
                     )
-                    return {"id": txn_id, "status": "success"}
+                    return succeeded_item("transaction", txn_id, {"changes": changes})
                 except MutationAmbiguousError as e:
-                    return {
-                        "id": txn_id,
-                        "status": "ambiguous",
-                        "error_code": e.code.value,
-                        "message": e.message,
-                        "verification": e.details.get("verification"),
-                    }
+                    return ambiguous_item(
+                        "transaction",
+                        txn_id,
+                        message=e.message,
+                        details={
+                            "reason": e.details.get("reason"),
+                            "remote_state": "unknown",
+                        },
+                    )
                 except Exception as e:
-                    return {"id": txn_id, "status": "error", "error": str(e)}
+                    error = error_from_exception(e)
+                    return failed_item(
+                        "transaction",
+                        txn_id,
+                        code=error["code"],
+                        message=error["message"],
+                        details=error["details"],
+                    )
 
         # Run all updates concurrently; asyncio.gather preserves input order.
-        tasks = [update_one(txn_id) for txn_id in ids]
-        results = await asyncio.gather(*tasks)
-
-        # Summarize results
-        successes = [r for r in results if r["status"] == "success"]
-        ambiguous = [r for r in results if r["status"] == "ambiguous"]
-        failures = [r for r in results if r["status"] == "error"]
-
-        return {
-            "status": "completed",
-            "success_count": len(successes),
-            "failure_count": len(failures),
-            "ambiguous_count": len(ambiguous),
-            # Keep the complete ordered per-item record for automation. The
-            # summary lists below remain for compatibility with the original
-            # command-specific result shape.
-            "results": results,
-            "changes": changes,
-            "failures": failures if failures else None,
-            "ambiguous": ambiguous if ambiguous else None,
-        }
+        return list(await asyncio.gather(*(update_one(txn_id) for txn_id in ids)))
 
     with spinner(f"Updating {len(ids)} transaction(s)..."):
         try:
-            result = run_async(do_batch_update())
-        except KeyboardInterrupt as e:
+            items = run_async(do_batch_update())
+        except KeyboardInterrupt:
             # The interrupt cancelled the batch task before the completed
             # per-item records could be collected. Some or all requests may
-            # have been dispatched, so report a batch-level ambiguity
-            # covering every requested ID instead of a silent "Interrupted."
-            # exit 130 with no verification guidance.
-            raise MutationAmbiguousError(
-                message=(
-                    f"Batch update 'transactions batch-update' was interrupted "
-                    "(cancelled after requests may have been dispatched). "
-                    f"Remote state may have changed for some or all of "
-                    f"{len(ids)} transaction(s); do not retry blindly. Verify "
-                    "each requested transaction first: "
-                    f"{', '.join(ids)}. " + _BATCH_VERIFICATION
-                ),
-                details={
-                    "operation": "transactions batch-update",
-                    "entity_ids": list(ids),
-                    "remote_state": "unknown",
-                    "reason": "cancelled",
-                    "attempts": len(ids),
-                    "verification": (
-                        "Verify each requested transaction via read commands "
-                        "or the Monarch web UI before re-running the batch; " + _BATCH_VERIFICATION
+            # have been dispatched, so every requested transaction is
+            # reported as an ambiguous item (exit 4) with a required
+            # verification object instead of a silent "Interrupted." exit
+            # 130 with no verification guidance.
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        ambiguous_item(
+                            "transaction",
+                            txn_id,
+                            message=(
+                                "The batch update was interrupted after requests "
+                                "may have been dispatched; remote state may have "
+                                "changed. Do not retry before verifying."
+                            ),
+                            details={"reason": "cancelled", "remote_state": "unknown"},
+                        )
+                        for txn_id in ids
+                    ],
+                    verification=verification_object(
+                        BATCH_VERIFICATION_MESSAGE,
+                        command=UPDATE_VERIFICATION_COMMAND,
                     ),
-                },
-            ) from e
+                )
+            )
+            return
 
-    output(result)
-
-    # Any definite failure or ambiguous item makes the invocation fail:
-    # ambiguous items may have been applied and must be verified by a human
-    # or agent before any retry.
-    if result["failure_count"] or result["ambiguous_count"]:
-        raise typer.Exit(1)
+    _finish_mutation(
+        build_mutation_outcome(
+            operation.command,
+            items,
+            verification=verification_object(
+                BATCH_VERIFICATION_MESSAGE,
+                command=UPDATE_VERIFICATION_COMMAND,
+            ),
+        )
+    )

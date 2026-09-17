@@ -348,7 +348,7 @@ class TestAuthorizedMutations:
         result = self._invoke_update(mock_client, "--allow-mutations")
         assert result.exit_code == 0, result.output
         mock_client.update_transaction.assert_called_once()
-        assert '"status": "updated"' in result.stdout
+        assert '"status": "succeeded"' in result.stdout
 
     def test_same_invocation_without_flag_is_blocked(self) -> None:
         mock_client = MagicMock()

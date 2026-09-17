@@ -50,6 +50,11 @@ def handle_errors(func: Callable[P, R]) -> Callable[P, R]:  # noqa: UP047
         except KeyboardInterrupt:
             print("\nInterrupted.", file=sys.stderr)
             raise typer.Exit(130) from None
+        except typer.Exit:
+            # Commands legitimately control their own exit codes (e.g. exit 4
+            # for partial or ambiguous mutation outcomes); let them through
+            # untouched instead of masking them as unexpected errors.
+            raise
         except MonarchCLIError as e:
             output_error(e)
             raise typer.Exit(e.exit_code) from None
