@@ -18,6 +18,7 @@ from ..core.exceptions import MutationAmbiguousError
 from ..core.mutation_outcomes import (
     ambiguous_item,
     build_mutation_outcome,
+    error_from_exception,
     failed_item,
     succeeded_item,
     verification_object,
@@ -101,9 +102,8 @@ def refresh_accounts(
         instead (this is not a mutation outcome).
 
     Raises:
-        AuthenticationError: If not authenticated.
-        APIError: If API request fails.
-        NetworkError: On timeout or network failure.
+        AuthenticationError: If not authenticated (pre-execution; stays on
+            the structured error path, never becomes a mutation outcome).
         PolicyViolationError: If the descriptor lacks the remote_mutation
             effect (metadata/execution disagreement).
         MutationBlockedError: If the invocation lacks --allow-mutations.
@@ -130,12 +130,18 @@ def refresh_accounts(
             "message": "No accounts found to refresh",
         }
 
-    # Request refresh (through the shared mutation boundary). Resolve the
-    # authenticated client inside the callable so the boundary remains before
-    # client creation for direct service callers as well as CLI callers.
-    # The refresh is a single attempt: on timeout/disconnect the outcome is
-    # reported as ambiguous (exit 4) rather than a plain failure, with
-    # verification guidance for the affected account IDs.
+    # Request refresh (through the shared mutation boundary). The refresh is
+    # a single attempt: on timeout/disconnect the outcome is reported as
+    # ambiguous (exit 4) rather than a plain failure, with verification
+    # guidance for the affected account IDs.
+    #
+    # The authenticated client is resolved before the mutation attempt (the
+    # authorization boundary above still precedes client creation) so a
+    # pre-execution authentication failure stays on the structured error
+    # path. Any exception raised after the request was attempted is a
+    # definite rejection and becomes a failed envelope below; upstream
+    # ``request_accounts_refresh`` reports rejection by raising, never by
+    # returning a falsy value.
     #
     # Upstream performs one refresh request covering all listed accounts, so
     # per-account outcomes are not independently observable: every item
@@ -147,9 +153,10 @@ def refresh_accounts(
         "pending institution sync may still be in progress."
     )
 
+    client = get_authenticated_client()
     try:
         success = run_mutation_call(
-            lambda: get_authenticated_client().request_accounts_refresh(account_ids),
+            lambda: client.request_accounts_refresh(account_ids),
             operation,
             entity_ids=tuple(account_ids),
             verification=_REFRESH_VERIFICATION,
@@ -185,12 +192,30 @@ def refresh_accounts(
                 command=None,
             ),
         )
+    except Exception as e:  # noqa: BLE001 - classified by the contract
+        # Definite rejection after the request was attempted: the refresh
+        # did not succeed and the rejection is not ambiguous. The error
+        # object is sanitized by the shared contract helper, so arbitrary
+        # upstream exception text never reaches the envelope.
+        error = error_from_exception(e)
+        items = [
+            failed_item(
+                "account",
+                account_id,
+                code=error["code"],
+                message=error["message"],
+                details=error["details"],
+            )
+            for account_id in account_ids
+        ]
+        return build_mutation_outcome(operation.command, items)
 
     if success:
         items = [succeeded_item("account", account_id, {}) for account_id in account_ids]
         return build_mutation_outcome(operation.command, items)
 
-    # The request completed and was definitively not accepted: nothing
+    # The request completed and was definitively not accepted (defensive:
+    # upstream reports rejection by raising, handled above): nothing
     # succeeded and the failure is definitive, not ambiguous.
     items = [
         failed_item(

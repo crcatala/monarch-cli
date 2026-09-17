@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from monarch_cli.core.exceptions import MutationAmbiguousError
+from monarch_cli.core.exceptions import APIError, MutationAmbiguousError
 from monarch_cli.core.operations import (
     Effect,
     Operation,
@@ -237,6 +237,60 @@ class TestRefreshAccounts:
         assert item["result"] is None
         assert item["error"]["code"] == "API_ERROR"
         assert result["verification"] is None
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_mutation_call")
+    def test_definite_rejection_returns_failed_envelope(self, mock_run_async, mock_get_client):
+        """A definite post-attempt API rejection is a failed envelope, not a stderr error.
+
+        Upstream ``request_accounts_refresh`` reports rejection by raising,
+        never by returning a falsy value, so the raised structured error must
+        become a failed mutation-outcome.v1 envelope (mc-ik8o).
+        """
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_run_async.side_effect = APIError("refresh rejected", status_code=422)
+
+        result = refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
+
+        assert result["schema_version"] == "mutation-outcome.v1"
+        assert result["operation"] == "accounts.refresh"
+        assert result["status"] == "failed"
+        assert result["summary"] == {
+            "total": 1,
+            "succeeded": 0,
+            "failed": 1,
+            "ambiguous": 0,
+        }
+        (item,) = result["items"]
+        assert item["entity"] == "account"
+        assert item["id"] == "acc-123"
+        assert item["status"] == "failed"
+        assert item["result"] is None
+        assert item["error"] == {
+            "code": "API_ERROR",
+            "message": "refresh rejected",
+            "details": {"status_code": 422},
+        }
+        # A definitive failure needs no follow-up verification.
+        assert result["verification"] is None
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_mutation_call")
+    def test_arbitrary_rejection_exception_is_sanitized(self, mock_run_async, mock_get_client):
+        """Arbitrary upstream exception text never reaches the envelope."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        secret = "raw graphql variables and password=hunter2"
+        mock_run_async.side_effect = RuntimeError(secret)
+
+        result = refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
+
+        assert result["status"] == "failed"
+        (item,) = result["items"]
+        assert item["error"]["code"] == "UNKNOWN"
+        assert secret not in item["error"]["message"]
+        assert item["error"]["details"] == {"exception_class": "RuntimeError"}
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")
