@@ -7,8 +7,14 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
+from ..core.operations import (
+    Effect,
+    Operation,
+    operation_effects,
+    require_mutation_authorization,
+    run_read_call,
+)
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 from ..services.accounts import list_accounts, refresh_accounts
@@ -21,6 +27,7 @@ app = typer.Typer(
 
 @app.command("list")
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def list_cmd(
     format: Annotated[
         OutputFormat | None,
@@ -75,10 +82,15 @@ def list_cmd(
         if raw:
             # Raw mode: return untransformed API response
             client = get_authenticated_client()
-            data: Any = run_api_call(lambda: client.get_accounts())
+            data: Any = run_read_call(
+                lambda: client.get_accounts(),
+                Operation(command="accounts list", effects=frozenset({Effect.READ_ONLY})),
+            )
         else:
             # Normal mode: use service with transformation
-            data = list_accounts()
+            data = list_accounts(
+                Operation(command="accounts list", effects=frozenset({Effect.READ_ONLY}))
+            )
 
     # Handle NDJSON output
     if ndjson:
@@ -97,6 +109,7 @@ def list_cmd(
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
 def refresh(
     account: Annotated[
         list[str] | None,
@@ -123,7 +136,11 @@ def refresh(
     # Convert None to None (not empty list) for the service
     account_ids = list(account) if account else None
 
+    # Authorize before authentication lookup, client creation, or any prompt.
+    operation = Operation(command="accounts refresh", effects=frozenset({Effect.REMOTE_MUTATION}))
+    require_mutation_authorization(operation)
+
     with spinner("Requesting account refresh..."):
-        result = refresh_accounts(account_ids)
+        result = refresh_accounts(account_ids, operation=operation)
 
     output(result)

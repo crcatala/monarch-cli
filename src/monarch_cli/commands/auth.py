@@ -10,9 +10,10 @@ import typer
 from monarchmoney import MonarchMoney, RequireMFAException  # type: ignore[import-untyped]
 
 from ..core.adapter import extract_token_from_client, get_authenticated_client, reset_client
-from ..core.async_utils import run_api_call, run_async
+from ..core.async_utils import run_async
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, AuthenticationError
+from ..core.operations import Effect, Operation, operation_effects, run_read_call
 from ..core.session import (
     COMPAT_SESSION_PATH,
     StorageBackend,
@@ -72,6 +73,7 @@ def _prompt_storage_backend() -> StorageBackend:
 
 
 @app.command()
+@operation_effects(Effect.REMOTE_AUTHENTICATION, Effect.LOCAL_CREDENTIAL_CHANGE)
 def login(
     storage: Annotated[
         str | None,
@@ -150,10 +152,16 @@ def login(
     save_session_token(token, backend)
     reset_client()  # Clear cached client so it picks up new token
 
-    # Show success with account count
+    # Show success with account count (read-only verification call)
     try:
         client = get_authenticated_client()
-        accounts_data = run_api_call(lambda: client.get_accounts())
+        accounts_data = run_read_call(
+            lambda: client.get_accounts(),
+            Operation(
+                command="auth login",
+                effects=frozenset({Effect.REMOTE_AUTHENTICATION, Effect.LOCAL_CREDENTIAL_CHANGE}),
+            ),
+        )
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 
@@ -170,6 +178,7 @@ def login(
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def status(
     json_output: Annotated[
         bool,
@@ -237,6 +246,7 @@ def status(
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.LOCAL_CREDENTIAL_CHANGE)
 def logout(
     storage: Annotated[
         str | None,
@@ -280,6 +290,7 @@ def logout(
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def doctor() -> None:
     """Diagnose authentication setup.
 
@@ -345,7 +356,10 @@ def doctor() -> None:
     if storage_info["active_backend"]:
         try:
             client = get_authenticated_client()
-            accounts_data = run_api_call(lambda: client.get_accounts())
+            accounts_data = run_read_call(
+                lambda: client.get_accounts(),
+                Operation(command="auth doctor", effects=frozenset({Effect.READ_ONLY})),
+            )
             accounts = accounts_data.get("accounts", [])
             console.print(f"  [green]✓ Connected[/green] ({len(accounts)} accounts)")
         except AuthenticationError:
@@ -358,6 +372,7 @@ def doctor() -> None:
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def ping(
     json_output: Annotated[
         bool,
@@ -379,7 +394,10 @@ def ping(
     client = get_authenticated_client()
 
     try:
-        accounts_data = run_api_call(lambda: client.get_accounts())
+        accounts_data = run_read_call(
+            lambda: client.get_accounts(),
+            Operation(command="auth ping", effects=frozenset({Effect.READ_ONLY})),
+        )
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 
@@ -398,6 +416,7 @@ def ping(
 
 
 @app.command()
+@operation_effects(Effect.READ_ONLY)
 def setup() -> None:
     """Show setup instructions.
 

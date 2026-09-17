@@ -5,6 +5,7 @@ import typer
 from monarch_cli import __version__
 from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
 from monarch_cli.core.config import get_config, set_config
+from monarch_cli.core.operations import set_mutation_authorized
 from monarch_cli.output import apply_config
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
@@ -67,8 +68,21 @@ def main(
         "--timeout",
         help="API request timeout in seconds.",
     ),
+    allow_mutations: bool = typer.Option(
+        False,
+        "--allow-mutations",
+        help=(
+            "Authorize remote mutations for this invocation only. "
+            "Must appear before the command path; never persisted to config "
+            "or read from the environment."
+        ),
+    ),
 ) -> None:
     """CLI for Monarch Money - AI-agent friendly financial data access."""
+    # Per-invocation mutation authorization (mc-k48z). Read-only by default;
+    # no config-file or environment-variable authorization is supported.
+    set_mutation_authorized(allow_mutations)
+
     # Load config from file and env vars
     config = get_config()
 

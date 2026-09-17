@@ -10,9 +10,19 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_api_call, run_async
+from ..core.async_utils import run_async
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
+from ..core.operations import (
+    Effect,
+    Operation,
+    operation_effects,
+    require_mutation_authorization,
+    resolve_invocation,
+    run_mutation_async_call,
+    run_mutation_call,
+    run_read_call,
+)
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 from ..transformers.transactions import transform_transactions
@@ -21,6 +31,11 @@ app = typer.Typer(
     help="Transaction management",
     no_args_is_help=True,
 )
+
+#: Declared effect sets for this group's commands.
+LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
+BATCH_UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 
 
 def _parse_date(date_str: str | None) -> date | None:
@@ -47,6 +62,7 @@ def _parse_date(date_str: str | None) -> date | None:
 
 @app.command("list")
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def list_cmd(
     limit: Annotated[
         int,
@@ -164,7 +180,7 @@ def list_cmd(
 
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
-        raw_data: Any = run_api_call(
+        raw_data: Any = run_read_call(
             lambda: client.get_transactions(
                 limit=limit,
                 offset=offset,
@@ -172,7 +188,8 @@ def list_cmd(
                 end_date=end_str,
                 search=search or "",
                 account_ids=account_ids,
-            )
+            ),
+            Operation(command="transactions list", effects=LIST_EFFECTS),
         )
 
         # Transform unless raw mode
@@ -195,6 +212,7 @@ def list_cmd(
 
 @app.command()
 @handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
 def update(
     transaction_id: Annotated[
         str,
@@ -281,6 +299,11 @@ def update(
         )
         raise typer.Exit(1)
 
+    # Classify this parsed invocation. A confirmed --dry-run is a validated
+    # preview: no state change, no client creation, and no authorization
+    # required. The mutation path retains its declared effects.
+    operation = resolve_invocation("transactions update", UPDATE_EFFECTS, dry_run=dry_run)
+
     # Dry run mode
     if dry_run:
         output(
@@ -293,10 +316,17 @@ def update(
         )
         return
 
+    # Authorize before authentication lookup, client creation, or any prompt.
+    require_mutation_authorization(operation)
+
     # Apply the update
     with spinner("Updating transaction..."):
-        client = get_authenticated_client()
-        run_api_call(lambda: client.update_transaction(transaction_id=transaction_id, **changes))
+        run_mutation_call(
+            lambda: get_authenticated_client().update_transaction(
+                transaction_id=transaction_id, **changes
+            ),
+            operation,
+        )
 
     output(
         {
@@ -309,6 +339,7 @@ def update(
 
 @app.command("batch-update")
 @handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
 def batch_update(
     transaction_ids: Annotated[
         list[str] | None,
@@ -372,6 +403,17 @@ def batch_update(
         # Set notes on multiple transactions
         monarch transactions batch-update --stdin --notes "Q1 Expenses" < ids.txt
     """
+    # Classify this parsed invocation before any prompt or client creation.
+    operation = resolve_invocation(
+        "transactions batch-update", BATCH_UPDATE_EFFECTS, dry_run=dry_run
+    )
+
+    # Authorize before reading stdin, authentication lookup, client creation,
+    # or any prompt. Dry-run invocations are classified as previews and skip
+    # this gate below.
+    if not dry_run:
+        require_mutation_authorization(operation)
+
     # Collect transaction IDs
     ids: list[str] = []
 
@@ -429,7 +471,6 @@ def batch_update(
         from ..core.config import get_config
 
         config = get_config()
-        client = get_authenticated_client()
         semaphore = asyncio.Semaphore(max_concurrency)
         results: list[dict[str, Any]] = []
 
@@ -438,7 +479,12 @@ def batch_update(
             async with semaphore:
                 try:
                     async with asyncio.timeout(config.timeout_seconds):
-                        await client.update_transaction(transaction_id=txn_id, **changes)
+                        await run_mutation_async_call(
+                            lambda: get_authenticated_client().update_transaction(
+                                transaction_id=txn_id, **changes
+                            ),
+                            operation,
+                        )
                     return {"id": txn_id, "status": "success"}
                 except TimeoutError:
                     return {"id": txn_id, "status": "error", "error": "Request timed out"}

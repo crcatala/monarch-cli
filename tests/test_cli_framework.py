@@ -62,6 +62,7 @@ GLOBAL_OPTIONS = (
     "--quiet",
     "--no-color",
     "--timeout",
+    "--allow-mutations",
 )
 
 

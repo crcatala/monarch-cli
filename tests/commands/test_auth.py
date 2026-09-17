@@ -339,7 +339,7 @@ class TestAuthPing:
                 return_value=mock_client,
             ),
             mock.patch(
-                "monarch_cli.commands.auth.run_api_call",
+                "monarch_cli.commands.auth.run_read_call",
                 return_value=mock_accounts,
             ),
         ):
@@ -361,7 +361,7 @@ class TestAuthPing:
                 return_value=mock_client,
             ),
             mock.patch(
-                "monarch_cli.commands.auth.run_api_call",
+                "monarch_cli.commands.auth.run_read_call",
                 return_value=mock_accounts,
             ),
         ):
@@ -383,7 +383,7 @@ class TestAuthPing:
                 return_value=mock_client,
             ),
             mock.patch(
-                "monarch_cli.commands.auth.run_api_call",
+                "monarch_cli.commands.auth.run_read_call",
                 return_value=mock_accounts,
             ),
         ):
@@ -417,7 +417,7 @@ class TestAuthPing:
                 return_value=mock_client,
             ),
             mock.patch(
-                "monarch_cli.commands.auth.run_api_call",
+                "monarch_cli.commands.auth.run_read_call",
                 side_effect=Exception("Connection failed"),
             ),
         ):
@@ -516,7 +516,7 @@ class TestAuthDoctor:
                 return_value=mock_client,
             ),
             mock.patch(
-                "monarch_cli.commands.auth.run_api_call",
+                "monarch_cli.commands.auth.run_read_call",
                 return_value=mock_accounts,
             ),
         ):
