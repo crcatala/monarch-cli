@@ -1,4 +1,7 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test release release-dry prepublish
+.PHONY: setup verify format format-check lint lint-fix typecheck test test-live smoke-install release release-dry prepublish
+
+# Python version used by the isolated wheel smoke-install environment.
+SMOKE_PYTHON ?= 3.13
 
 # Setup development environment (run once after cloning)
 setup:
@@ -48,11 +51,14 @@ release:
 release-dry:
 	./scripts/release.sh --dry-run
 
+# Build the wheel and prove it installs and runs from an isolated environment.
+# This is the single maintained implementation of the procedure; CI, prepublish,
+# and release validation invoke this target rather than duplicating its steps.
+smoke-install:
+	SMOKE_PYTHON=$(SMOKE_PYTHON) ./scripts/smoke_install.sh
+
 # Pre-publish verification
-prepublish: verify
-	rm -rf dist/
-	uv build
-	@echo "✓ Build successful"
+prepublish: verify smoke-install
 	uv run twine check dist/*
 	@echo "✓ Package metadata valid"
 	uv run python -m readme_renderer README.md > /dev/null

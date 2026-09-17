@@ -8,8 +8,13 @@ on:
 
 jobs:
   check:
-    name: Check
+    name: Check (Python ${{ matrix.python-version }})
     runs-on: ubicloud-standard-2
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout code
@@ -20,8 +25,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
 
       - name: Check formatting
         run: uv run ruff format --check .
@@ -34,3 +42,20 @@ jobs:
 
       - name: Test (excluding live tests)
         run: uv run pytest -m "not live" --tb=short
+
+  smoke-install:
+    name: Wheel smoke install
+    runs-on: ubicloud-standard-2
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Build wheel and smoke test isolated install
+        # Single canonical target: CI must not duplicate its steps.
+        run: make smoke-install
