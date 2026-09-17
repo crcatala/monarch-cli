@@ -9,10 +9,37 @@ from __future__ import annotations
 import asyncio
 import random
 from collections.abc import Awaitable, Callable
+from enum import StrEnum
 
 import aiohttp
 
 from .exceptions import NetworkError
+
+
+class MutationRetryPolicy(StrEnum):
+    """Retry policy for remote mutations.
+
+    The only policy implemented today is :attr:`NO_RETRY`: no current
+    mutation is known to be idempotent, so a second automatic attempt could
+    duplicate an undocumented side effect.
+
+    A future retry-enabled mutation must select a *named*, operation-specific
+    mechanism (an upstream idempotency key, or a tested read-after-write
+    verification) rather than a generic boolean override. Those reserved
+    values exist so the selection point is explicit; selecting one before its
+    operation-specific mechanism and tests exist is refused by the mutation
+    executor.
+    """
+
+    #: Never retry. The default and only supported policy for mutations.
+    NO_RETRY = "no_retry"
+    #: Reserved: requires an upstream idempotency key plus operation-specific
+    #: tests proving duplicate suppression before it may be implemented.
+    IDEMPOTENCY_KEY = "idempotency_key"
+    #: Reserved: requires tested read-after-write verification plus
+    #: operation-specific tests before it may be implemented.
+    READ_AFTER_WRITE = "read_after_write"
+
 
 # Exceptions that are safe to retry - typically transient network issues.
 # Includes both stdlib exceptions and aiohttp-specific exceptions since

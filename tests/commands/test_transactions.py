@@ -431,6 +431,40 @@ class TestTransactionsUpdate:
             assert output["transaction_id"] == "txn_123"
             assert output["changes"]["amount"] == 25.50
 
+    def test_update_transport_ambiguity_is_exit_four(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """A failed transport does not retry and reports ambiguous state."""
+        attempts = 0
+
+        async def async_update_transaction(**_kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise ConnectionError("secret transport detail")
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["update", "txn_123", "--notes", "Review"])
+
+        assert result.exit_code == 4
+        assert attempts == 1
+        # Non-interactive progress is also written to stderr; parse the
+        # structured error object that follows it.
+        error = json.loads(result.stderr[result.stderr.index("{") :])
+        assert error["code"] == "MUTATION_AMBIGUOUS"
+        assert error["details"]["operation"] == "transactions update"
+        assert error["details"]["entity_ids"] == ["txn_123"]
+        assert "may have changed" in error["message"]
+        assert "secret transport detail" not in result.stderr
+
     def test_update_with_description(
         self,
         mock_authenticated_client: MagicMock,
@@ -651,7 +685,10 @@ class TestTransactionsBatchUpdate:
             assert output["status"] == "completed"
             assert output["success_count"] == 2
             assert output["failure_count"] == 0
+            assert output["ambiguous_count"] == 0
             assert output["changes"]["category_id"] == "cat_food"
+            assert [item["id"] for item in output["results"]] == ["txn_123", "txn_456"]
+            assert [item["status"] for item in output["results"]] == ["success", "success"]
             assert len(update_calls) == 2
 
     def test_batch_update_with_notes(
@@ -762,6 +799,58 @@ class TestTransactionsBatchUpdate:
             assert output["changes"]["category_id"] == "cat_food"
             assert "Would update 2 transaction(s)" in output["message"]
 
+    def test_batch_update_labels_ambiguity_and_preserves_order(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Batch output retains ordered success and ambiguous item outcomes."""
+        attempts: list[str] = []
+
+        async def async_update_transaction(**kwargs):
+            transaction_id = kwargs["transaction_id"]
+            attempts.append(transaction_id)
+            if transaction_id == "txn_456":
+                raise TimeoutError("secret transport detail")
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "batch-update",
+                    "txn_123",
+                    "txn_456",
+                    "txn_789",
+                    "--category",
+                    "cat_food",
+                ],
+            )
+
+        assert result.exit_code == 1
+        output = json.loads(result.stdout)
+        assert [item["id"] for item in output["results"]] == [
+            "txn_123",
+            "txn_456",
+            "txn_789",
+        ]
+        assert [item["status"] for item in output["results"]] == [
+            "success",
+            "ambiguous",
+            "success",
+        ]
+        assert output["ambiguous_count"] == 1
+        assert output["ambiguous"][0]["error_code"] == "MUTATION_AMBIGUOUS"
+        assert "secret transport detail" not in result.stdout
+        assert attempts == ["txn_123", "txn_456", "txn_789"]
+
     def test_batch_update_handles_partial_failures(
         self,
         mock_authenticated_client: MagicMock,
@@ -798,11 +887,24 @@ class TestTransactionsBatchUpdate:
                 ],
             )
 
-            assert result.exit_code == 0
+            # A definite per-item failure makes the invocation exit nonzero,
+            # while the ordered per-item results are still printed.
+            assert result.exit_code == 1
             output = json.loads(result.stdout)
             assert output["status"] == "completed"
             assert output["success_count"] == 2
             assert output["failure_count"] == 1
+            assert output["ambiguous_count"] == 0
+            assert [item["id"] for item in output["results"]] == [
+                "txn_123",
+                "txn_456",
+                "txn_789",
+            ]
+            assert [item["status"] for item in output["results"]] == [
+                "success",
+                "error",
+                "success",
+            ]
             assert output["failures"] is not None
             assert len(output["failures"]) == 1
             assert output["failures"][0]["id"] == "txn_456"

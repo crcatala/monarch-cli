@@ -13,6 +13,7 @@ from ..core.adapter import get_authenticated_client
 from ..core.async_utils import run_async
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
+from ..core.exceptions import MutationAmbiguousError
 from ..core.operations import (
     Effect,
     Operation,
@@ -319,13 +320,22 @@ def update(
     # Authorize before authentication lookup, client creation, or any prompt.
     require_mutation_authorization(operation)
 
-    # Apply the update
+    # Apply the update. Exactly one attempt: a timeout, disconnect, or
+    # cancellation after the request was invoked is reported as
+    # MUTATION_AMBIGUOUS (exit 4) — remote state may have changed — never as
+    # an ordinary failure, and never retried automatically.
     with spinner("Updating transaction..."):
         run_mutation_call(
             lambda: get_authenticated_client().update_transaction(
                 transaction_id=transaction_id, **changes
             ),
             operation,
+            entity_ids=(transaction_id,),
+            verification=(
+                "Fetch the transaction (e.g. 'monarch transactions list --search' "
+                "or the Monarch web UI) and confirm whether the update was "
+                "applied before retrying."
+            ),
         )
 
     output(
@@ -465,49 +475,81 @@ def batch_update(
         )
         return
 
-    # Execute batch update
+    # Execute batch update. Each item runs through the single-attempt
+    # mutation executor: transport uncertainty (timeout/disconnect/cancel
+    # after dispatch) is labeled "ambiguous" — the item may have been applied
+    # — while definite application rejections remain "error". Input order is
+    # preserved in the per-item results.
+    _BATCH_VERIFICATION = (
+        "Fetch the transaction (e.g. 'monarch transactions list --search' or "
+        "the Monarch web UI) and confirm whether the update was applied "
+        "before retrying this item."
+    )
+
     async def do_batch_update() -> dict[str, Any]:
         """Execute parallel batch updates with concurrency control."""
-        from ..core.config import get_config
-
-        config = get_config()
         semaphore = asyncio.Semaphore(max_concurrency)
         results: list[dict[str, Any]] = []
 
         async def update_one(txn_id: str) -> dict[str, Any]:
-            """Update a single transaction with semaphore and timeout control."""
+            """Update a single transaction with bounded concurrency.
+
+            The shared mutation executor applies the per-attempt timeout and
+            converts ambiguous transport failures into
+            MutationAmbiguousError; this wrapper only classifies the outcome.
+            """
             async with semaphore:
                 try:
-                    async with asyncio.timeout(config.timeout_seconds):
-                        await run_mutation_async_call(
-                            lambda: get_authenticated_client().update_transaction(
-                                transaction_id=txn_id, **changes
-                            ),
-                            operation,
-                        )
+                    await run_mutation_async_call(
+                        lambda: get_authenticated_client().update_transaction(
+                            transaction_id=txn_id, **changes
+                        ),
+                        operation,
+                        entity_ids=(txn_id,),
+                        verification=_BATCH_VERIFICATION,
+                    )
                     return {"id": txn_id, "status": "success"}
-                except TimeoutError:
-                    return {"id": txn_id, "status": "error", "error": "Request timed out"}
+                except MutationAmbiguousError as e:
+                    return {
+                        "id": txn_id,
+                        "status": "ambiguous",
+                        "error_code": e.code.value,
+                        "message": e.message,
+                        "verification": e.details.get("verification"),
+                    }
                 except Exception as e:
                     return {"id": txn_id, "status": "error", "error": str(e)}
 
-        # Run all updates concurrently
+        # Run all updates concurrently; asyncio.gather preserves input order.
         tasks = [update_one(txn_id) for txn_id in ids]
         results = await asyncio.gather(*tasks)
 
         # Summarize results
         successes = [r for r in results if r["status"] == "success"]
+        ambiguous = [r for r in results if r["status"] == "ambiguous"]
         failures = [r for r in results if r["status"] == "error"]
 
         return {
             "status": "completed",
             "success_count": len(successes),
             "failure_count": len(failures),
+            "ambiguous_count": len(ambiguous),
+            # Keep the complete ordered per-item record for automation. The
+            # summary lists below remain for compatibility with the original
+            # command-specific result shape.
+            "results": results,
             "changes": changes,
             "failures": failures if failures else None,
+            "ambiguous": ambiguous if ambiguous else None,
         }
 
     with spinner(f"Updating {len(ids)} transaction(s)..."):
         result = run_async(do_batch_update())
 
     output(result)
+
+    # Any definite failure or ambiguous item makes the invocation fail:
+    # ambiguous items may have been applied and must be verified by a human
+    # or agent before any retry.
+    if result["failure_count"] or result["ambiguous_count"]:
+        raise typer.Exit(1)

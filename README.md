@@ -304,7 +304,7 @@ verbose = false
 # API request timeout in seconds
 timeout = 30
 
-# Number of retry attempts for transient failures
+# Number of retry attempts for transient failures on read commands only
 max_retries = 3
 ```
 
@@ -322,9 +322,32 @@ Environment variables override config file values:
 | `MONARCH_DEBUG` | Enable debug mode with stack traces | `false` |
 | `MONARCH_QUIET` | Output only IDs, one per line | `false` |
 | `MONARCH_TIMEOUT` | API timeout in seconds | `30` |
-| `MONARCH_MAX_RETRIES` | Max API retry attempts | `3` |
+| `MONARCH_MAX_RETRIES` | Max API retry attempts for read commands | `3` |
 | `MONARCH_NO_COLOR` | Disable colored output | `false` |
 | `NO_COLOR` | Standard color disable ([no-color.org](https://no-color.org)) | - |
+
+### Read retries and mutation ambiguity
+
+The configured `timeout` is a timeout **per API attempt**. Read commands may
+retry transient transport failures up to `max_retries` times. Current remote
+mutations—account refresh, transaction update, and each item of batch
+update—always make one attempt; they never inherit the read retry setting.
+There is no generic retry override because a request that times out or loses
+its connection may already have changed remote state.
+
+If a mutation request may have been dispatched but its result is unknown, the
+CLI emits the structured `MUTATION_AMBIGUOUS` error and exits with code `4`.
+The error identifies the operation and affected record ID(s), says that remote
+state may have changed, and gives a safe read/UI verification step. Verify the
+record or refresh status before retrying; never retry an ambiguous mutation
+blindly. Batch updates include an ordered `results` entry for every input ID,
+with `success`, `error`, or `ambiguous` status, and exit nonzero if any item is
+not successful. Definite API/application rejections remain ordinary failures.
+
+Authentication is intentionally outside this financial mutation executor:
+`auth login` is recorded as remote authentication plus local credential change,
+and local credential writes/deletes are not covered by these mutation retry
+semantics.
 
 ### CLI Flags
 

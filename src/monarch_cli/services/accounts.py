@@ -122,9 +122,18 @@ def refresh_accounts(
     # Request refresh (through the shared mutation boundary). Resolve the
     # authenticated client inside the callable so the boundary remains before
     # client creation for direct service callers as well as CLI callers.
+    # The refresh is a single attempt: on timeout/disconnect the outcome is
+    # reported as MUTATION_AMBIGUOUS (exit 4) rather than a plain failure,
+    # with verification guidance for the affected account IDs.
     success = run_mutation_call(
         lambda: get_authenticated_client().request_accounts_refresh(account_ids),
         operation,
+        entity_ids=tuple(account_ids),
+        verification=(
+            "Verify the refresh status for the listed account(s) in the Monarch "
+            "web UI (Accounts page) before requesting another refresh; a "
+            "pending institution sync may still be in progress."
+        ),
     )
 
     if success:

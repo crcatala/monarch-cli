@@ -65,8 +65,9 @@ class Config:
         verbose: Enable verbose logging
         debug: Enable debug mode (stack traces, implies verbose)
         quiet: Quiet mode - output only IDs
-        timeout_seconds: Request timeout in seconds
-        max_retries: Number of retry attempts for failed requests
+        timeout_seconds: Request timeout in seconds (applies per attempt)
+        max_retries: Retry attempts for transient failures on read commands
+            (remote mutations never retry automatically)
         confirm_destructive: Require confirmation for destructive operations
         non_interactive: Fail instead of prompting when input is required
     """
@@ -475,7 +476,9 @@ quiet = false
 # API request timeout in seconds
 timeout = 30
 
-# Number of retry attempts for transient failures
+# Number of retry attempts for transient failures (read commands only;
+# remote mutations never retry automatically because a timed-out write may
+# already have been applied)
 max_retries = 3
 
 # Require confirmation for destructive operations (delete, etc.)
