@@ -8,6 +8,7 @@ import typer
 
 from ..core.adapter import get_authenticated_client
 from ..core.error_handler import handle_errors
+from ..core.mutation_outcomes import outcome_exit_code
 from ..core.operations import (
     Effect,
     Operation,
@@ -144,3 +145,12 @@ def refresh(
         result = refresh_accounts(account_ids, operation=operation)
 
     output(result)
+
+    # All-succeeded outcomes exit 0; ambiguous outcomes exit 4 with the
+    # required verification object in the envelope. Definitive failures exit
+    # with the normal operation/API nonzero code. The no_accounts notice is
+    # a pre-execution result, not a mutation outcome, and exits 0.
+    if result.get("schema_version") == "mutation-outcome.v1":
+        code = outcome_exit_code(result["status"])
+        if code:
+            raise typer.Exit(code)

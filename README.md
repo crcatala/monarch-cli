@@ -135,6 +135,15 @@ or `--yes` requirement: authorization is checked first, then the second layer
 applies. Login and logout remain available without the flag so users can
 recover credentials.
 
+After remote execution is attempted, every remote mutation returns the shared
+`mutation-outcome.v1` envelope on stdout (see
+[docs/mutation-outcomes.md](docs/mutation-outcomes.md)): top-level
+`succeeded` (exit `0`), `failed` (normal nonzero error exit), `ambiguous` and
+`partial` (both exit `4`), ordered per-item outcomes with sanitized error
+objects, and a required `verification` object whenever any item is ambiguous.
+Pre-execution authorization and validation failures keep the structured error
+contract and are never misrepresented as mutation outcomes.
+
 ### Non-interactive automation
 
 Use `--non-interactive` when stdin is unavailable or a command must never wait
@@ -335,16 +344,24 @@ update—always make one attempt; they never inherit the read retry setting.
 There is no generic retry override because a request that times out or loses
 its connection may already have changed remote state.
 
+Every remote mutation returns the versioned `mutation-outcome.v1` envelope on
+stdout after the request is attempted (see
+[docs/mutation-outcomes.md](docs/mutation-outcomes.md) for the full contract).
+Account refresh and single transaction updates report one item; batch updates
+report one ordered item per requested transaction. All-succeeded outcomes
+exit `0`; a definitive failure with no successes is a `failed` outcome on the
+normal nonzero error exit; any ambiguity or mixture of outcomes is an
+`ambiguous` or `partial` outcome and exits `4`.
+
 If a mutation request may have been dispatched but its result is unknown, the
-CLI emits the structured `MUTATION_AMBIGUOUS` error and exits with code `4`.
-The error identifies the operation and affected record ID(s), says that remote
-state may have changed, and gives a safe read/UI verification step. Verify the
-record or refresh status before retrying; never retry an ambiguous mutation
-blindly. Interrupting a mutation (Ctrl-C) is also treated as ambiguous and
-reported the same way. Batch updates include an ordered `results` entry for
-every input ID,
-with `success`, `error`, or `ambiguous` status, and exit nonzero if any item is
-not successful. Definite API/application rejections remain ordinary failures.
+affected items are reported `ambiguous`, the envelope's `verification` object
+is required (with a tokenized safe command when one exists), and the CLI
+exits `4`. Verify the record or refresh status before retrying; never retry an
+ambiguous mutation blindly. Interrupting a mutation (Ctrl-C) is also treated
+as ambiguous and reported the same way — a mid-batch interrupt reports every
+requested transaction as ambiguous. Error objects are sanitized: stable
+`code`, `message`, and object-valued `details`, never credentials, raw request
+bodies, or arbitrary upstream exception text.
 
 Authentication is intentionally outside this financial mutation executor:
 `auth login` is recorded as remote authentication plus local credential change,

@@ -14,6 +14,15 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.adapter import get_authenticated_client
+from ..core.exceptions import MutationAmbiguousError
+from ..core.mutation_outcomes import (
+    ambiguous_item,
+    build_mutation_outcome,
+    error_from_exception,
+    failed_item,
+    succeeded_item,
+    verification_object,
+)
 from ..core.operations import (
     Effect,
     Operation,
@@ -84,15 +93,17 @@ def refresh_accounts(
                     to carry the ``remote_mutation`` effect.
 
     Returns:
-        Dict with:
-            - status: 'ok', 'no_accounts', or 'failed'
-            - account_count: Number of accounts refreshed
-            - message: Human-readable status message
+        After remote execution is attempted, the normative
+        ``mutation-outcome.v1`` envelope (see ``core.mutation_outcomes``):
+        one ordered item per requested account, a top-level ``succeeded`` or
+        ``failed`` status, and a required ``verification`` object when the
+        outcome is ambiguous. When no accounts exist, no remote execution is
+        attempted and a pre-execution ``no_accounts`` notice is returned
+        instead (this is not a mutation outcome).
 
     Raises:
-        AuthenticationError: If not authenticated.
-        APIError: If API request fails.
-        NetworkError: On timeout or network failure.
+        AuthenticationError: If not authenticated (pre-execution; stays on
+            the structured error path, never becomes a mutation outcome).
         PolicyViolationError: If the descriptor lacks the remote_mutation
             effect (metadata/execution disagreement).
         MutationBlockedError: If the invocation lacks --allow-mutations.
@@ -119,32 +130,101 @@ def refresh_accounts(
             "message": "No accounts found to refresh",
         }
 
-    # Request refresh (through the shared mutation boundary). Resolve the
-    # authenticated client inside the callable so the boundary remains before
-    # client creation for direct service callers as well as CLI callers.
-    # The refresh is a single attempt: on timeout/disconnect the outcome is
-    # reported as MUTATION_AMBIGUOUS (exit 4) rather than a plain failure,
-    # with verification guidance for the affected account IDs.
-    success = run_mutation_call(
-        lambda: get_authenticated_client().request_accounts_refresh(account_ids),
-        operation,
-        entity_ids=tuple(account_ids),
-        verification=(
-            "Verify the refresh status for the listed account(s) in the Monarch "
-            "web UI (Accounts page) before requesting another refresh; a "
-            "pending institution sync may still be in progress."
-        ),
+    # Request refresh (through the shared mutation boundary). The refresh is
+    # a single attempt: on timeout/disconnect the outcome is reported as
+    # ambiguous (exit 4) rather than a plain failure, with verification
+    # guidance for the affected account IDs.
+    #
+    # The authenticated client is resolved before the mutation attempt (the
+    # authorization boundary above still precedes client creation) so a
+    # pre-execution authentication failure stays on the structured error
+    # path. Any exception raised after the request was attempted is a
+    # definite rejection and becomes a failed envelope below; upstream
+    # ``request_accounts_refresh`` reports rejection by raising, never by
+    # returning a falsy value.
+    #
+    # Upstream performs one refresh request covering all listed accounts, so
+    # per-account outcomes are not independently observable: every item
+    # honestly shares the single attempted effect's outcome, preserving the
+    # normalized input order.
+    _REFRESH_VERIFICATION = (
+        "Verify the refresh status for the listed account(s) in the Monarch "
+        "web UI (Accounts page) before requesting another refresh; a "
+        "pending institution sync may still be in progress."
     )
 
+    client = get_authenticated_client()
+    try:
+        success = run_mutation_call(
+            lambda: client.request_accounts_refresh(account_ids),
+            operation,
+            entity_ids=tuple(account_ids),
+            verification=_REFRESH_VERIFICATION,
+        )
+    except MutationAmbiguousError as e:
+        items = [
+            ambiguous_item(
+                "account",
+                account_id,
+                message=(
+                    "The refresh request could not be confirmed; remote state "
+                    "may have changed. Do not request another refresh before "
+                    "verifying."
+                ),
+                details={
+                    "reason": e.details.get("reason"),
+                    "remote_state": "unknown",
+                },
+            )
+            for account_id in account_ids
+        ]
+        return build_mutation_outcome(
+            operation.command,
+            items,
+            verification=verification_object(
+                e.details.get(
+                    "verification",
+                    "Verify the account(s) in the Monarch web UI before "
+                    "requesting another refresh.",
+                ),
+                # No observational refresh-status command exists yet, so no
+                # safe verification command can be tokenized here.
+                command=None,
+            ),
+        )
+    except Exception as e:  # noqa: BLE001 - classified by the contract
+        # Definite rejection after the request was attempted: the refresh
+        # did not succeed and the rejection is not ambiguous. The error
+        # object is sanitized by the shared contract helper, so arbitrary
+        # upstream exception text never reaches the envelope.
+        error = error_from_exception(e)
+        items = [
+            failed_item(
+                "account",
+                account_id,
+                code=error["code"],
+                message=error["message"],
+                details=error["details"],
+            )
+            for account_id in account_ids
+        ]
+        return build_mutation_outcome(operation.command, items)
+
     if success:
-        return {
-            "status": "ok",
-            "account_count": len(account_ids),
-            "message": f"Refresh requested for {len(account_ids)} account(s)",
-        }
-    else:
-        return {
-            "status": "failed",
-            "account_count": len(account_ids),
-            "message": "Refresh request failed",
-        }
+        items = [succeeded_item("account", account_id, {}) for account_id in account_ids]
+        return build_mutation_outcome(operation.command, items)
+
+    # The request completed and was definitively not accepted (defensive:
+    # upstream reports rejection by raising, handled above): nothing
+    # succeeded and the failure is definitive, not ambiguous.
+    items = [
+        failed_item(
+            "account",
+            account_id,
+            code="API_ERROR",
+            message="The refresh request was not accepted by the service.",
+            details={},
+        )
+        for account_id in account_ids
+    ]
+    return build_mutation_outcome(operation.command, items)

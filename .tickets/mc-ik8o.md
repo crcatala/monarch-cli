@@ -1,6 +1,6 @@
 ---
 id: mc-ik8o
-status: open
+status: closed
 deps: [mc-t9o7]
 links: []
 created: 2026-09-11T11:58:14Z
