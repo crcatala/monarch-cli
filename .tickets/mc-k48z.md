@@ -1,6 +1,6 @@
 ---
 id: mc-k48z
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-11T01:15:13Z
