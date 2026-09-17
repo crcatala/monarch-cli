@@ -6,6 +6,7 @@ from monarch_cli import __version__
 from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
 from monarch_cli.core.config import get_config, set_config
 from monarch_cli.core.operations import set_mutation_authorized
+from monarch_cli.core.prompting import resolve_non_interactive, set_non_interactive
 from monarch_cli.output import apply_config
 
 app = typer.Typer(name="monarch", help="CLI for Monarch Money", no_args_is_help=True)
@@ -77,6 +78,17 @@ def main(
             "or read from the environment."
         ),
     ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        help=(
+            "Fail with a structured error instead of prompting whenever input "
+            "would be read (email, password, MFA code, storage choice, "
+            "confirmation). Also enabled by MONARCH_NON_INTERACTIVE=1 or "
+            "config non_interactive=true. Never authorizes mutations or "
+            "auto-answers confirmations."
+        ),
+    ),
 ) -> None:
     """CLI for Monarch Money - AI-agent friendly financial data access."""
     # Per-invocation mutation authorization (mc-k48z). Read-only by default;
@@ -85,6 +97,11 @@ def main(
 
     # Load config from file and env vars
     config = get_config()
+
+    # Shared non-interactive prompt policy (mc-2btg): CLI flag OR the
+    # automation-friendly config sources (MONARCH_NON_INTERACTIVE env var or
+    # the non_interactive config-file key).
+    set_non_interactive(resolve_non_interactive(non_interactive))
 
     # Apply CLI flag overrides
     config = config.with_overrides(

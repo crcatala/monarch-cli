@@ -45,6 +45,18 @@ make test-live
 - Type hints are required (strict mypy)
 - Tests are required for new features
 
+## Prompt policy
+
+Every future interactive input site must use the shared helpers in
+`monarch_cli.core.prompting` (`prompt_text`, `prompt_secret`,
+`prompt_choice`, or `confirm_action`). Do not call `typer.prompt`,
+`typer.confirm`, `getpass`, or read a prompt from stdin directly in command
+code. The shared guard must run before any input read so
+`--non-interactive`/`MONARCH_NON_INTERACTIVE` can fail deterministically.
+Explicit input redirection such as `--stdin` is not a prompt and should remain
+separate. Non-interactive policy also must not be used to bypass mutation
+authorization or destructive confirmation.
+
 ## Questions?
 
 Open an issue for discussion before starting large changes.

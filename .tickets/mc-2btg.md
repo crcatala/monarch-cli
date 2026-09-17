@@ -1,6 +1,6 @@
 ---
 id: mc-2btg
-status: open
+status: closed
 deps: [mc-k48z]
 links: []
 created: 2026-09-11T01:21:50Z

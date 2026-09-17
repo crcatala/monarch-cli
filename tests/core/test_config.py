@@ -23,6 +23,7 @@ def clean_env(monkeypatch, tmp_path):
         "MONARCH_FORMAT",
         "MONARCH_TIMEOUT",
         "MONARCH_MAX_RETRIES",
+        "MONARCH_NON_INTERACTIVE",
         "MONARCH_VERBOSE",
         "MONARCH_DEBUG",
         "MONARCH_QUIET",
@@ -87,6 +88,11 @@ class TestConfigDefaults:
         """Confirm destructive should be true by default."""
         config = Config.load()
         assert config.confirm_destructive is True
+
+    def test_default_non_interactive_is_false(self):
+        """Prompting remains enabled unless explicitly disabled by policy."""
+        config = Config.load()
+        assert config.non_interactive is False
 
 
 class TestMonarchFormat:
