@@ -61,14 +61,14 @@ echo "$CHANGELOG"
 echo "─────────────────────────────────────────"
 echo ""
 
-# Build package
-echo "🔨 Building package..."
+# Build package and verify the wheel installs cleanly (canonical target)
+echo "🔨 Building package and smoke-installing wheel..."
 if [[ "$DRY_RUN" == false ]]; then
-    rm -rf dist/ build/ *.egg-info
-    uv build
+    rm -rf build/ *.egg-info
+    make smoke-install
     uv run twine check dist/*
 else
-    echo "   [dry-run] Would run: uv build && twine check dist/*"
+    echo "   [dry-run] Would run: make smoke-install && twine check dist/*"
 fi
 echo ""
 

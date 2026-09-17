@@ -24,8 +24,17 @@ classifiers = [
 ]
 keywords = ["monarch", "money", "finance", "cli", "personal-finance", "budgeting"]
 dependencies = [
-    "typer[all]>=0.9.0",
+    # Plain Typer: current releases publish no `all` extra, and requesting it
+    # produces a warning during a clean wheel install. The pre-1.0 minor line is
+    # bounded because Typer upgrades can change command registration, help
+    # rendering, and option parsing. Widening the range requires the same
+    # framework-sensitive suite (tests/test_cli_framework.py) to be re-run.
+    "typer>=0.27.1,<0.28",
     "monarchmoneycommunity>=1.0.0",
+    # Imported directly by monarch_cli.core.retry; it must not rely on being
+    # pulled in transitively by monarchmoneycommunity. Floor matches the
+    # verified resolution (monarchmoneycommunity 1.5.2 requires aiohttp>=3.14.3).
+    "aiohttp>=3.14.3",
     "keyring>=24.0.0",
     "rich>=13.0.0",
     "platformdirs>=4.0.0",
