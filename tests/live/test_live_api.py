@@ -227,8 +227,8 @@ class TestLiveTransactions:
             assert "description" in txn
 
     def test_transactions_list_with_filters(self):
-        """Verify a bounded transaction list accepts read-only filters."""
-        data = run_cli_json("transactions", "list", "--limit", "3")
+        """Verify a bounded transaction list accepts a read-only date filter."""
+        data = run_cli_json("transactions", "list", "--preset", "this-month", "--limit", "3")
         assert isinstance(data, list)
 
     def test_transactions_list_table(self):
