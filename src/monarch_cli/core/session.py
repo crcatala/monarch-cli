@@ -184,7 +184,7 @@ def _get_from_file() -> str | None:
 def legacy_artifact_exists() -> bool:
     """Report whether a legacy pickle session artifact exists.
 
-    Uses filesystem metadata (``Path.exists()``) only. The file's contents are
+    Uses filesystem metadata (``Path.is_file()``) only. The file's contents are
     never read: pickle deserialization can execute arbitrary code, so legacy
     files are never treated as credentials and never deserialized.
 

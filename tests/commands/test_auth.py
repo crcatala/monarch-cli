@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
+import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.core.session import StorageBackend
@@ -32,22 +33,34 @@ class _HostilePickle:
         return _hostile_mark, ()
 
 
-def tmp_hostile_pickle_file() -> object:
+def tmp_hostile_pickle_file() -> Path:
     """Create a hostile pickle file that survives for the duration of a test.
 
-    Returns a Path-like object backed by a temporary directory that is cleaned
-    up when the test process requests the next file. Callers patch the session
-    module's COMPAT_SESSION_PATH with the returned path.
+    Returns a path to a hostile pickle payload backed by a temporary directory.
+    Callers patch the session module's COMPAT_SESSION_PATH with the returned
+    path. The directory is cleaned up by the module-level autouse hygiene
+    fixture after each test.
     """
     tmp = TemporaryDirectory()
     path = Path(tmp.name) / "mm_session.pickle"
     path.write_bytes(pickle.dumps(_HostilePickle()))
-    # Keep the directory alive via a module-level holder (cleaned per test run).
+    # Keep the directory alive for the duration of the test; the autouse
+    # hygiene fixture below cleans it up afterwards.
     _TMP_HOLDERS.append(tmp)
     return path
 
 
 _TMP_HOLDERS: list[TemporaryDirectory] = []
+
+
+@pytest.fixture(autouse=True)
+def _hostile_pickle_hygiene() -> None:
+    """Reset the hostile-pickle sentinel and clean up temp dirs per test."""
+    HOSTILE_SENTINEL.clear()
+    yield
+    HOSTILE_SENTINEL.clear()
+    while _TMP_HOLDERS:
+        _TMP_HOLDERS.pop().cleanup()
 
 
 def _plain(text: str) -> str:
