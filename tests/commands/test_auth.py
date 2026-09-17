@@ -3,14 +3,71 @@
 from __future__ import annotations
 
 import json
+import pickle
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
+import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.core.session import StorageBackend
 from monarch_cli.main import app
 
 runner = CliRunner()
+
+# Sentinel that records execution of a hostile pickle payload.
+HOSTILE_SENTINEL: list[str] = []
+
+
+def _hostile_mark() -> str:
+    """Called only if a hostile pickle payload is actually unpickled."""
+    HOSTILE_SENTINEL.append("executed")
+    return "hostile-code-ran"
+
+
+class _HostilePickle:
+    """Object that records execution if its pickle payload is deserialized."""
+
+    def __reduce__(self) -> tuple[object, tuple[()]]:
+        return _hostile_mark, ()
+
+
+def tmp_hostile_pickle_file() -> Path:
+    """Create a hostile pickle file that survives for the duration of a test.
+
+    Returns a path to a hostile pickle payload backed by a temporary directory.
+    Callers patch the session module's COMPAT_SESSION_PATH with the returned
+    path. The directory is cleaned up by the module-level autouse hygiene
+    fixture after each test.
+    """
+    tmp = TemporaryDirectory()
+    path = Path(tmp.name) / "mm_session.pickle"
+    path.write_bytes(pickle.dumps(_HostilePickle()))
+    # Keep the directory alive for the duration of the test; the autouse
+    # hygiene fixture below cleans it up afterwards.
+    _TMP_HOLDERS.append(tmp)
+    return path
+
+
+_TMP_HOLDERS: list[TemporaryDirectory] = []
+
+
+@pytest.fixture(autouse=True)
+def _hostile_pickle_hygiene() -> None:
+    """Reset the hostile-pickle sentinel and clean up temp dirs per test."""
+    HOSTILE_SENTINEL.clear()
+    yield
+    HOSTILE_SENTINEL.clear()
+    while _TMP_HOLDERS:
+        _TMP_HOLDERS.pop().cleanup()
+
+
+def _plain(text: str) -> str:
+    """Strip ANSI codes and collapse whitespace for robust assertions."""
+    import re
+
+    return re.sub(r"\s+", " ", re.sub(r"\x1b\[[0-9;]*m", "", text))
 
 
 class TestAuthStatus:
@@ -22,7 +79,7 @@ class TestAuthStatus:
             "has_env_token": False,
             "has_keyring_token": True,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "keyring",
         }
         with mock.patch(
@@ -42,7 +99,7 @@ class TestAuthStatus:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": True,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "file",
         }
         with mock.patch(
@@ -62,7 +119,7 @@ class TestAuthStatus:
             "has_env_token": True,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "env",
         }
         with mock.patch(
@@ -82,7 +139,7 @@ class TestAuthStatus:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": None,
         }
         with mock.patch(
@@ -101,7 +158,7 @@ class TestAuthStatus:
             "has_env_token": False,
             "has_keyring_token": True,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "keyring",
         }
         with mock.patch(
@@ -121,7 +178,7 @@ class TestAuthStatus:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": None,
         }
         with mock.patch(
@@ -142,7 +199,7 @@ class TestAuthStatus:
             "has_env_token": True,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "env",
         }
         with mock.patch(
@@ -154,6 +211,58 @@ class TestAuthStatus:
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         assert data["storage_backend"] == "env"
+
+    def test_status_human_readable_identifies_legacy_artifact(self) -> None:
+        """Should flag a legacy artifact as unsupported and direct to login."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_legacy_artifact": True,
+            "active_backend": None,
+        }
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_storage_info",
+                return_value=mock_info,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.COMPAT_SESSION_PATH",
+                Path("/tmp/fake-mm_session.pickle"),
+            ),
+        ):
+            result = runner.invoke(app, ["auth", "status"])
+
+        assert result.exit_code == 0
+        stderr = _plain(result.stderr)
+        assert "Not authenticated" in stderr
+        assert "Legacy session file" in stderr
+        assert "no longer supported" in stderr
+        assert "monarch auth login" in stderr
+
+    def test_status_json_reports_legacy_artifact(self) -> None:
+        """JSON status should report legacy artifact presence, not a credential."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_legacy_artifact": True,
+            "active_backend": None,
+        }
+        with mock.patch(
+            "monarch_cli.commands.auth.get_storage_info",
+            return_value=mock_info,
+        ):
+            result = runner.invoke(app, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["authenticated"] is False
+        assert data["storage_backend"] is None
+        assert data["legacy_pickle_artifact"]["exists"] is True
+        assert data["legacy_pickle_artifact"]["active_credential"] is False
+        assert "monarch auth login" in data["message"]
+        assert "no longer supported" in data["message"]
 
 
 class TestAuthLogout:
@@ -195,16 +304,19 @@ class TestAuthLogout:
         assert result.exit_code == 0
         mock_delete.assert_called_once_with(StorageBackend.FILE)
 
-    def test_logout_file_compat_backend(self) -> None:
-        """Should clear only file-compat backend when specified."""
+    def test_logout_file_compat_backend_removed(self) -> None:
+        """The removed file-compat backend must be rejected."""
         with (
             mock.patch("monarch_cli.commands.auth.delete_session_token") as mock_delete,
-            mock.patch("monarch_cli.commands.auth.reset_client"),
+            mock.patch("monarch_cli.commands.auth.reset_client") as mock_reset,
         ):
             result = runner.invoke(app, ["auth", "logout", "-s", "file-compat"])
 
-        assert result.exit_code == 0
-        mock_delete.assert_called_once_with(StorageBackend.FILE_COMPAT)
+        assert result.exit_code == 1
+        assert "Invalid storage backend" in result.stderr
+        assert "file-compat" not in result.stderr.split("Valid options")[1]
+        mock_delete.assert_not_called()
+        mock_reset.assert_not_called()
 
     def test_logout_invalid_backend(self) -> None:
         """Should error on invalid storage backend."""
@@ -324,7 +436,7 @@ class TestAuthDoctor:
             "has_env_token": False,
             "has_keyring_token": True,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "keyring",
         }
         with (
@@ -347,7 +459,7 @@ class TestAuthDoctor:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": True,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "file",
         }
         with (
@@ -369,7 +481,7 @@ class TestAuthDoctor:
             "has_env_token": True,
             "has_keyring_token": False,
             "has_file_token": True,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "env",
         }
         with (
@@ -389,7 +501,7 @@ class TestAuthDoctor:
             "has_env_token": False,
             "has_keyring_token": True,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "keyring",
         }
         mock_client = mock.MagicMock()
@@ -422,7 +534,7 @@ class TestAuthDoctor:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": None,
         }
         with (
@@ -434,6 +546,125 @@ class TestAuthDoctor:
 
         assert result.exit_code == 0
         assert "Skipped" in result.stderr
+
+    def test_doctor_identifies_legacy_artifact(self) -> None:
+        """Doctor should report legacy artifact presence and re-auth guidance."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_legacy_artifact": True,
+            "active_backend": None,
+        }
+        with (
+            mock.patch("monarch_cli.commands.auth._is_keyring_available", return_value=False),
+            mock.patch("monarch_cli.commands.auth._get_keyring_backend_name", return_value="Fail"),
+            mock.patch("monarch_cli.commands.auth.get_storage_info", return_value=mock_info),
+            mock.patch(
+                "monarch_cli.commands.auth.COMPAT_SESSION_PATH",
+                Path("/tmp/fake-mm_session.pickle"),
+            ),
+        ):
+            result = runner.invoke(app, ["auth", "doctor"])
+
+        assert result.exit_code == 0
+        stderr = _plain(result.stderr)
+        assert "mm_session.pickle" in stderr
+        assert "not read" in stderr
+        assert "not an active credential" in stderr
+        assert "monarch auth login" in stderr
+
+    def test_doctor_safe_with_hostile_legacy_artifact(self) -> None:
+        """Doctor must never deserialize a hostile legacy artifact."""
+        mock_info = {
+            "has_env_token": False,
+            "has_keyring_token": False,
+            "has_file_token": False,
+            "has_legacy_artifact": True,
+            "active_backend": None,
+        }
+        hostile_path = tmp_hostile_pickle_file()
+        with (
+            mock.patch("monarch_cli.commands.auth._is_keyring_available", return_value=False),
+            mock.patch("monarch_cli.commands.auth._get_keyring_backend_name", return_value="Fail"),
+            mock.patch("monarch_cli.commands.auth.get_storage_info", return_value=mock_info),
+            mock.patch("monarch_cli.commands.auth.COMPAT_SESSION_PATH", hostile_path),
+        ):
+            result = runner.invoke(app, ["auth", "doctor"])
+
+        assert result.exit_code == 0
+        assert HOSTILE_SENTINEL == []
+
+
+class TestLegacyArtifactSafety:
+    """End-to-end safety of diagnostics and auth failures with hostile pickles."""
+
+    def test_status_safe_with_hostile_legacy_artifact(self) -> None:
+        """auth status must not deserialize a hostile legacy artifact."""
+        hostile_path = tmp_hostile_pickle_file()
+        with (
+            mock.patch("monarch_cli.core.session.COMPAT_SESSION_PATH", hostile_path),
+            mock.patch("monarch_cli.core.session._get_from_keyring", return_value=None),
+        ):
+            result = runner.invoke(app, ["auth", "status"])
+
+        assert result.exit_code == 0
+        assert "Not authenticated" in result.stderr
+        assert HOSTILE_SENTINEL == []
+
+    def test_status_json_safe_with_hostile_legacy_artifact(self) -> None:
+        """JSON status must not deserialize a hostile legacy artifact."""
+        hostile_path = tmp_hostile_pickle_file()
+        with (
+            mock.patch("monarch_cli.core.session.COMPAT_SESSION_PATH", hostile_path),
+            mock.patch("monarch_cli.core.session._get_from_keyring", return_value=None),
+        ):
+            result = runner.invoke(app, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["authenticated"] is False
+        assert data["legacy_pickle_artifact"]["exists"] is True
+        assert HOSTILE_SENTINEL == []
+
+    def test_authenticated_command_failure_mentions_legacy_artifact(self) -> None:
+        """Auth failure with legacy artifact should direct to 'monarch auth login'."""
+        hostile_path = tmp_hostile_pickle_file()
+        with (
+            mock.patch("monarch_cli.core.session.COMPAT_SESSION_PATH", hostile_path),
+            mock.patch("monarch_cli.core.session._get_from_keyring", return_value=None),
+            mock.patch("monarch_cli.core.adapter.get_session_token", return_value=None),
+            mock.patch("monarch_cli.core.adapter.legacy_artifact_exists", return_value=True),
+        ):
+            result = runner.invoke(app, ["auth", "ping"])
+
+        assert result.exit_code == 1
+        assert "monarch auth login" in result.stderr
+        assert HOSTILE_SENTINEL == []
+
+    def test_authenticated_command_ignores_legacy_artifact_contents(self) -> None:
+        """get_session_token must never read the hostile artifact."""
+        hostile_path = tmp_hostile_pickle_file()
+        with (
+            mock.patch("monarch_cli.core.session.COMPAT_SESSION_PATH", hostile_path),
+            mock.patch("monarch_cli.core.session._get_from_keyring", return_value=None),
+            mock.patch("monarch_cli.core.adapter.get_session_token") as mock_get_token,
+        ):
+            mock_get_token.return_value = None
+            runner.invoke(app, ["auth", "ping"])
+
+        # The adapter consulted get_session_token; the hostile pickle was never
+        # deserialized (sentinel empty) and no token came from the legacy file.
+        assert HOSTILE_SENTINEL == []
+
+    def test_setup_documents_legacy_sessions(self) -> None:
+        """Setup output should document legacy pickle removal and cleanup."""
+        result = runner.invoke(app, ["auth", "setup"])
+
+        assert result.exit_code == 0
+        assert "Legacy Sessions" in result.stderr
+        assert "mm_session.pickle" in result.stderr
+        assert "monarch auth login" in result.stderr
 
 
 class TestAuthSetup:

@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TTY: Human-friendly output with emoji icons
   - Piped/redirected: Automatic JSON output (backwards compatible)
 
+### Removed
+
+#### Legacy Pickle Session Support (breaking)
+- **Pickle session format is no longer read, written, or migrated** - Pickle deserialization can execute arbitrary code, so the legacy `~/.mm/mm_session.pickle` file is never deserialized
+- **`StorageBackend.FILE_COMPAT` (`file-compat`) removed** - The `file-compat` storage option is gone from `auth login` and `auth logout`; supported backends are `keyring`, `file`, and `MONARCH_TOKEN`
+- **Forced re-authentication** - Users with only a legacy pickle session must run `monarch auth login` again; there is no migration path
+- **Presence-only detection** - `auth status`, `auth doctor`, and authentication failures report that a legacy artifact exists (filesystem metadata only) and direct users to `monarch auth login`; the file is never read and never deleted by the CLI (remove it yourself with `rm ~/.mm/mm_session.pickle`)
+
 ### Fixed
 
 - **Color auto-detection** - `NO_COLOR`, `TERM=dumb`, and non-TTY now properly disable color

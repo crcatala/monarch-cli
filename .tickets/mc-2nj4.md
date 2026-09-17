@@ -1,6 +1,6 @@
 ---
 id: mc-2nj4
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-09-11T01:15:13Z
@@ -51,3 +51,9 @@ File-backed session writes remain atomic. On POSIX, the resulting credential fil
 - [ ] Logout and diagnostics can operate safely when a malformed or hostile legacy artifact exists.
 - [ ] Security, re-authentication, manual cleanup, and major-release removal behavior are documented.
 - [ ] Repository verification passes.
+
+## Notes
+
+**2026-09-17T17:29:49Z**
+
+verification_and_proof stage: all safe verification steps passed (hostile-sentinel CLI drill 34/34 in isolated temp HOME — sentinel never deserialized/executed, artifact byte-identical after status/doctor/logout/ping; precedence env>keyring>json with legacy never active; 0600 atomic JSON write; no implicit cleanup; 577 non-live tests; ruff/mypy clean; CI 4/4; docs accurate). Results comment posted on PR #53. Human-recommended: real re-auth on a genuine legacy machine, manual rm cleanup, Windows ACL check, merge/release.

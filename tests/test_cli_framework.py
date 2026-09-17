@@ -193,7 +193,7 @@ class TestGlobalOptionParsing:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "none",
         }
         with patch(
@@ -221,7 +221,7 @@ class TestGlobalOptionParsing:
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
-            "has_compat_token": False,
+            "has_legacy_artifact": False,
             "active_backend": "none",
         }
         with patch(
