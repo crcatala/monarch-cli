@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -979,3 +980,44 @@ class TestTransactionsBatchUpdate:
         assert "--stdin" in output
         assert "--category" in output
         assert "--dry-run" in output
+
+
+class TestTransactionsBatchUpdateInterrupt:
+    """An interrupt mid-batch reports batch-level ambiguity, not silence."""
+
+    @staticmethod
+    def _interrupting_run_async(coro: Any) -> Any:
+        """Simulate a KeyboardInterrupt surfacing from the async bridge."""
+        coro.close()  # Cancel the pending batch coroutine like asyncio.run does.
+        raise KeyboardInterrupt()
+
+    def test_keyboard_interrupt_mid_batch_reports_all_ids(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Ctrl-C during batch execution exits 4 with every requested ID."""
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch(
+                "monarch_cli.commands.transactions.run_async",
+                side_effect=TestTransactionsBatchUpdateInterrupt._interrupting_run_async,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["batch-update", "txn_1", "txn_2", "--category", "cat_food"],
+            )
+
+        assert result.exit_code == 4
+        error = json.loads(result.stderr[result.stderr.index("{") :])
+        assert error["code"] == "MUTATION_AMBIGUOUS"
+        assert error["details"]["operation"] == "transactions batch-update"
+        assert error["details"]["entity_ids"] == ["txn_1", "txn_2"]
+        assert error["details"]["reason"] == "cancelled"
+        assert error["details"]["remote_state"] == "unknown"
+        assert "may have changed" in error["message"]
+        assert "verify" in error["details"]["verification"].lower()

@@ -544,7 +544,35 @@ def batch_update(
         }
 
     with spinner(f"Updating {len(ids)} transaction(s)..."):
-        result = run_async(do_batch_update())
+        try:
+            result = run_async(do_batch_update())
+        except KeyboardInterrupt as e:
+            # The interrupt cancelled the batch task before the completed
+            # per-item records could be collected. Some or all requests may
+            # have been dispatched, so report a batch-level ambiguity
+            # covering every requested ID instead of a silent "Interrupted."
+            # exit 130 with no verification guidance.
+            raise MutationAmbiguousError(
+                message=(
+                    f"Batch update 'transactions batch-update' was interrupted "
+                    "(cancelled after requests may have been dispatched). "
+                    f"Remote state may have changed for some or all of "
+                    f"{len(ids)} transaction(s); do not retry blindly. Verify "
+                    "each requested transaction first: "
+                    f"{', '.join(ids)}. " + _BATCH_VERIFICATION
+                ),
+                details={
+                    "operation": "transactions batch-update",
+                    "entity_ids": list(ids),
+                    "remote_state": "unknown",
+                    "reason": "cancelled",
+                    "attempts": len(ids),
+                    "verification": (
+                        "Verify each requested transaction via read commands "
+                        "or the Monarch web UI before re-running the batch; " + _BATCH_VERIFICATION
+                    ),
+                },
+            ) from e
 
     output(result)
 

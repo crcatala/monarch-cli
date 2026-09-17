@@ -340,7 +340,9 @@ CLI emits the structured `MUTATION_AMBIGUOUS` error and exits with code `4`.
 The error identifies the operation and affected record ID(s), says that remote
 state may have changed, and gives a safe read/UI verification step. Verify the
 record or refresh status before retrying; never retry an ambiguous mutation
-blindly. Batch updates include an ordered `results` entry for every input ID,
+blindly. Interrupting a mutation (Ctrl-C) is also treated as ambiguous and
+reported the same way. Batch updates include an ordered `results` entry for
+every input ID,
 with `success`, `error`, or `ambiguous` status, and exit nonzero if any item is
 not successful. Definite API/application rejections remain ordinary failures.
 

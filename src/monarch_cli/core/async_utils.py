@@ -208,7 +208,9 @@ def _classify_ambiguity(exc: BaseException) -> str:
     Labels are coarse and stable by design; raw exception text is never
     included in mutation ambiguity output.
     """
-    if isinstance(exc, asyncio.CancelledError):
+    if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):
+        # Includes Ctrl-C (KeyboardInterrupt is delivered to the main thread,
+        # outside the coroutine, and cancels the running task).
         return "cancelled"
     if isinstance(exc, TimeoutError):
         # Includes asyncio.timeout expiry and aiohttp server timeouts.
@@ -356,14 +358,35 @@ def run_mutation_api_call[T](
     See :func:`run_mutation_api_call_async` for the retry-safety and
     ambiguity semantics. The timeout applies per attempt; there is exactly
     one attempt.
+
+    A ``KeyboardInterrupt`` (Ctrl-C) delivered while the mutation runs is
+    converted into ``MutationAmbiguousError``: the interrupt stops the event
+    loop before the coroutine's own ambiguity conversion can surface, and a
+    request that was already dispatched must never be reported as a plain
+    "Interrupted." exit 130 with no verification guidance.
     """
-    return run_async(
-        run_mutation_api_call_async(
-            coro_factory,
-            operation=operation,
-            entity_ids=entity_ids,
-            verification=verification,
-            timeout_seconds=timeout_seconds,
-            retry_policy=retry_policy,
+    config = get_config()
+    effective_timeout = timeout_seconds if timeout_seconds is not None else config.timeout_seconds
+    try:
+        return run_async(
+            run_mutation_api_call_async(
+                coro_factory,
+                operation=operation,
+                entity_ids=entity_ids,
+                verification=verification,
+                timeout_seconds=timeout_seconds,
+                retry_policy=retry_policy,
+            )
         )
-    )
+    except KeyboardInterrupt as e:
+        # The interrupt cancelled the running task; the coroutine's internal
+        # ambiguity conversion cannot surface through asyncio.run() shutdown,
+        # so report it here. This is conservative: even if the interrupt
+        # landed before dispatch, claiming ambiguity never understates risk.
+        raise _mutation_ambiguous_error(
+            operation=operation,
+            entity_ids=tuple(entity_ids),
+            verification=verification,
+            cause=e,
+            timeout_seconds=effective_timeout,
+        ) from e

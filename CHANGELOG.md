@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable timeout** - `MONARCH_TIMEOUT` and config file `timeout` setting now functional
 - **Configurable retries** - `MONARCH_MAX_RETRIES` and config file `max_retries` setting now functional
 
+#### Mutation Retry Safety
+- **Remote mutations never retry automatically** - Account refresh, transaction update, and each batch-update item execute exactly once; the configured retry behavior now applies to read commands only (a timed-out write may already have been applied)
+- **Ambiguity is distinct from failure** - When a mutation request may have been dispatched but its outcome is unknown (timeout, disconnect, cancellation after invocation, or Ctrl-C), the CLI emits the structured `MUTATION_AMBIGUOUS` error with exit code `4`, identifying the operation and affected record ID(s) with a safe verification step instead of claiming the operation failed
+- **Batch update per-item outcomes** - `transactions batch-update` reports an ordered per-item result for every input ID with `success`/`error`/`ambiguous` status and exits nonzero when any item is failed or ambiguous
+- **No generic retry override** - Any future mutation retry must select a named, operation-specific mechanism (`idempotency_key` or `read_after_write`) with operation-specific tests before the executor accepts it
+
 ### Changed
 
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use

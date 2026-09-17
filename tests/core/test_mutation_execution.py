@@ -328,3 +328,71 @@ class TestRetryClassifications:
     def test_classifications_require_a_named_mechanism_to_change(self) -> None:
         for operation, classification in MUTATION_RETRY_CLASSIFICATIONS.items():
             assert classification.startswith("no_retry:"), operation
+
+
+class TestKeyboardInterruptIsAmbiguous:
+    """Ctrl-C during a mutation reports ambiguity, never a plain interrupt.
+
+    A KeyboardInterrupt is delivered to the main thread outside the running
+    coroutine, so it stops the event loop before the coroutine's internal
+    ambiguity conversion can surface. The executors must still report the
+    uncertain outcome (exit code 4) rather than exit 130 as an ordinary
+    "Interrupted." with no verification guidance.
+    """
+
+    def test_sync_bridge_reports_ambiguity_on_interrupt(self, monkeypatch) -> None:
+        """The sync bridge converts a surfaced KeyboardInterrupt."""
+        executed = AsyncMock(return_value="ok")
+        monkeypatch.setattr(
+            "monarch_cli.core.async_utils.run_async",
+            lambda _coro: (_ for _ in ()).throw(KeyboardInterrupt()),
+        )
+
+        with pytest.raises(MutationAmbiguousError) as exc_info:
+            run_mutation_api_call(
+                executed,
+                operation="transactions update",
+                entity_ids=("TXN7",),
+            )
+
+        details = exc_info.value.details
+        assert details["reason"] == "cancelled"
+        assert details["entity_ids"] == ["TXN7"]
+        assert details["remote_state"] == "unknown"
+        assert "may have changed" in exc_info.value.message
+
+    def test_real_interrupt_mid_mutation_is_single_attempt_and_ambiguous(self) -> None:
+        """A signal-driven KeyboardInterrupt mid-coroutine surfaces ambiguity."""
+        import signal
+
+        attempts = 0
+
+        async def dispatched_then_slow() -> None:
+            nonlocal attempts
+            attempts += 1
+            await asyncio.sleep(10)
+
+        def factory() -> Any:
+            return dispatched_then_slow()
+
+        def _raise_interrupt(*_args: Any) -> None:
+            raise KeyboardInterrupt()
+
+        previous_handler = signal.signal(signal.SIGALRM, _raise_interrupt)
+        signal.setitimer(signal.ITIMER_REAL, 0.5)
+        try:
+            with pytest.raises(MutationAmbiguousError) as exc_info:
+                run_mutation_api_call(
+                    factory,
+                    operation="transactions update",
+                    entity_ids=("TXN1",),
+                    timeout_seconds=30,
+                )
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous_handler)
+
+        # Exactly one attempt was made before the interrupt.
+        assert attempts == 1
+        assert exc_info.value.details["reason"] == "cancelled"
+        assert exc_info.value.exit_code == 4
