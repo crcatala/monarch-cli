@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import getpass
 from typing import Annotated
 
 import keyring
@@ -14,6 +13,11 @@ from ..core.async_utils import run_async
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, AuthenticationError
 from ..core.operations import Effect, Operation, operation_effects, run_read_call
+from ..core.prompting import (
+    prompt_secret,
+    prompt_text,
+    require_prompt_allowed,
+)
 from ..core.session import (
     COMPAT_SESSION_PATH,
     StorageBackend,
@@ -63,7 +67,16 @@ def _prompt_storage_backend() -> StorageBackend:
     if _is_keyring_available():
         console.print("  1. [green]keyring[/green] (recommended) - Secure OS credential storage")
         console.print("  2. file - JSON file in config directory")
-        choice = typer.prompt("Enter choice", default="1")
+        choice = prompt_text(
+            "Enter choice",
+            default="1",
+            missing_input="storage backend choice",
+            remedy=(
+                "Pass --storage=keyring or --storage=file explicitly, or run "
+                "'monarch auth login' in an interactive terminal."
+            ),
+            operation="auth login",
+        )
         if choice == "2":
             return StorageBackend.FILE
         return StorageBackend.KEYRING
@@ -73,6 +86,7 @@ def _prompt_storage_backend() -> StorageBackend:
 
 
 @app.command()
+@handle_errors
 @operation_effects(Effect.REMOTE_AUTHENTICATION, Effect.LOCAL_CREDENTIAL_CHANGE)
 def login(
     storage: Annotated[
@@ -89,8 +103,9 @@ def login(
     Prompts for email and password interactively. If MFA is enabled on your
     account, you'll be prompted for a code from your authenticator app.
 
-    Note: This command uses interactive prompts and styled console output
-    rather than structured JSON errors, as it's designed for human use.
+    Note: This command is designed for human use and prompts for credentials;
+    under --non-interactive it fails with a structured PROMPT_BLOCKED error
+    before reading any input (email, password, storage choice, or MFA code).
     For programmatic auth status checking, use 'monarch auth status'.
 
     Examples:
@@ -98,12 +113,34 @@ def login(
         monarch auth login -s file      # Use file storage
         monarch auth login -s keyring   # Use keyring storage
     """
+    # Fail before any input read or output when non-interactive (mc-2btg):
+    # the check happens before the banner, credentials prompts, /dev/tty
+    # reads, storage choice, or any MFA prompt.
+    require_prompt_allowed(
+        missing_input="email and password",
+        remedy=(
+            "Set MONARCH_TOKEN to authenticate with an existing token, or run "
+            "'monarch auth login' in an interactive terminal."
+        ),
+        operation="auth login",
+    )
+
     console.print("[bold]Monarch Money Login[/bold]")
     console.print()
 
     # Get credentials
-    email = typer.prompt("Email")
-    password = getpass.getpass("Password: ")
+    email = prompt_text(
+        "Email",
+        missing_input="email",
+        remedy="Run 'monarch auth login' in an interactive terminal.",
+        operation="auth login",
+    )
+    password = prompt_secret(
+        "Password: ",
+        missing_input="password",
+        remedy="Run 'monarch auth login' in an interactive terminal.",
+        operation="auth login",
+    )
 
     # Determine storage backend
     if storage:
@@ -130,10 +167,15 @@ def login(
     try:
         run_async(mm.login(email, password, use_saved_session=False, save_session=False))
     except RequireMFAException:
-        # MFA required - prompt for code
+        # MFA required - prompt for code (guard runs before reading input)
         console.print()
         console.print("[yellow]MFA required[/yellow]")
-        mfa_code = typer.prompt("MFA Code")
+        mfa_code = prompt_text(
+            "MFA Code",
+            missing_input="MFA code",
+            remedy="Run 'monarch auth login' in an interactive terminal.",
+            operation="auth login",
+        )
         try:
             run_async(mm.multi_factor_authenticate(email, password, mfa_code))
         except Exception as e:

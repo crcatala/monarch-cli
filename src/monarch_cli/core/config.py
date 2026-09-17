@@ -68,6 +68,7 @@ class Config:
         timeout_seconds: Request timeout in seconds
         max_retries: Number of retry attempts for failed requests
         confirm_destructive: Require confirmation for destructive operations
+        non_interactive: Fail instead of prompting when input is required
     """
 
     format: FormatType = DEFAULT_FORMAT
@@ -78,6 +79,7 @@ class Config:
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
     confirm_destructive: bool = True
+    non_interactive: bool = False
 
     # Track which source set each value (for debugging/diagnostics)
     _sources: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
@@ -105,6 +107,7 @@ class Config:
             "timeout_seconds": DEFAULT_TIMEOUT_SECONDS,
             "max_retries": DEFAULT_MAX_RETRIES,
             "confirm_destructive": True,
+            "non_interactive": False,
         }
         for key in config_dict:
             sources[key] = "default"
@@ -263,6 +266,10 @@ def _load_config_file() -> dict[str, Any]:
     if "confirm_destructive" in data and isinstance(data["confirm_destructive"], bool):
         result["confirm_destructive"] = data["confirm_destructive"]
 
+    # Parse non_interactive
+    if "non_interactive" in data and isinstance(data["non_interactive"], bool):
+        result["non_interactive"] = data["non_interactive"]
+
     return result
 
 
@@ -307,6 +314,11 @@ def _load_from_env() -> dict[str, Any | None]:
         retries = _parse_positive_int(env_retries)
         if retries is not None:
             result["max_retries"] = retries
+
+    # MONARCH_NON_INTERACTIVE
+    env_non_interactive = os.environ.get("MONARCH_NON_INTERACTIVE")
+    if env_non_interactive:
+        result["non_interactive"] = _parse_bool(env_non_interactive)
 
     # Color: NO_COLOR standard + MONARCH_NO_COLOR
     result["color"] = _parse_color_from_env()
@@ -468,4 +480,8 @@ max_retries = 3
 
 # Require confirmation for destructive operations (delete, etc.)
 confirm_destructive = true
+
+# Fail instead of prompting when input is required (CI/automation).
+# Never bypasses --allow-mutations or destructive confirmation.
+non_interactive = false
 """

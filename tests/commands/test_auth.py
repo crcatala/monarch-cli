@@ -706,7 +706,7 @@ class TestAuthLogin:
 
     def test_login_invalid_storage_backend(self) -> None:
         """Should error on invalid --storage value."""
-        with mock.patch("monarch_cli.commands.auth.getpass.getpass", return_value="password"):
+        with mock.patch("monarch_cli.core.prompting.getpass.getpass", return_value="password"):
             result = runner.invoke(
                 app,
                 ["auth", "login", "-s", "invalid"],
@@ -718,7 +718,7 @@ class TestAuthLogin:
     def test_login_keyring_unavailable_with_keyring_flag(self) -> None:
         """Should error when --storage=keyring but keyring unavailable."""
         with (
-            mock.patch("monarch_cli.commands.auth.getpass.getpass", return_value="password"),
+            mock.patch("monarch_cli.core.prompting.getpass.getpass", return_value="password"),
             mock.patch(
                 "monarch_cli.commands.auth._is_keyring_available",
                 return_value=False,

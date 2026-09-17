@@ -101,6 +101,7 @@ monarch budgets list --json
 | `--quiet` | `-q` | Output only IDs, one per line |
 | `--no-color` | | Disable colored output |
 | `--allow-mutations` | | Authorize remote mutations for this invocation only; place before the command path |
+| `--non-interactive` | | Fail before prompting; useful for CI and agents |
 | `--help` | | Show help and exit |
 
 ### Mutation safety
@@ -133,6 +134,38 @@ output. Mutation authorization is separate from any destructive confirmation
 or `--yes` requirement: authorization is checked first, then the second layer
 applies. Login and logout remain available without the flag so users can
 recover credentials.
+
+### Non-interactive automation
+
+Use `--non-interactive` when stdin is unavailable or a command must never wait
+for input. The same policy can be enabled with `MONARCH_NON_INTERACTIVE=1` or
+`non_interactive = true` in the config file. A blocked prompt is rejected
+before stdin, `/dev/tty`, password, MFA, storage-choice, or confirmation input
+is read. It exits with stable code `5`; errors are one JSON object on stderr
+with code `PROMPT_BLOCKED` and an actionable `details.remedy` (stdout remains
+empty). For example:
+
+```bash
+monarch --non-interactive auth login
+# exit 5; stderr: {"error": true, "code": "PROMPT_BLOCKED", ...}
+```
+
+Non-interactive mode does not authorize mutations and never answers a
+confirmation automatically. Pass explicit values or use deliberate channels
+such as `transactions batch-update --stdin`; use `--allow-mutations`
+separately when a remote mutation is authorized.
+
+### Configuration
+
+The default config file is `~/.config/monarch-cli/config.toml` (or the path
+selected by `MONARCH_CONFIG_DIR`). Automation may set:
+
+```toml
+non_interactive = true
+```
+
+The CLI flag and environment variable are convenient per-invocation choices;
+all three sources enable the same shared prompt policy.
 
 ### auth
 
