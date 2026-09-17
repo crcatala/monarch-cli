@@ -147,15 +147,26 @@ def _effective_command_name(command_info: Any) -> str:
 def collect_command_effects(root_app: Any) -> dict[str, frozenset[Effect]]:
     """Build the full command inventory with declared effects.
 
-    Walks every command group registered on ``root_app``. Raises
+    Walks every command group registered on ``root_app`` plus any commands
+    registered directly on the root app itself. Raises
     :class:`MissingOperationMetadataError` if any registered command lacks
     explicit metadata, so tests fail loudly when a new command is added
     without reviewed effect declarations.
 
     Returns:
-        Mapping of "group command" path to declared effect set.
+        Mapping of "[group ]command" path to declared effect set.
     """
     inventory: dict[str, frozenset[Effect]] = {}
+    for command_info in root_app.registered_commands:
+        effects = declared_effects(command_info.callback)
+        if effects is None:
+            path = _effective_command_name(command_info)
+            raise MissingOperationMetadataError(
+                f"Registered command '{path}' is missing explicit "
+                "operation-effect metadata. Declare effects with "
+                "@operation_effects(...) from monarch_cli.core.operations."
+            )
+        inventory[_effective_command_name(command_info)] = effects
     for group_info in root_app.registered_groups:
         group_name = group_info.name or ""
         for command_info in group_info.typer_instance.registered_commands:

@@ -26,6 +26,7 @@ from monarch_cli.core.operations import (
     Operation,
     PolicyViolationError,
     collect_command_effects,
+    declared_effects,
     operation_effects,
     require_mutation_authorization,
     reset_mutation_authorization,
@@ -109,6 +110,19 @@ class TestRegistrationMetadata:
         with pytest.raises(MissingOperationMetadataError, match="synthetic bare-callback"):
             collect_command_effects(root)
 
+    def test_missing_metadata_on_root_level_command_is_detected(self) -> None:
+        # Commands registered directly on the root app (outside any group)
+        # must also be covered by the inventory, so they cannot silently
+        # bypass the metadata requirement.
+        def bare_root_callback() -> None:  # pragma: no cover - never invoked
+            raise AssertionError("should not run")
+
+        root = type(app)(name="root", no_args_is_help=True)
+        root.command(name="rogue")(bare_root_callback)
+
+        with pytest.raises(MissingOperationMetadataError, match="'rogue'"):
+            collect_command_effects(root)
+
     def test_multi_effect_command_keeps_both_effects(self) -> None:
         # A real multi-effect command: auth login must not collapse to one.
         inventory = collect_command_effects(app)
@@ -122,12 +136,7 @@ class TestRegistrationMetadata:
         def synthetic() -> None:  # pragma: no cover - never invoked
             raise AssertionError("should not run")
 
-        effects = collect_command_effects.__globals__  # keep import used
-        assert effects is not None
-        from monarch_cli.core.operations import declared_effects
-
         declared = declared_effects(synthetic)
-        assert declared is not None
         assert declared == frozenset({Effect.REMOTE_MUTATION, Effect.LOCAL_CREDENTIAL_CHANGE})
 
     def test_current_mutations_declare_remote_mutation(self) -> None:
