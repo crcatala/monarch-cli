@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from monarch_cli.core.exceptions import MutationAmbiguousError
 from monarch_cli.core.operations import (
     Effect,
     Operation,
@@ -215,6 +216,22 @@ class TestRefreshAccounts:
         assert result["status"] == "failed"
         assert result["account_count"] == 1
         assert "failed" in result["message"].lower()
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_mutation_call")
+    def test_ambiguous_refresh_propagates_with_entity_ids(
+        self, mock_run_mutation, _mock_get_client
+    ):
+        """Refresh does not downgrade an ambiguous outcome to ordinary failure."""
+        mock_run_mutation.side_effect = MutationAmbiguousError(
+            details={"operation": "accounts refresh", "entity_ids": ["acc-123"]}
+        )
+
+        with pytest.raises(MutationAmbiguousError):
+            refresh_accounts(account_ids=["acc-123"], operation=MUTATION_OPERATION)
+
+        assert mock_run_mutation.call_args.kwargs["entity_ids"] == ("acc-123",)
+        assert "verify" in mock_run_mutation.call_args.kwargs["verification"].lower()
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_mutation_call")

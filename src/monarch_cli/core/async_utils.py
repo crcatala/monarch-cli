@@ -11,8 +11,8 @@ import concurrent.futures
 from collections.abc import Awaitable, Callable, Coroutine
 
 from .config import get_config
-from .exceptions import NetworkError
-from .retry import RETRYABLE_EXCEPTIONS
+from .exceptions import ErrorCode, MonarchCLIError, MutationAmbiguousError, NetworkError
+from .retry import RETRYABLE_EXCEPTIONS, MutationRetryPolicy
 
 
 def _run_in_new_loop[T](coro: Coroutine[object, object, T]) -> T:
@@ -188,3 +188,205 @@ def run_api_call[T](
             max_retries=effective_retries,
         )
     )
+
+
+# --- Mutation execution (retry-safe, ambiguity-aware) ----------------------
+
+#: Exceptions that leave the outcome of an already-dispatched request unknown.
+#: For a remote mutation, any of these after the request has been invoked
+#: means the service may have received and processed it: the result is
+#: ambiguous, not merely failed.
+AMBIGUOUS_TRANSPORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    *RETRYABLE_EXCEPTIONS,
+    asyncio.CancelledError,
+)
+
+
+def _classify_ambiguity(exc: BaseException) -> str:
+    """Map an ambiguous transport failure to a stable reason label.
+
+    Labels are coarse and stable by design; raw exception text is never
+    included in mutation ambiguity output.
+    """
+    if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):
+        # Includes Ctrl-C (KeyboardInterrupt is delivered to the main thread,
+        # outside the coroutine, and cancels the running task).
+        return "cancelled"
+    if isinstance(exc, TimeoutError):
+        # Includes asyncio.timeout expiry and aiohttp server timeouts.
+        return "timeout"
+    return "transport_failure"
+
+
+def _default_verification(entity_ids: tuple[str, ...]) -> str:
+    if entity_ids:
+        return (
+            "Verify the affected record(s) "
+            f"({', '.join(entity_ids)}) via read commands or the Monarch web "
+            "UI to confirm whether the change was applied before retrying."
+        )
+    return (
+        "Verify the affected record(s) via read commands or the Monarch web UI "
+        "to confirm whether the change was applied before retrying."
+    )
+
+
+def _mutation_ambiguous_error(
+    *,
+    operation: str,
+    entity_ids: tuple[str, ...],
+    verification: str | None,
+    cause: BaseException,
+    timeout_seconds: float,
+) -> MutationAmbiguousError:
+    """Build the structured ambiguity error for an uncertain mutation."""
+    reason = _classify_ambiguity(cause)
+    verification_text = verification or _default_verification(entity_ids)
+    return MutationAmbiguousError(
+        message=(
+            f"Mutation '{operation}' could not be confirmed ({reason} after the "
+            "request may have been dispatched). Remote state may have changed; "
+            "do not retry blindly. Verify first: "
+            f"{verification_text}"
+        ),
+        details={
+            "operation": operation,
+            "entity_ids": list(entity_ids),
+            "remote_state": "unknown",
+            "reason": reason,
+            "timeout_seconds": timeout_seconds,
+            "attempts": 1,
+            "verification": verification_text,
+        },
+    )
+
+
+def _validate_mutation_retry_policy(retry_policy: MutationRetryPolicy) -> None:
+    """Refuse any mutation retry policy that has not been earned.
+
+    Only NO_RETRY is implemented. Selecting a named mechanism before its
+    operation-specific tests exist is a policy violation, not a runtime
+    decision; there is deliberately no generic boolean override.
+    """
+    if retry_policy is MutationRetryPolicy.NO_RETRY:
+        return
+    raise MonarchCLIError(
+        message=(
+            f"Retry policy '{retry_policy.value}' is not implemented for "
+            "mutations: enabling automatic retry requires a named, "
+            "operation-specific idempotency mechanism (upstream idempotency "
+            "key or tested read-after-write verification) with "
+            "operation-specific tests. There is no generic retry override."
+        ),
+        code=ErrorCode.POLICY_VIOLATION,
+        exit_code=1,
+    )
+
+
+async def run_mutation_api_call_async[T](
+    coro_factory: Callable[[], Awaitable[T]],
+    *,
+    operation: str,
+    entity_ids: tuple[str, ...] | list[str] = (),
+    verification: str | None = None,
+    timeout_seconds: float | None = None,
+    retry_policy: MutationRetryPolicy = MutationRetryPolicy.NO_RETRY,
+) -> T:
+    """Execute a remote mutation exactly once, with a per-attempt timeout.
+
+    This is the single-attempt execution path for remote mutations. It is
+    deliberately separate from :func:`run_api_call` (the read path):
+
+    - **No automatic retries, regardless of configuration.** A timed-out,
+      disconnected, or cancelled mutation may already have been applied by
+      the service; a second attempt can duplicate the side effect. Reads keep
+      their configured bounded retries; mutations never inherit them.
+    - **Ambiguity is distinct from failure.** If the request may have been
+      dispatched and the outcome is unknown, this raises
+      :class:`MutationAmbiguousError` (exit code 4) identifying the operation
+      and affected entities with a safe verification step. A definite
+      application-level rejection propagates unchanged on the normal API
+      error path.
+
+    Args:
+        coro_factory: Callable that creates the mutation coroutine.
+        operation: Stable operation name (e.g. ``transactions update``).
+        entity_ids: Identifiers of the records the mutation targets.
+        verification: Domain-appropriate safe verification instruction;
+            a generic instruction is generated when omitted.
+        timeout_seconds: Per-attempt timeout override (default: from config).
+        retry_policy: Mutation retry policy; only ``NO_RETRY`` is supported.
+
+    Returns:
+        The result of the mutation call.
+
+    Raises:
+        MutationAmbiguousError: On timeout, disconnect, cancellation after
+            invocation, or another ambiguous transport failure.
+        MonarchCLIError: POLICY_VIOLATION if a non-``NO_RETRY`` policy is
+            selected.
+    """
+    _validate_mutation_retry_policy(retry_policy)
+    config = get_config()
+    effective_timeout = timeout_seconds if timeout_seconds is not None else config.timeout_seconds
+    ids = tuple(entity_ids)
+
+    try:
+        async with asyncio.timeout(effective_timeout):
+            return await coro_factory()
+    except AMBIGUOUS_TRANSPORT_EXCEPTIONS as e:
+        raise _mutation_ambiguous_error(
+            operation=operation,
+            entity_ids=ids,
+            verification=verification,
+            cause=e,
+            timeout_seconds=effective_timeout,
+        ) from e
+
+
+def run_mutation_api_call[T](
+    coro_factory: Callable[[], Awaitable[T]],
+    *,
+    operation: str,
+    entity_ids: tuple[str, ...] | list[str] = (),
+    verification: str | None = None,
+    timeout_seconds: float | None = None,
+    retry_policy: MutationRetryPolicy = MutationRetryPolicy.NO_RETRY,
+) -> T:
+    """Synchronous bridge for the single-attempt mutation executor.
+
+    See :func:`run_mutation_api_call_async` for the retry-safety and
+    ambiguity semantics. The timeout applies per attempt; there is exactly
+    one attempt.
+
+    A ``KeyboardInterrupt`` (Ctrl-C) delivered while the mutation runs is
+    converted into ``MutationAmbiguousError``: the interrupt stops the event
+    loop before the coroutine's own ambiguity conversion can surface, and a
+    request that was already dispatched must never be reported as a plain
+    "Interrupted." exit 130 with no verification guidance.
+    """
+    config = get_config()
+    effective_timeout = timeout_seconds if timeout_seconds is not None else config.timeout_seconds
+    try:
+        return run_async(
+            run_mutation_api_call_async(
+                coro_factory,
+                operation=operation,
+                entity_ids=entity_ids,
+                verification=verification,
+                timeout_seconds=timeout_seconds,
+                retry_policy=retry_policy,
+            )
+        )
+    except KeyboardInterrupt as e:
+        # The interrupt cancelled the running task; the coroutine's internal
+        # ambiguity conversion cannot surface through asyncio.run() shutdown,
+        # so report it here. This is conservative: even if the interrupt
+        # landed before dispatch, claiming ambiguity never understates risk.
+        raise _mutation_ambiguous_error(
+            operation=operation,
+            entity_ids=tuple(entity_ids),
+            verification=verification,
+            cause=e,
+            timeout_seconds=effective_timeout,
+        ) from e

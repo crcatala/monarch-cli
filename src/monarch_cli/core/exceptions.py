@@ -20,6 +20,7 @@ class ErrorCode(Enum):
     AUTH_EXPIRED = "AUTH_EXPIRED"
     AUTH_FAILED = "AUTH_FAILED"
     MUTATION_BLOCKED = "MUTATION_BLOCKED"
+    MUTATION_AMBIGUOUS = "MUTATION_AMBIGUOUS"
     PROMPT_BLOCKED = "PROMPT_BLOCKED"
     POLICY_VIOLATION = "POLICY_VIOLATION"
     NOT_FOUND = "NOT_FOUND"
@@ -143,6 +144,37 @@ class ValidationError(MonarchCLIError):
             code=ErrorCode.INVALID_INPUT,
             details=full_details,
             exit_code=2,  # Usage error
+        )
+
+
+class MutationAmbiguousError(MonarchCLIError):
+    """A remote mutation was dispatched but its outcome is unknown.
+
+    Raised when a mutation request may have reached the service (timeout,
+    disconnect, or cancellation after the request was invoked) so remote
+    state MAY have changed. This is deliberately not an ordinary network
+    failure: the caller must verify remote state before retrying, because a
+    blind retry can duplicate an undocumented side effect.
+
+    The structured details identify the stable operation and the affected
+    entity identifiers and carry a domain-appropriate verification step.
+    They never include credentials, raw request bodies, or arbitrary upstream
+    exception text.
+
+    Exits with code 4 (see also exit code 3 for blocked mutations).
+    """
+
+    def __init__(
+        self,
+        message: str = "Mutation outcome unknown: the request may have been "
+        "dispatched, so remote state may have changed. Verify before retrying.",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            code=ErrorCode.MUTATION_AMBIGUOUS,
+            details=details,
+            exit_code=4,
         )
 
 
