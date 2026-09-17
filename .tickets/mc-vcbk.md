@@ -46,3 +46,9 @@ Set explicit per-command record/page limits, a total request budget, timeout, an
 - [ ] Local execution and release-check documentation state prerequisites, safety properties, exact matrix, maximum requests, expected runtime, and interpretation of skips/failures.
 - [ ] Tests prove the read-only gate remains opt-in, excluded from CI, and unable to select separately gated mutation tests.
 - [ ] `mc-3437` infrastructure/documentation is completed rather than duplicated, and repository verification passes.
+
+## Notes
+
+**2026-09-17T23:42:05Z**
+
+Human verification evidence (2026-09-17): `MONARCH_LIVE_TESTS=1 make test-live` passed locally with the intended authenticated read-only suite. The run covered auth status/ping, accounts list, bounded transactions list, categories, budgets, and cashflow. No refresh, login replacement, upload, transaction/account edit, or other mutation was performed. This is live-service evidence for the read-only runner; the ticket remains open for its remaining schema-backed/installed-CLI acceptance criteria and dependency on mc-cpzi.

@@ -37,3 +37,9 @@ Before creating later children, review existing open tickets and link or update 
 - [ ] Existing tickets are reused or linked where their scope overlaps this roadmap.
 - [ ] The repository verification suite and clean-install smoke tests pass at each release boundary.
 
+
+## Notes
+
+**2026-09-17T23:42:05Z**
+
+Human Verification Checkpoint A evidence recorded (2026-09-17): the operator reports all critical verification scenarios completed, including clean shipped-wheel validation and approved disposable-household mutation smoke checks. The read-only live API smoke suite also passed via `MONARCH_LIVE_TESTS=1 make test-live`. Additional medium-priority verification was partially completed; only confirmed scope is recorded on the linked tickets. No credentials or raw financial payloads are recorded here. P0 implementation state remains complete; no downstream ticket is being closed by this note.
