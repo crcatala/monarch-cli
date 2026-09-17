@@ -100,7 +100,39 @@ monarch budgets list --json
 | `--json` | | Output in JSON format |
 | `--quiet` | `-q` | Output only IDs, one per line |
 | `--no-color` | | Disable colored output |
+| `--allow-mutations` | | Authorize remote mutations for this invocation only; place before the command path |
 | `--help` | | Show help and exit |
+
+### Mutation safety
+
+The CLI is **read-only by default**. Every command has explicit operation
+metadata. Read commands make no state changes; `--dry-run` is a validated
+`preview`; `remote_authentication` and `local_credential_change` cover login
+and logout; and `remote_mutation` covers transaction updates and account
+refreshes. The effect taxonomy is `read_only`, `preview`,
+`remote_authentication`, `remote_mutation`, and `local_credential_change`.
+
+Remote mutations require the global `--allow-mutations` option on that
+invocation. Put it before the command path; it is never persisted in config and
+there is no environment-variable equivalent:
+
+```bash
+# Blocked safely before authentication or any API call:
+monarch transactions update TXN123 --notes "Review"
+
+# Explicitly authorized for this invocation only:
+monarch --allow-mutations transactions update TXN123 --notes "Review"
+monarch --allow-mutations accounts refresh -a ACC123
+
+# Safe preview; no client or mutation API call is made:
+monarch transactions update TXN123 --dry-run --notes "Review"
+```
+
+A blocked mutation exits with code `3` and structured `MUTATION_BLOCKED`
+output. Mutation authorization is separate from any destructive confirmation
+or `--yes` requirement: authorization is checked first, then the second layer
+applies. Login and logout remain available without the flag so users can
+recover credentials.
 
 ### auth
 
@@ -126,8 +158,8 @@ monarch accounts list --json     # JSON format
 monarch accounts list --format table  # Table format
 monarch accounts list --raw      # Raw API response
 
-monarch accounts refresh         # Refresh all account data
-monarch accounts refresh ACC123  # Refresh specific account
+monarch --allow-mutations accounts refresh         # Refresh all account data
+monarch --allow-mutations accounts refresh -a ACC123  # Refresh specific account
 ```
 
 ### transactions
@@ -142,15 +174,15 @@ monarch transactions list --account ACC123
 monarch transactions list --search "grocery"
 
 # Update a transaction
-monarch transactions update TXN123 --amount 25.50
-monarch transactions update TXN123 --description "Coffee Shop"
-monarch transactions update TXN123 --category CAT456
-monarch transactions update TXN123 --notes "Business expense"
-monarch transactions update TXN123 --date 2024-01-15
-monarch transactions update TXN123 --dry-run --amount 30.00  # Preview
+monarch --allow-mutations transactions update TXN123 --amount 25.50
+monarch --allow-mutations transactions update TXN123 --description "Coffee Shop"
+monarch --allow-mutations transactions update TXN123 --category CAT456
+monarch --allow-mutations transactions update TXN123 --notes "Business expense"
+monarch --allow-mutations transactions update TXN123 --date 2024-01-15
+monarch transactions update TXN123 --dry-run --amount 30.00  # Preview; no flag needed
 
 # Batch update multiple transactions
-monarch transactions batch-update TXN1 TXN2 TXN3 --category CAT456
+monarch --allow-mutations transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 ```
 
 **Date Presets:**

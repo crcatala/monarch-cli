@@ -7,8 +7,8 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_api_call
 from ..core.error_handler import handle_errors
+from ..core.operations import Effect, Operation, operation_effects, run_read_call
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 
@@ -61,6 +61,7 @@ def _transform_categories(raw_data: dict[str, Any]) -> list[dict[str, Any]]:
 
 @app.command("list")
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def list_cmd(
     format: Annotated[
         OutputFormat | None,
@@ -97,7 +98,10 @@ def list_cmd(
 
     with spinner("Fetching categories..."):
         client = get_authenticated_client()
-        raw_data: dict[str, Any] = run_api_call(lambda: client.get_transaction_categories())
+        raw_data: dict[str, Any] = run_read_call(
+            lambda: client.get_transaction_categories(),
+            Operation(command="categories list", effects=frozenset({Effect.READ_ONLY})),
+        )
 
         # Transform to simplified structure
         data = _transform_categories(raw_data)

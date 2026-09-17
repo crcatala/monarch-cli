@@ -9,8 +9,17 @@ import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.commands.transactions import _parse_date, app
+from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def authorize_subcommand_tests():
+    """Sub-app tests bypass the root callback's global option parser."""
+    set_mutation_authorized(True)
+    yield
+    reset_mutation_authorization()
 
 
 class TestParseDateHelper:
@@ -440,7 +449,10 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--description", "Coffee Shop"])
+            result = runner.invoke(
+                app,
+                ["update", "txn_123", "--description", "Coffee Shop"],
+            )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -465,7 +477,10 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--category", "cat_456"])
+            result = runner.invoke(
+                app,
+                ["update", "txn_123", "--category", "cat_456"],
+            )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -490,7 +505,10 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--notes", "Business lunch"])
+            result = runner.invoke(
+                app,
+                ["update", "txn_123", "--notes", "Business lunch"],
+            )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -618,7 +636,14 @@ class TestTransactionsBatchUpdate:
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
             result = runner.invoke(
-                app, ["batch-update", "txn_123", "txn_456", "--category", "cat_food"]
+                app,
+                [
+                    "batch-update",
+                    "txn_123",
+                    "txn_456",
+                    "--category",
+                    "cat_food",
+                ],
             )
 
             assert result.exit_code == 0
@@ -649,8 +674,10 @@ class TestTransactionsBatchUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["batch-update", "txn_123", "--notes", "Q1 Expenses"])
-
+            result = runner.invoke(
+                app,
+                ["batch-update", "txn_123", "--notes", "Q1 Expenses"],
+            )
             assert result.exit_code == 0
             output = json.loads(result.stdout)
             assert output["status"] == "completed"
@@ -761,7 +788,14 @@ class TestTransactionsBatchUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["batch-update", "txn_123", "txn_456", "txn_789", "--category", "cat_food"],
+                [
+                    "batch-update",
+                    "txn_123",
+                    "txn_456",
+                    "txn_789",
+                    "--category",
+                    "cat_food",
+                ],
             )
 
             assert result.exit_code == 0
@@ -816,7 +850,13 @@ class TestTransactionsBatchUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["batch-update", "txn_arg1", "--stdin", "--category", "cat_123"],
+                [
+                    "batch-update",
+                    "txn_arg1",
+                    "--stdin",
+                    "--category",
+                    "cat_123",
+                ],
                 input="txn_stdin1\ntxn_stdin2\n",
             )
 

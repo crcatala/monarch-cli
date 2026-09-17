@@ -8,9 +8,9 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.async_utils import run_api_call
 from ..core.dates import DatePreset, parse_date_range
 from ..core.error_handler import handle_errors
+from ..core.operations import Effect, Operation, operation_effects, run_read_call
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 from ..transformers.cashflow import transform_cashflow_summary
@@ -45,6 +45,7 @@ def _parse_date(date_str: str | None) -> date | None:
 
 @app.command("summary")
 @handle_errors
+@operation_effects(Effect.READ_ONLY)
 def summary(
     start: Annotated[
         str | None,
@@ -112,11 +113,12 @@ def summary(
 
     with spinner("Calculating cashflow..."):
         client = get_authenticated_client()
-        data: Any = run_api_call(
+        data: Any = run_read_call(
             lambda: client.get_cashflow_summary(
                 start_date=start_str,
                 end_date=end_str,
-            )
+            ),
+            Operation(command="cashflow summary", effects=frozenset({Effect.READ_ONLY})),
         )
 
     # Transform to flat structure for display

@@ -9,9 +9,23 @@ import pytest
 from typer.testing import CliRunner
 
 from monarch_cli.commands.accounts import app
+from monarch_cli.core.operations import (
+    Effect,
+    Operation,
+    reset_mutation_authorization,
+    set_mutation_authorized,
+)
 from monarch_cli.output import set_quiet
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def authorize_subcommand_tests():
+    """Sub-app tests bypass the root callback's global option parser."""
+    set_mutation_authorized(True)
+    yield
+    reset_mutation_authorization()
 
 
 @pytest.fixture
@@ -266,7 +280,13 @@ class TestAccountsRefresh:
             result = runner.invoke(app, ["refresh"])
 
             assert result.exit_code == 0
-            mock_refresh.assert_called_once_with(None)
+            mock_refresh.assert_called_once_with(
+                None,
+                operation=Operation(
+                    command="accounts refresh",
+                    effects=frozenset({Effect.REMOTE_MUTATION}),
+                ),
+            )
             output = json.loads(result.stdout)
             assert output["status"] == "ok"
             assert output["account_count"] == 3
@@ -286,10 +306,19 @@ class TestAccountsRefresh:
             ) as mock_refresh,
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["refresh", "-a", "acc_123", "-a", "acc_456"])
+            result = runner.invoke(
+                app,
+                ["refresh", "-a", "acc_123", "-a", "acc_456"],
+            )
 
             assert result.exit_code == 0
-            mock_refresh.assert_called_once_with(["acc_123", "acc_456"])
+            mock_refresh.assert_called_once_with(
+                ["acc_123", "acc_456"],
+                operation=Operation(
+                    command="accounts refresh",
+                    effects=frozenset({Effect.REMOTE_MUTATION}),
+                ),
+            )
 
     def test_refresh_no_accounts(self) -> None:
         """Refresh handles no accounts case."""
