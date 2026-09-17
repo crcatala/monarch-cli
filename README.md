@@ -286,6 +286,11 @@ Session credentials are resolved in this order:
 2. System keyring (if available)
 3. Session file (`~/.config/monarch-cli/session.json`)
 
+Legacy pickle session files (`~/.mm/mm_session.pickle`) are not a credential
+source and are never read (see [Troubleshooting](#troubleshooting)). On POSIX,
+the session file is created with mode `0600` (owner read/write only); on
+Windows it inherits the default NTFS ACLs of your profile directory.
+
 ## Scripting & Automation
 
 Monarch CLI is designed for scripting and automation. When output is piped (non-TTY), it automatically outputs JSON:
@@ -410,6 +415,24 @@ monarch auth ping
 # Use file storage instead
 monarch auth login -s file
 ```
+
+**Legacy pickle session file (`~/.mm/mm_session.pickle`):**
+
+Older releases stored sessions as a pickle file at `~/.mm/mm_session.pickle`.
+Pickle files can execute arbitrary code when loaded, so this CLI never reads
+them: a legacy file is **not** an active credential and is ignored during
+credential lookup. If one exists, `auth status` and `auth doctor` will report
+its presence and ask you to re-authenticate:
+
+```bash
+monarch auth login
+
+# Optionally remove the legacy file once you have re-authenticated
+rm ~/.mm/mm_session.pickle
+```
+
+The CLI never reads, migrates, or deletes this file; cleanup is always an
+explicit user action.
 
 ### Debug Mode
 

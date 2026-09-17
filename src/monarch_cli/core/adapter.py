@@ -11,7 +11,7 @@ from typing import cast
 from monarchmoney import MonarchMoney  # type: ignore[import-untyped]
 
 from .exceptions import AuthenticationError
-from .session import get_session_token
+from .session import COMPAT_SESSION_PATH, get_session_token, legacy_artifact_exists
 
 # Module-level cached client instance
 _client: MonarchMoney | None = None
@@ -35,6 +35,18 @@ def get_authenticated_client() -> MonarchMoney:
 
     token = get_session_token()
     if token is None:
+        if legacy_artifact_exists():
+            # Presence check only (filesystem metadata); the legacy pickle
+            # file's contents are never read or deserialized.
+            raise AuthenticationError(
+                message=(
+                    "Not authenticated. A legacy session file "
+                    f"({COMPAT_SESSION_PATH}) exists but is no longer "
+                    "supported. Run 'monarch auth login' to authenticate "
+                    "again; you may delete the legacy file yourself."
+                ),
+                details={"legacy_artifact_path": str(COMPAT_SESSION_PATH)},
+            )
         raise AuthenticationError()
 
     # Use constructor parameter, never manipulate private attributes

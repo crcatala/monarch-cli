@@ -1,6 +1,6 @@
 ---
 id: mc-2nj4
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-11T01:15:13Z

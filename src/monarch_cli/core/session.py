@@ -1,6 +1,14 @@
 """Session management with dual-backend token storage.
 
-Supports keyring (secure, default), JSON file (portable), and legacy pickle (library compat).
+Supported backends, in precedence order:
+1. ``MONARCH_TOKEN`` environment variable
+2. System keyring (secure, default)
+3. Atomic JSON file (portable)
+
+Legacy pickle session files (``~/.mm/mm_session.pickle``) are no longer a
+credential source. Pickle deserialization can execute arbitrary code, so a
+legacy file is never read, only detected as a filesystem artifact so that
+diagnostics can direct the user to ``monarch auth login`` for re-auth.
 """
 
 from __future__ import annotations
@@ -8,7 +16,6 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import pickle
 import sys
 import tempfile
 from enum import StrEnum
@@ -28,7 +35,9 @@ if TYPE_CHECKING:
 KEYRING_SERVICE = "com.monarch-cli"
 KEYRING_USERNAME = "monarch-token"
 
-# Legacy compat path (for monarchmoney library interop)
+# Legacy pickle session artifact written by older releases (and the
+# monarchmoney library). Its contents are NEVER read: presence is detected via
+# filesystem metadata only so diagnostics can direct users to re-authenticate.
 COMPAT_SESSION_PATH = Path.home() / ".mm" / "mm_session.pickle"
 
 
@@ -53,7 +62,6 @@ class StorageBackend(StrEnum):
 
     KEYRING = "keyring"
     FILE = "file"
-    FILE_COMPAT = "file-compat"
 
 
 def get_session_path() -> Path:
@@ -69,7 +77,13 @@ def get_session_path() -> Path:
 
 
 def _set_file_permissions(fd: int) -> None:
-    """Set secure file permissions (0600) if supported by the platform.
+    """Set secure file permissions (0600) on POSIX platforms.
+
+    On POSIX, the resulting credential file has mode ``0600`` (owner
+    read/write only). On Windows, ``os.fchmod`` is not applicable; the file
+    inherits the default NTFS ACLs of the user's profile directory, which
+    restricts access to the user and administrators. Those ACLs are not
+    equivalent to POSIX mode ``0600`` and should not be described as such.
 
     Args:
         fd: File descriptor to set permissions on.
@@ -119,25 +133,6 @@ def _save_to_file(token: str) -> None:
         raise
 
 
-def _save_to_compat(token: str) -> None:
-    """Save token to legacy pickle file for library interop."""
-    COMPAT_SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    # Create temp file for atomic write
-    fd, tmp_path = tempfile.mkstemp(dir=COMPAT_SESSION_PATH.parent, suffix=".tmp")
-    tmp_path_obj = Path(tmp_path)
-    try:
-        _set_file_permissions(fd)  # Set perms before writing (Unix only)
-        with os.fdopen(fd, "wb") as f:
-            # The library expects {"token": token} structure
-            pickle.dump({"token": token}, f)
-        os.replace(tmp_path, COMPAT_SESSION_PATH)
-    except Exception:
-        if tmp_path_obj.exists():
-            tmp_path_obj.unlink()
-        raise
-
-
 def save_session_token(token: str, backend: StorageBackend) -> None:
     """Save token to specified storage backend.
 
@@ -153,8 +148,6 @@ def save_session_token(token: str, backend: StorageBackend) -> None:
             _save_to_keyring(token)
         case StorageBackend.FILE:
             _save_to_file(token)
-        case StorageBackend.FILE_COMPAT:
-            _save_to_compat(token)
 
 
 def _get_from_env() -> str | None:
@@ -188,30 +181,31 @@ def _get_from_file() -> str | None:
         return None
 
 
-def _get_from_compat() -> str | None:
-    """Get token from legacy pickle file."""
-    if not COMPAT_SESSION_PATH.exists():
-        return None
+def legacy_artifact_exists() -> bool:
+    """Report whether a legacy pickle session artifact exists.
+
+    Uses filesystem metadata (``Path.exists()``) only. The file's contents are
+    never read: pickle deserialization can execute arbitrary code, so legacy
+    files are never treated as credentials and never deserialized.
+
+    Returns:
+        True if the legacy artifact file exists on disk.
+    """
     try:
-        with COMPAT_SESSION_PATH.open("rb") as f:
-            data = pickle.load(f)  # noqa: S301 - Required for library compat
-        # Handle corrupted/unexpected data types gracefully
-        if not isinstance(data, dict):
-            return None
-        token = data.get("token")
-        return token if isinstance(token, str) else None
-    except (pickle.UnpicklingError, OSError, AttributeError, TypeError):
-        return None
+        return COMPAT_SESSION_PATH.is_file()
+    except OSError:
+        return False
 
 
 def get_session_token() -> str | None:
-    """Get token from the first available source.
+    """Get token from the first available supported source.
 
     Checks in order:
     1. MONARCH_TOKEN environment variable
     2. OS keyring
     3. JSON session file
-    4. Legacy pickle file (library compat)
+
+    Legacy pickle files are not consulted.
 
     Returns:
         The token if found, None otherwise.
@@ -226,10 +220,6 @@ def get_session_token() -> str | None:
         return token
 
     token = _get_from_file()
-    if token:
-        return token
-
-    token = _get_from_compat()
     if token:
         return token
 
@@ -252,31 +242,25 @@ def _delete_from_file() -> None:
         session_path.unlink()
 
 
-def _delete_from_compat() -> None:
-    """Delete legacy pickle file."""
-    if COMPAT_SESSION_PATH.exists():
-        COMPAT_SESSION_PATH.unlink()
-
-
 def delete_session_token(backend: StorageBackend | None = None) -> None:
-    """Delete token from specified backend or all backends.
+    """Delete token from specified backend or all supported backends.
+
+    Never touches the legacy pickle artifact (``~/.mm/mm_session.pickle``);
+    cleanup of that file is always an explicit user action.
 
     Args:
         backend: Specific backend to clear, or None for all backends.
     """
     if backend is None:
-        # Clear all backends
+        # Clear all supported backends
         _delete_from_keyring()
         _delete_from_file()
-        _delete_from_compat()
     else:
         match backend:
             case StorageBackend.KEYRING:
                 _delete_from_keyring()
             case StorageBackend.FILE:
                 _delete_from_file()
-            case StorageBackend.FILE_COMPAT:
-                _delete_from_compat()
 
 
 def has_valid_session() -> bool:
@@ -296,15 +280,16 @@ def get_storage_info() -> dict[str, Any]:
         - has_env_token: bool
         - has_keyring_token: bool
         - has_file_token: bool
-        - has_compat_token: bool
+        - has_legacy_artifact: bool (filesystem presence only, never read)
         - active_backend: str | None (which source would be used)
     """
     has_env = _get_from_env() is not None
     has_keyring = _get_from_keyring() is not None
     has_file = _get_from_file() is not None
-    has_compat = _get_from_compat() is not None
+    has_legacy_artifact = legacy_artifact_exists()
 
-    # Determine which backend would be active (first non-None in precedence)
+    # Determine which backend would be active (first non-None in precedence).
+    # Legacy pickle artifacts are never considered active credentials.
     active_backend: str | None = None
     if has_env:
         active_backend = "env"
@@ -312,13 +297,11 @@ def get_storage_info() -> dict[str, Any]:
         active_backend = StorageBackend.KEYRING.value
     elif has_file:
         active_backend = StorageBackend.FILE.value
-    elif has_compat:
-        active_backend = StorageBackend.FILE_COMPAT.value
 
     return {
         "has_env_token": has_env,
         "has_keyring_token": has_keyring,
         "has_file_token": has_file,
-        "has_compat_token": has_compat,
+        "has_legacy_artifact": has_legacy_artifact,
         "active_backend": active_backend,
     }

@@ -14,6 +14,7 @@ from ..core.async_utils import run_api_call, run_async
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, AuthenticationError
 from ..core.session import (
+    COMPAT_SESSION_PATH,
     StorageBackend,
     delete_session_token,
     get_session_path,
@@ -186,15 +187,26 @@ def status(
     """
     storage_info = get_storage_info()
     is_authenticated = storage_info["active_backend"] is not None
+    legacy_artifact = storage_info["has_legacy_artifact"]
 
     if json_output:
         result = {
             "authenticated": is_authenticated,
             "storage_backend": storage_info["active_backend"],
+            "legacy_pickle_artifact": {
+                "exists": legacy_artifact,
+                "path": str(COMPAT_SESSION_PATH) if legacy_artifact else None,
+                "active_credential": False,
+            },
             "message": (
                 "Authenticated and ready"
                 if is_authenticated
-                else "Not authenticated. Run 'monarch auth login' to authenticate."
+                else (
+                    "Not authenticated. A legacy session file was found but is "
+                    "no longer supported. Run 'monarch auth login' to authenticate."
+                    if legacy_artifact
+                    else "Not authenticated. Run 'monarch auth login' to authenticate."
+                )
             ),
         }
         output(result, OutputFormat.JSON)
@@ -212,6 +224,14 @@ def status(
         else:
             console.print("[yellow]✗ Not authenticated[/yellow]")
             console.print()
+            if legacy_artifact:
+                console.print(
+                    f"[yellow]⚠ Legacy session file found: {COMPAT_SESSION_PATH}[/yellow]"
+                )
+                console.print(
+                    "  Legacy pickle sessions are no longer supported and are not "
+                    "an active credential."
+                )
             console.print("Run [cyan]monarch auth login[/cyan] to authenticate.")
 
 
@@ -223,14 +243,17 @@ def logout(
         typer.Option(
             "-s",
             "--storage",
-            help="Clear specific backend only: keyring, file, or file-compat",
+            help="Clear specific backend only: keyring or file",
         ),
     ] = None,
 ) -> None:
     """Log out and clear stored credentials.
 
-    By default, clears tokens from all storage backends.
+    By default, clears tokens from all supported storage backends.
     Use --storage to clear a specific backend only.
+
+    Never deletes a legacy pickle session file (~/.mm/mm_session.pickle);
+    remove that file yourself if you no longer need it.
 
     Examples:
         monarch auth logout              # Clear all tokens
@@ -243,7 +266,7 @@ def logout(
             backend = StorageBackend(storage_lower)
         except ValueError:
             console.print(f"[red]✗ Invalid storage backend: {storage}[/red]")
-            console.print("  Valid options: keyring, file, file-compat")
+            console.print("  Valid options: keyring, file")
             raise typer.Exit(1) from None
 
         delete_session_token(backend)
@@ -298,10 +321,16 @@ def doctor() -> None:
     else:
         console.print(f"  [dim]✗ File[/dim] no token at {get_session_path()}")
 
-    if storage_info["has_compat_token"]:
-        console.print("  [green]✓ Compat[/green] legacy mm_session.pickle found")
+    if storage_info["has_legacy_artifact"]:
+        # Presence check only; the file's contents are never read.
+        console.print(
+            f"  [yellow]⚠ Legacy[/yellow] {COMPAT_SESSION_PATH} exists "
+            "(unsupported pickle format; not read, not an active credential)"
+        )
+        console.print("    Run [cyan]monarch auth login[/cyan] to re-authenticate;")
+        console.print("    delete the file yourself (e.g. rm) when no longer needed.")
     else:
-        console.print("  [dim]✗ Compat[/dim] no legacy session")
+        console.print("  [dim]✗ Legacy[/dim] no legacy session file")
 
     console.print()
     console.print("[bold]Active Backend:[/bold]")
@@ -396,11 +425,24 @@ def setup() -> None:
     console.print()
     console.print("  [yellow]file[/yellow]")
     console.print(f"    Stores token in: {get_session_path()}")
-    console.print("    File has 0600 permissions (owner read/write only)")
+    console.print("    On POSIX, the file is created with mode 0600 (owner")
+    console.print("    read/write only). On Windows, the file inherits the default")
+    console.print("    NTFS ACLs of your profile directory; they are not equivalent")
+    console.print("    to POSIX 0600 permissions.")
     console.print()
     console.print("  [dim]MONARCH_TOKEN[/dim] (environment variable)")
     console.print("    Set this env var to skip storage entirely")
     console.print("    Useful for CI/CD or containerized environments")
+    console.print()
+
+    console.print("[bold]Legacy Sessions:[/bold]")
+    console.print()
+    console.print("  Older releases stored sessions as a pickle file at")
+    console.print(f"  {COMPAT_SESSION_PATH}.")
+    console.print("  Pickle files can execute code when loaded, so this CLI never reads")
+    console.print("  them: they are not an active credential and are ignored. If one")
+    console.print("  exists, you must re-authenticate with [cyan]monarch auth login[/cyan].")
+    console.print("  The CLI will not delete it; remove it yourself when ready (e.g. rm).")
     console.print()
 
     console.print("[bold]Security Considerations:[/bold]")
@@ -413,7 +455,9 @@ def setup() -> None:
     console.print()
     console.print("  [yellow]📁 File Storage (Moderate Security)[/yellow]")
     console.print("    • Token stored in plaintext JSON file")
-    console.print("    • Protected by filesystem permissions (0600)")
+    console.print("    • On POSIX, protected by file mode 0600 (owner read/write only)")
+    console.print("    • On Windows, protected by default profile-folder ACLs (not")
+    console.print("      equivalent to POSIX 0600)")
     console.print("    • Accessible to root/admin and your user account")
     console.print("    • Best for: Headless servers, VMs where keyring unavailable")
     console.print()
