@@ -1,6 +1,6 @@
 ---
 id: mc-t9o7
-status: in_progress
+status: closed
 deps: [mc-k48z]
 links: []
 created: 2026-09-11T01:15:13Z
