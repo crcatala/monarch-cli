@@ -1,6 +1,6 @@
 ---
 id: mc-4edf
-status: open
+status: closed
 deps: [mc-h3cl, mc-7xfl]
 links: [mc-7xfl, mc-7wqj]
 created: 2026-09-11T01:21:50Z
