@@ -53,3 +53,7 @@ Do not add a schema library or other runtime dependency for this work.
 **2026-09-18T02:05:24Z**
 
 Started implementation on branch feat/mc-h3cl-harden-normalization. Added reusable null-safe traversal helper in transformers/nesting.py (nested_get, list_or_empty, mapping_or_empty, bool_or_default, number_or_zero, require_object -> typed APIError for non-object roots). Hardened account/transaction/cashflow transformers; corrected is_pending to read upstream pending with lower-precedence isPending alias; deterministic description fallback; documented boolean defaults and cashflow zero-for-no-data exception. Expanded transformer/schema/command contract tests (raw passthrough, malformed roots, null/coll containers). make verify passes.
+
+**2026-09-18T02:06:26Z**
+
+Implementation complete on feat/mc-h3cl-harden-normalization. PR #59 opened: https://github.com/crcatala/monarch-cli/pull/59. make verify passed (format, lint, typecheck, 795 tests). No new runtime dependency; raw passthrough and stable v1 key set preserved.
