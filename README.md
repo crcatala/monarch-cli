@@ -260,7 +260,7 @@ monarch accounts types --raw     # Raw API response
 monarch accounts history ACC123 --json
 monarch accounts recent-balances --start 2024-01-01 --json
 monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --json
-monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --account-type asset --json
+monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --account-type depository --json
 monarch accounts snapshots-by-type --start 2024-01-01 --timeframe month --json
 monarch accounts refresh-status --json
 monarch accounts refresh-status --account ACC123 --json

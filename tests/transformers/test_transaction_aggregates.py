@@ -42,6 +42,40 @@ def test_summary_maps_released_all_time_fields() -> None:
     }
 
 
+def test_summary_accepts_released_aggregate_list_shape() -> None:
+    result = transform_transaction_summary(
+        {
+            "aggregates": [
+                {
+                    "summary": {
+                        "avg": 12.5,
+                        "count": 3,
+                        "max": 50.0,
+                        "maxExpense": -30.0,
+                        "sum": 20.0,
+                        "sumIncome": 100.0,
+                        "sumExpense": -80.0,
+                        "first": "2024-01-01",
+                        "last": "2024-02-01",
+                    }
+                }
+            ]
+        }
+    )
+
+    assert result == {
+        "count": 3,
+        "average": 12.5,
+        "maximum": 50.0,
+        "maximum_expense": -30.0,
+        "net_sum": 20.0,
+        "income": 100.0,
+        "expenses": 80.0,
+        "first": "2024-01-01",
+        "last": "2024-02-01",
+    }
+
+
 def test_summary_missing_values_are_null_not_zero() -> None:
     assert transform_transaction_summary({"aggregates": None}) == {
         "count": None,

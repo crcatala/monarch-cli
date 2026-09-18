@@ -33,13 +33,19 @@ def _number_or_none(value: Any) -> int | float | None:
     return value
 
 
+def _summary_mapping(value: Any) -> Mapping[str, Any]:
+    """Return a summary mapping from either the list or object API shape."""
+    if isinstance(value, Mapping):
+        return value
+    items = list_or_empty(value)
+    return mapping_or_empty(items[0]) if items else {}
+
+
 def _summary_block(data: Any, context: str) -> Mapping[str, Any]:
     """Return the first period summary block from an aggregate response."""
     response = require_object(data, context)
-    summary_list = list_or_empty(nested_get(response, "summary"))
-    if not summary_list:
-        return {}
-    return mapping_or_empty(nested_get(summary_list[0], "summary"))
+    summary_entry = _summary_mapping(nested_get(response, "summary"))
+    return _summary_mapping(summary_entry.get("summary"))
 
 
 def _normalize_summary(data: Any, context: str) -> dict[str, int | float]:
@@ -71,17 +77,11 @@ def transform_cashflow_summary(data: Any) -> dict[str, int | float]:
     return _normalize_summary(data, "cashflow summary")
 
 
-def _first_item(value: Any) -> Any:
-    """Return the first list item, or ``None`` for an unavailable collection."""
-    items = list_or_empty(value)
-    return items[0] if items else None
-
-
 def _category_record(item: Any) -> dict[str, Any]:
     """Normalize one category aggregate while preserving signed amount."""
     category = nested_get(item, "groupBy", "category")
     group = nested_get(category, "group")
-    summary = mapping_or_empty(_first_item(nested_get(item, "summary")))
+    summary = _summary_mapping(nested_get(item, "summary"))
     return {
         "id": nested_get(category, "id"),
         "name": nested_get(category, "name"),
@@ -94,7 +94,7 @@ def _category_record(item: Any) -> dict[str, Any]:
 def _category_group_record(item: Any) -> dict[str, Any]:
     """Normalize one category-group aggregate while preserving signed amount."""
     group = nested_get(item, "groupBy", "categoryGroup")
-    summary = mapping_or_empty(_first_item(nested_get(item, "summary")))
+    summary = _summary_mapping(nested_get(item, "summary"))
     return {
         "id": nested_get(group, "id"),
         "name": nested_get(group, "name"),
@@ -106,7 +106,7 @@ def _category_group_record(item: Any) -> dict[str, Any]:
 def _merchant_record(item: Any) -> dict[str, Any]:
     """Normalize one merchant aggregate with positive expense semantics."""
     merchant = nested_get(item, "groupBy", "merchant")
-    summary = mapping_or_empty(_first_item(nested_get(item, "summary")))
+    summary = _summary_mapping(nested_get(item, "summary"))
     expense = _number_or_none(summary.get("sumExpense"))
     return {
         "id": nested_get(merchant, "id"),

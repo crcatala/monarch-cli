@@ -25,11 +25,17 @@ def _number_or_none(value: Any) -> int | float | None:
 def _summary_object(response: Mapping[str, Any]) -> Mapping[str, Any]:
     """Locate the released ``aggregates.summary`` object.
 
-    A direct ``summary`` fallback makes the normalizer tolerant of a small
-    envelope variation seen in fixtures while never merging or calculating
-    values locally.
+    The released client returns ``aggregates`` as a one-item list, while
+    earlier fixtures used a direct object. Accept both shapes without merging
+    or calculating values locally.
     """
-    summary = nested_get(response, "aggregates", "summary")
+    aggregates = response.get("aggregates")
+    if isinstance(aggregates, Mapping):
+        summary = aggregates.get("summary")
+    elif isinstance(aggregates, list):
+        summary = nested_get(aggregates[0], "summary") if aggregates else None
+    else:
+        summary = None
     if summary is None:
         summary = nested_get(response, "summary")
     return mapping_or_empty(summary)

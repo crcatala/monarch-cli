@@ -92,6 +92,69 @@ class TestTransformCashflowDetail:
             },
         }
 
+    def test_normalizes_released_object_summary_shape(self) -> None:
+        result = transform_cashflow_detail(
+            {
+                "byCategory": [
+                    {
+                        "groupBy": {
+                            "category": {
+                                "id": "cat-food",
+                                "name": "Food",
+                                "group": {"id": "group-need", "type": "needs"},
+                            }
+                        },
+                        "summary": {"sum": -25.0},
+                    }
+                ],
+                "byCategoryGroup": [
+                    {
+                        "groupBy": {
+                            "categoryGroup": {
+                                "id": "group-need",
+                                "name": "Needs",
+                                "type": "needs",
+                            }
+                        },
+                        "summary": {"sum": -25.0},
+                    }
+                ],
+                "byMerchant": [
+                    {
+                        "groupBy": {
+                            "merchant": {
+                                "id": "merchant-1",
+                                "name": "Market",
+                                "logoUrl": "https://logo",
+                            }
+                        },
+                        "summary": {"sumIncome": 5.0, "sumExpense": -25.0},
+                    }
+                ],
+                "summary": [
+                    {
+                        "summary": {
+                            "sumIncome": 5.0,
+                            "sumExpense": -25.0,
+                            "savings": -20.0,
+                            "savingsRate": -400.0,
+                        }
+                    }
+                ],
+            }
+        )
+
+        assert result["categories"][0]["amount"] == -25.0
+        assert result["category_groups"][0]["amount"] == -25.0
+        assert result["merchants"][0]["income"] == 5.0
+        assert result["merchants"][0]["expenses"] == 25.0
+        assert result["summary"] == {
+            "income": 5.0,
+            "expenses": 25.0,
+            "savings": -20.0,
+            "savings_rate": -400.0,
+        }
+
     def test_missing_and_partial_detail_data_is_stable(self) -> None:
         result = transform_cashflow_detail(
             {
