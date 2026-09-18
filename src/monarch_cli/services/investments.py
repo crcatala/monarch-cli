@@ -30,6 +30,11 @@ def _validate_account_id(account_id: str) -> str:
     return account_id
 
 
+def _usable_account_id(value: Any) -> bool:
+    """Return whether discovery supplied a safe opaque ID for fanout."""
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _normal_key(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
@@ -78,9 +83,7 @@ def _select_accounts(
     include_hidden: bool,
 ) -> list[dict[str, Any]]:
     by_id = {
-        str(account["id"]): account
-        for account in accounts
-        if isinstance(account.get("id"), str) and account["id"]
+        account["id"]: account for account in accounts if _usable_account_id(account.get("id"))
     }
     if requested_ids is not None:
         unknown = [account_id for account_id in requested_ids if account_id not in by_id]
@@ -106,7 +109,8 @@ def _select_accounts(
         selected = [
             account
             for account in accounts
-            if account_is_holdings_eligible(account)
+            if _usable_account_id(account.get("id"))
+            and account_is_holdings_eligible(account)
             and (include_hidden or not account.get("is_hidden"))
         ]
 

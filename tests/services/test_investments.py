@@ -67,6 +67,19 @@ def test_discovery_once_hidden_and_zero_accounts_are_not_read(client: MagicMock)
     client.get_account_holdings.assert_awaited_once_with("visible")
 
 
+def test_discovery_accounts_without_usable_ids_are_not_read(client: MagicMock) -> None:
+    client.get_account_holdings = AsyncMock(return_value=response("missing"))
+    missing_id = {**account("missing"), "id": None}
+    whitespace_id = {**account("whitespace"), "id": "   "}
+    discovery = {"accounts": [missing_id, whitespace_id]}
+    with (
+        patch("monarch_cli.services.investments.get_authenticated_client", return_value=client),
+        patch("monarch_cli.services.investments.run_read_call", return_value=discovery),
+    ):
+        assert get_investment_holdings() == []
+    client.get_account_holdings.assert_not_awaited()
+
+
 def test_manual_balance_only_account_is_ineligible() -> None:
     from monarch_cli.services.investments import account_is_holdings_eligible
 
