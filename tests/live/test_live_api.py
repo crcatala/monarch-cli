@@ -24,85 +24,23 @@ Prerequisites:
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import time
-from typing import Any
 
 import pytest
 
+from tests.live.live_cli import (
+    LIVE_ENABLED,
+    get_output,
+    run_cli,
+    run_cli_json,
+)
+
 # Skip all tests in this module unless MONARCH_LIVE_TESTS=1.  Keep this exact,
-# deliberate opt-in separate from any future mutation-test opt-in.
-LIVE_ENABLED = os.environ.get("MONARCH_LIVE_TESTS") == "1"
-
-# Configurable delay between API calls (seconds).  A one-second default keeps
-# local runs below the API's throttling threshold without making CI opt in.
-LIVE_DELAY = float(os.environ.get("MONARCH_LIVE_DELAY", "1.0"))
-_last_call_at: float | None = None
-
+# deliberate opt-in separate from the mutation-test opt-in
+# (MONARCH_LIVE_MUTATION_TESTS); the latter never enables this module.
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(not LIVE_ENABLED, reason="Live tests disabled (set MONARCH_LIVE_TESTS=1)"),
 ]
-
-
-def _wait_for_api_throttle() -> None:
-    """Wait between subprocess calls so consecutive API requests are spaced."""
-    global _last_call_at
-    if _last_call_at is not None and LIVE_DELAY > 0:
-        elapsed = time.monotonic() - _last_call_at
-        if elapsed < LIVE_DELAY:
-            time.sleep(LIVE_DELAY - elapsed)
-    _last_call_at = time.monotonic()
-
-
-def run_cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    """Run a monarch CLI command and return the result.
-
-    Args:
-        *args: Command arguments (e.g., "accounts", "list", "--json")
-        check: If True, raise on non-zero exit code
-
-    Returns:
-        CompletedProcess with stdout, stderr, returncode
-    """
-    cmd = ["uv", "run", "monarch", *args]
-    _wait_for_api_throttle()
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=30)
-
-    if check and result.returncode != 0:
-        pytest.fail(
-            f"Command failed: {' '.join(cmd)}\n"
-            f"Exit code: {result.returncode}\n"
-            f"Stdout: {result.stdout}\n"
-            f"Stderr: {result.stderr}"
-        )
-
-    return result
-
-
-def run_cli_json(*args: str) -> Any:
-    """Run a monarch CLI command and parse JSON output.
-
-    Args:
-        *args: Command arguments (--json is added automatically)
-
-    Returns:
-        Parsed JSON data
-    """
-    result = run_cli(*args, "--json")
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as e:
-        pytest.fail(f"Invalid JSON output: {e}\nOutput: {result.stdout}")
-
-
-def get_output(result: subprocess.CompletedProcess[str]) -> str:
-    """Get combined stdout + stderr for human-readable command output.
-
-    Some commands output styled text to stderr (via Rich console).
-    """
-    return result.stdout + result.stderr
 
 
 # ---------------------------------------------------------------------------

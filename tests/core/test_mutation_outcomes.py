@@ -289,6 +289,12 @@ class TestOperationRegistry:
             "accounts refresh": "accounts.refresh",
             "transactions update": "transactions.update",
             "transactions batch-update": "transactions.batch-update",
+            # Test-only disposable-fixture operations (mc-584r): real remote
+            # effects used only by the gated live mutation adapter.
+            "live-fixture account create": "live-fixture.account.create",
+            "live-fixture transaction create": "live-fixture.transaction.create",
+            "live-fixture transaction delete": "live-fixture.transaction.delete",
+            "live-fixture account delete": "live-fixture.account.delete",
         }
 
     def test_unknown_command_is_refused(self) -> None:

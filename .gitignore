@@ -20,6 +20,10 @@ build/
 .coverage
 htmlcov/
 
+# Live mutation recovery manifests (created by the gated live mutation suite).
+# Root-anchored: never ignore test fixtures or docs directories with this name.
+/.monarch-live-mutation-recovery/
+
 # Type checking
 .mypy_cache/
 
