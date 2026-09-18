@@ -83,5 +83,6 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "live: marks tests that hit the real Monarch Money API (excluded in CI)",
+    "live_mutation: marks live tests that mutate a disposable fixture (also carries 'live'; requires MONARCH_LIVE_MUTATION_TESTS=1 and is excluded from normal and read-only-live runs)",
 ]
 

@@ -1,4 +1,4 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test test-live smoke-install release release-dry prepublish
+.PHONY: setup verify format format-check lint lint-fix typecheck test test-live test-live-mutation smoke-install release release-dry prepublish
 
 # Python version used by the isolated wheel smoke-install environment.
 SMOKE_PYTHON ?= 3.13
@@ -39,9 +39,17 @@ typecheck:
 test:
 	uv run pytest -m "not live"
 
-# Run live tests only (requires MONARCH_LIVE_TESTS=1 and valid credentials)
+# Run read-only live tests only (requires MONARCH_LIVE_TESTS=1 and valid credentials).
+# The explicit "live and not live_mutation" selector keeps the mutation contract
+# suite out of this target even though mutation nodes also carry the `live` marker.
 test-live:
-	MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m live -v
+	MONARCH_LIVE_TESTS=1 uv run pytest tests/live/ -m "live and not live_mutation" -v
+
+# Run the credential-gated disposable-fixture live mutation contract suite.
+# This mutates only a suite-created fixture and requires the dedicated opt-in
+# plus an explicit approved household ID. It is never run in CI or by `make test`.
+test-live-mutation:
+	MONARCH_LIVE_MUTATION_TESTS=1 uv run pytest tests/live/ -m live_mutation -v
 
 # Create GitHub release with tag and changelog
 release:

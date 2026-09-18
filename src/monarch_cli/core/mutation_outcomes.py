@@ -87,6 +87,14 @@ OUTCOME_OPERATIONS: dict[str, str] = {
     "accounts refresh": "accounts.refresh",
     "transactions update": "transactions.update",
     "transactions batch-update": "transactions.batch-update",
+    # Test-only disposable-fixture operations (mc-584r). These are real remote
+    # effects used exclusively by the gated live mutation adapter; they are
+    # deliberately NOT registered as public CLI commands and must never be
+    # exposed through a Typer command.
+    "live-fixture account create": "live-fixture.account.create",
+    "live-fixture transaction create": "live-fixture.transaction.create",
+    "live-fixture transaction delete": "live-fixture.transaction.delete",
+    "live-fixture account delete": "live-fixture.account.delete",
 }
 
 

@@ -3,14 +3,15 @@
 These are ordinary, non-live tests: they never spawn a CLI subprocess or call
 the Monarch API, so they run in the default ``-m "not live"`` suite and give CI
 coverage for the throttling behavior that would otherwise only be observable in
-a credential-gated live run.
+a credential-gated live run. They target the shared runner used by both the
+read-only live suite and the gated mutation suite.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from tests.live import test_live_api as live
+from tests.live import live_cli as live
 
 
 class _FakeClock:

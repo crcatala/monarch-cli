@@ -593,6 +593,58 @@ The ordinary `make test` and CI command explicitly select `-m "not live"`.
 Live failures usually indicate missing/expired authentication or API contract
 drift; do not rerun repeatedly when a service or rate-limit error occurs.
 
+#### Gated live mutation contract suite
+
+`make test-live-mutation` is a separately gated, disposable-fixture mutation
+contract suite. It mutates only a uniquely named manual account and uniquely
+marked manual transaction that the suite itself creates for that run, then
+deletes both. Existing household records are never mutation targets.
+
+Request limits and runtime: the suite spaces CLI subprocess invocations with
+the same one-second default delay as the read-only suite (`MONARCH_LIVE_DELAY`
+can increase it), and bounds every CLI call with a 60-second timeout. A full
+lifecycle run (create account, create transaction, update notes, read back,
+delete both) typically completes in under a minute of wall time plus the
+per-call delays; expect roughly ten CLI/API calls per run.
+
+```bash
+# 1. Authenticate with the exact installed CLI used by the suite:
+uv run monarch auth login
+# 2. Export the exact opaque ID of the owner-approved disposable household
+#    (never commit or persist it):
+export MONARCH_LIVE_MUTATION_HOUSEHOLD_ID=<approved-household-id>
+# 3. Run the gated suite locally:
+MONARCH_LIVE_MUTATION_TESTS=1 make test-live-mutation
+```
+
+Layered gating: mutation nodes carry both `live` and `live_mutation` markers;
+`make test-live` selects `-m "live and not live_mutation"` so mutation nodes
+are never collected by read-only runs; a collection guard additionally
+deselects `live_mutation` nodes unless `MONARCH_LIVE_MUTATION_TESTS=1`; and an
+independent runtime guard fails closed before fixture setup. Before the first
+mutation, the suite performs a minimal read-only `myHousehold { id }` lookup
+and refuses to proceed unless it exactly matches the exported approved ID.
+Only the transaction-notes update runs through the installed public CLI with
+the global `--allow-mutations` authorization.
+
+Residual risks and manual recovery: each run journals its intended and
+observed fixture effects to a git-ignored `.monarch-live-mutation-recovery/<run-id>.json`
+manifest (directory mode `0700`, file mode `0600`). The manifest contains only
+operation names, the high-entropy run marker, fixture remote IDs, statuses,
+and recovery steps — never credentials, household IDs, financial values, or
+raw payloads. Cleanup is conservative and single-attempt: a timed-out or
+disconnected create/delete is never retried automatically. If a delete does
+not definitively succeed, the manifest is preserved and the failure message
+prints its absolute path; inspect the disposable household and delete only
+records matching the manifest's run marker (`mc584r-<run-id>`). A manifest is
+removed only after both fixture deletions are definitively confirmed. If
+`monarch` is not installed in the pytest environment's scripts directory, the
+suite fails closed with setup guidance rather than falling back to a
+different environment (`uv run --no-sync monarch` is a manual fallback only).
+The dedicated live mutation run is an explicit human gate: merge evidence
+must not claim the contract is live-proven until an operator-authenticated
+gated run succeeds.
+
 ### Pre-commit hooks
 
 Git hooks are managed with [prek](https://github.com/j178/prek):
