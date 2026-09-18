@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Account Type Discovery
+- **`monarch accounts types`** - Read-only discovery of the supported account groups, types, and subtypes accepted by account workflows, so callers no longer have to guess identifiers
+- **Normalized hierarchy records** - One stable record per `(group, type, subtype)` leaf with `group`, `type`, `type_display`, `subtype`, and `subtype_display` fields; identifiers are the upstream `name` values and labels are human-readable `display` values
+- **Deterministic ordering** - Types follow upstream first-seen order; within a type, subtypes follow the upstream `possibleSubtypes` order; duplicate identifiers collapse (first wins)
+- **Null-safe evolution** - Empty, null, partial, and unknown option fields normalize without crashes or invented values; `--raw` returns the upstream payload untouched
+
 #### Layered Configuration System
 - **Config file support** - Create `~/.config/monarch-cli/config.toml` for persistent settings
 - **Layered precedence** - Config file → Environment variables → CLI flags (highest priority)

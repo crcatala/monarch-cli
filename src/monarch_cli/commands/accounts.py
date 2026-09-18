@@ -18,7 +18,12 @@ from ..core.operations import (
 )
 from ..output import OutputFormat, output
 from ..output.progress import spinner
-from ..services.accounts import list_accounts, refresh_accounts
+from ..services.accounts import (
+    get_account_type_options,
+    list_account_types,
+    list_accounts,
+    refresh_accounts,
+)
 
 app = typer.Typer(
     help="Account management",
@@ -104,6 +109,69 @@ def list_cmd(
             # For raw mode with dict, output as single line
             print(json.dumps(data, default=str))
         return
+
+    output(data, output_format, raw=False)
+
+
+@app.command("types")
+@handle_errors
+@operation_effects(Effect.READ_ONLY)
+def types_cmd(
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option(
+            "-f",
+            "--format",
+            help="Output format (plain, json, table, csv, compact)",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output as JSON (shortcut for --format json)",
+        ),
+    ] = False,
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Output the raw API response without normalization",
+        ),
+    ] = False,
+) -> None:
+    """List supported account groups, types, and subtypes.
+
+    Exposes the authoritative account hierarchy accepted by account
+    workflows (for example manual-account creation and snapshot filters) so
+    callers do not have to guess identifiers.
+
+    Normalized records contain stable ``group`` > ``type`` > ``subtype``
+    identifiers plus ``type_display``/``subtype_display`` labels. Ordering
+    follows the upstream first-seen type order and, within a type, the
+    upstream subtype order. Duplicate identifiers are collapsed. Record
+    fields are always present; unavailable values are ``null``.
+
+    This command is read-only and never modifies remote state.
+
+    Examples:
+        monarch accounts types                # Plain format (default in terminal)
+        monarch accounts types --json         # JSON format
+        monarch accounts types --format table # Table format
+        monarch accounts types | jq .         # Auto-JSON when piped
+        monarch accounts types --raw          # Raw API response
+    """
+    output_format = format
+    if json_output:
+        output_format = OutputFormat.JSON
+
+    operation = Operation(command="accounts types", effects=frozenset({Effect.READ_ONLY}))
+
+    with spinner("Fetching account types..."):
+        if raw:
+            data: Any = get_account_type_options(operation)
+        else:
+            data = list_account_types(operation)
 
     output(data, output_format, raw=False)
 

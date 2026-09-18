@@ -252,6 +252,10 @@ monarch accounts list --json     # JSON format
 monarch accounts list --format table  # Table format
 monarch accounts list --raw      # Raw API response
 
+monarch accounts types           # List supported account groups/types/subtypes
+monarch accounts types --json    # JSON format
+monarch accounts types --raw     # Raw API response
+
 monarch --allow-mutations accounts refresh         # Refresh all account data
 monarch --allow-mutations accounts refresh -a ACC123  # Refresh specific account
 ```
@@ -512,6 +516,8 @@ These output fields are guaranteed stable across versions:
 
 **Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
 
+**Account types:** `group`, `type`, `type_display`, `subtype`, `subtype_display`
+
 **Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `notes`
 
 #### Normalization semantics (v1)
@@ -533,6 +539,27 @@ unknown fields).
 - Unknown additive upstream fields are ignored by normalized output.
 - Cashflow period aggregates are the one documented numeric-default
   exception: a period with no data reports `0` totals.
+- Account type discovery flattens the upstream hierarchy into one record per
+  `(group, type, subtype)` leaf. `group`/`type`/`subtype` are the upstream
+  `name` identifiers that account workflows send back to the API;
+  `type_display`/`subtype_display` are human labels. Ordering follows the
+  upstream first-seen type order and, within a type, the upstream subtype
+  order; duplicate identifiers collapse (first wins). A type with no subtype
+  information yields one row with `subtype: null`.
+
+#### Account type discovery
+
+Use `monarch accounts types` before constructing any operation that needs an
+account group/type/subtype identifier (for example manual-account creation or
+account-type filter validation). The identifiers are authoritative values
+accepted by Monarch, so agents should select `type`/`subtype` values from this
+output instead of guessing display labels:
+
+```bash
+monarch accounts types --json | jq '.[] | select(.group == "assets")'
+# {"group": "assets", "type": "asset", "type_display": "Asset",
+#  "subtype": "checking", "subtype_display": "Checking"}
+```
 
 ## Shell Completions
 

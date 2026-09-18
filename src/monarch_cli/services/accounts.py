@@ -11,7 +11,7 @@ the read executor.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from ..core.adapter import get_authenticated_client
 from ..core.exceptions import MutationAmbiguousError
@@ -31,10 +31,13 @@ from ..core.operations import (
     run_mutation_call,
     run_read_call,
 )
-from ..transformers.accounts import transform_accounts
+from ..transformers.accounts import transform_account_types, transform_accounts
 
 #: Descriptor for the read-only account listing operation.
 LIST_ACCOUNTS_OPERATION = Operation(command="accounts list", effects=frozenset({Effect.READ_ONLY}))
+
+#: Descriptor for the read-only account type-discovery operation.
+ACCOUNT_TYPES_OPERATION = Operation(command="accounts types", effects=frozenset({Effect.READ_ONLY}))
 
 
 def list_accounts(
@@ -56,6 +59,50 @@ def list_accounts(
     client = get_authenticated_client()
     raw = run_read_call(lambda: client.get_accounts(), operation)
     return transform_accounts(raw)
+
+
+def get_account_type_options(
+    operation: Operation = ACCOUNT_TYPES_OPERATION,
+) -> dict[str, Any]:
+    """Fetch the raw account type-discovery response.
+
+    Kept as an explicit raw accessor so callers that offer ``--raw`` never
+    import the upstream client directly from a command handler. The response
+    is returned untouched (no normalization).
+
+    Args:
+        operation: Explicit descriptor for the invoking read operation.
+
+    Returns:
+        The upstream response as-is.
+
+    Raises:
+        AuthenticationError: If not authenticated.
+        APIError: If API request fails.
+        NetworkError: On timeout or network failure.
+    """
+    client = get_authenticated_client()
+    return cast(dict[str, Any], run_read_call(lambda: client.get_account_type_options(), operation))
+
+
+def list_account_types(
+    operation: Operation = ACCOUNT_TYPES_OPERATION,
+) -> list[dict[str, Any]]:
+    """Fetch and normalize the supported account group/type/subtype hierarchy.
+
+    Args:
+        operation: Explicit descriptor for the invoking read operation.
+
+    Returns:
+        Deterministically ordered normalized account type records.
+
+    Raises:
+        AuthenticationError: If not authenticated.
+        APIError: If API request fails or the response root is not an object.
+        NetworkError: On timeout or network failure.
+    """
+    raw = get_account_type_options(operation)
+    return transform_account_types(raw)
 
 
 def get_account_ids(
