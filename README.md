@@ -328,7 +328,29 @@ monarch cashflow summary                      # Current period
 monarch cashflow summary --preset this-month  # This month
 monarch cashflow summary --preset ytd         # Year to date
 monarch cashflow summary -s 2024-01-01 -e 2024-12-31  # Date range
+monarch cashflow detail                       # Categories, groups, merchants, summary
+monarch cashflow detail --preset this-month
+monarch cashflow detail -s 2024-01-01 -e 2024-12-31 --json
+monarch cashflow detail --raw                 # Upstream response, without normalization
 ```
+
+`cashflow detail` is one read-only aggregate request; it does not expose
+pagination or a `--limit` option. It uses the same inclusive date presets and
+summary semantics as `cashflow summary`. Explicit `--start` and `--end` must
+be supplied together, and the start cannot be after the end.
+
+Normalized detail JSON has this stable shape:
+
+- `categories`: `{id, name, group_id, group_type, amount}` records. `amount`
+  preserves the upstream signed aggregate.
+- `category_groups`: `{id, name, type, amount}` records, also signed.
+- `merchants`: `{id, name, logo_url, income, expenses}` records. `expenses`
+  is positive, matching the summary contract.
+- `summary`: `{income, expenses, savings, savings_rate}`, shared with
+  `cashflow summary`; an empty period reports zero totals.
+
+Missing or null detail collections are empty lists. Missing fields remain
+`null`; use `--raw` when the untouched upstream envelope is required.
 
 ### categories
 

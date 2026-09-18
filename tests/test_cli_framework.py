@@ -49,7 +49,7 @@ NESTED_COMMANDS: dict[str, tuple[str, ...]] = {
     "accounts": ("list", "refresh"),
     "transactions": ("list", "update", "batch-update"),
     "budgets": ("list",),
-    "cashflow": ("summary",),
+    "cashflow": ("summary", "detail"),
     "categories": ("list",),
 }
 

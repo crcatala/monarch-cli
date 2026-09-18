@@ -85,7 +85,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["summary", "--json"])
 
             assert result.exit_code == 0
             data = json.loads(result.stdout)
@@ -114,7 +114,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "plain"])
+            result = runner.invoke(app, ["summary", "--format", "plain"])
 
             assert result.exit_code == 0
             # Plain format uses emoji icons and field names
@@ -143,7 +143,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--preset", "this-month", "--json"])
+            result = runner.invoke(app, ["summary", "--preset", "this-month", "--json"])
 
             assert result.exit_code == 0
             # Preset should resolve to dates
@@ -173,7 +173,7 @@ class TestCashflowSummary:
         ):
             result = runner.invoke(
                 app,
-                ["--start", "2024-01-01", "--end", "2024-12-31", "--json"],
+                ["summary", "--start", "2024-01-01", "--end", "2024-12-31", "--json"],
             )
 
             assert result.exit_code == 0
@@ -204,7 +204,16 @@ class TestCashflowSummary:
             # Use preset but override start date
             result = runner.invoke(
                 app,
-                ["--preset", "this-month", "--start", "2024-06-15", "--json"],
+                [
+                    "summary",
+                    "--preset",
+                    "this-month",
+                    "--start",
+                    "2024-06-15",
+                    "--end",
+                    "2024-06-30",
+                    "--json",
+                ],
             )
 
             assert result.exit_code == 0
@@ -230,7 +239,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["summary", "--json"])
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -260,7 +269,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "table"])
+            result = runner.invoke(app, ["summary", "--format", "table"])
 
             assert result.exit_code == 0
             # Table format falls back to JSON for non-list data (dicts)
@@ -288,7 +297,7 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "csv"])
+            result = runner.invoke(app, ["summary", "--format", "csv"])
 
             assert result.exit_code == 0
             # CSV format falls back to JSON for non-list data (dicts)
@@ -298,7 +307,7 @@ class TestCashflowSummary:
 
     def test_summary_help_shows_examples(self) -> None:
         """Summary --help shows examples."""
-        result = runner.invoke(app, ["--help"])
+        result = runner.invoke(app, ["summary", "--help"])
 
         assert result.exit_code == 0
         # Strip ANSI codes for comparison
@@ -328,11 +337,130 @@ class TestCashflowSummary:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["summary", "--json"])
 
             assert result.exit_code == 0
             assert captured_kwargs.get("start_date") is None
             assert captured_kwargs.get("end_date") is None
+
+
+class TestCashflowDetail:
+    """Tests for the single-request aggregate detail command."""
+
+    @pytest.fixture
+    def sample_detail_response(self) -> dict:
+        return {
+            "byCategory": [
+                {
+                    "groupBy": {
+                        "category": {
+                            "id": "cat-1",
+                            "name": "Food",
+                            "group": {"id": "g-1", "type": "needs"},
+                        }
+                    },
+                    "summary": [{"sum": -10.0}],
+                }
+            ],
+            "byCategoryGroup": [],
+            "byMerchant": [],
+            "summary": [
+                {
+                    "summary": {
+                        "sumIncome": 20.0,
+                        "sumExpense": -10.0,
+                        "savings": 10.0,
+                        "savingsRate": 50.0,
+                    }
+                }
+            ],
+        }
+
+    def test_detail_uses_get_cashflow_once_and_normalizes(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict
+    ) -> None:
+        captured: dict = {}
+
+        async def async_cashflow(**kwargs):
+            captured.update(kwargs)
+            return sample_detail_response
+
+        mock_authenticated_client.get_cashflow = async_cashflow
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app, ["detail", "--start", "2024-01-01", "--end", "2024-01-31", "--json"]
+            )
+
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert json.loads(result.stdout)["summary"]["income"] == 20.0
+        assert captured == {"start_date": "2024-01-01", "end_date": "2024-01-31"}
+
+    def test_detail_preset_resolves_both_bounds(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict
+    ) -> None:
+        captured: dict = {}
+
+        async def async_cashflow(**kwargs):
+            captured.update(kwargs)
+            return sample_detail_response
+
+        mock_authenticated_client.get_cashflow = async_cashflow
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["detail", "--preset", "this-month", "--json"])
+
+        assert result.exit_code == 0
+        assert captured["start_date"] is not None
+        assert captured["end_date"] is not None
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["detail", "--start", "2024-01-01"],
+            ["detail", "--end", "2024-01-31"],
+            ["detail", "--start", "2024-02-01", "--end", "2024-01-31"],
+            ["detail", "--start", "not-a-date", "--end", "2024-01-31"],
+        ],
+    )
+    def test_invalid_dates_fail_before_client_creation(self, args: list[str]) -> None:
+        with patch("monarch_cli.commands.cashflow.get_authenticated_client") as get_client:
+            result = runner.invoke(app, [*args, "--json"])
+
+        assert result.exit_code == 2
+        get_client.assert_not_called()
+        assert "INVALID_INPUT" in result.stderr
+
+    def test_raw_preserves_response_and_does_not_request_summary(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict
+    ) -> None:
+        async def async_cashflow(**_kwargs):
+            return sample_detail_response
+
+        mock_authenticated_client.get_cashflow = async_cashflow
+        mock_authenticated_client.get_cashflow_summary = MagicMock()
+        with (
+            patch(
+                "monarch_cli.commands.cashflow.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["detail", "--raw", "--json"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) == sample_detail_response
+        mock_authenticated_client.get_cashflow_summary.assert_not_called()
 
 
 class TestCashflowApp:
@@ -344,22 +472,21 @@ class TestCashflowApp:
 
         assert result.exit_code == 0
         output = result.stdout.lower()
-        # Single-command app shows the command's help directly
-        assert "income" in output or "expense" in output or "date" in output
+        assert "cashflow analysis" in output
+        assert "summary" in output
+        assert "detail" in output
 
     def test_no_args_runs_command(self) -> None:
-        """Running cashflow with no args runs the summary command (single-command app)."""
-        # Single-command apps run the command directly, so this will attempt to fetch data
-        # We just verify it doesn't show help (since no_args_is_help has no effect)
+        """The cashflow group exposes summary and detail subcommands."""
         result = runner.invoke(app, ["--help"])
 
-        # With --help it should show usage info
         assert result.exit_code == 0
         output = result.stdout.lower()
-        assert "income" in output or "expense" in output or "format" in output
+        assert "summary" in output
+        assert "detail" in output
 
     def test_invalid_option_shows_error(self) -> None:
         """Invalid option shows error."""
-        result = runner.invoke(app, ["--invalid-option-xyz"])
+        result = runner.invoke(app, ["summary", "--invalid-option-xyz"])
 
         assert result.exit_code != 0
