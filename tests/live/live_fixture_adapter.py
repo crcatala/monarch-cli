@@ -279,7 +279,7 @@ class LiveFixtureAdapter:
             target_ids=(marker,),
             call_factory=lambda: self._client.create_manual_account(
                 account_type="other_asset",
-                account_sub_type="other_asset",
+                account_sub_type="other",
                 is_in_net_worth=False,
                 account_name=name,
                 account_balance=0,

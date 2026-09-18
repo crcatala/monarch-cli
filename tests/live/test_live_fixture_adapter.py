@@ -199,8 +199,11 @@ def test_create_manual_account_success_mapping() -> None:
     assert result.remote_id == "acct-1"
     assert result.envelope["operation"] == "live-fixture.account.create"
     assert result.envelope["schema_version"] == "mutation-outcome.v1"
-    # Zero-balance manual account, not in net worth.
+    # Zero-balance manual account, not in net worth, using a valid upstream
+    # account type/subtype pair from accountTypeOptions.
     _, kwargs = client.calls[0]
+    assert kwargs["account_type"] == "other_asset"
+    assert kwargs["account_sub_type"] == "other"
     assert kwargs["account_balance"] == 0
     assert kwargs["is_in_net_worth"] is False
 
