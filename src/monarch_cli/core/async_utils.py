@@ -367,18 +367,24 @@ def run_mutation_api_call[T](
     """
     config = get_config()
     effective_timeout = timeout_seconds if timeout_seconds is not None else config.timeout_seconds
+    mutation_coro = run_mutation_api_call_async(
+        coro_factory,
+        operation=operation,
+        entity_ids=entity_ids,
+        verification=verification,
+        timeout_seconds=timeout_seconds,
+        retry_policy=retry_policy,
+    )
     try:
-        return run_async(
-            run_mutation_api_call_async(
-                coro_factory,
-                operation=operation,
-                entity_ids=entity_ids,
-                verification=verification,
-                timeout_seconds=timeout_seconds,
-                retry_policy=retry_policy,
-            )
-        )
-    except KeyboardInterrupt as e:
+        return run_async(mutation_coro)
+    except BaseException as e:
+        # If the bridge is interrupted before it can hand the coroutine to an
+        # event loop (as in a synchronous caller/test), close it explicitly so
+        # Python does not emit an unawaited-coroutine warning. ``close`` is
+        # harmless when asyncio.run already cancelled and closed the coroutine.
+        mutation_coro.close()
+        if not isinstance(e, KeyboardInterrupt):
+            raise
         # The interrupt cancelled the running task; the coroutine's internal
         # ambiguity conversion cannot surface through asyncio.run() shutdown,
         # so report it here. This is conservative: even if the interrupt
