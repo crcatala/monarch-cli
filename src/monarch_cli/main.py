@@ -10,6 +10,7 @@ from monarch_cli.commands import (
     cashflow,
     categories,
     institutions,
+    investments,
     subscription,
     transactions,
 )
@@ -28,6 +29,7 @@ app.add_typer(budgets.app, name="budgets")
 app.add_typer(cashflow.app, name="cashflow")
 app.add_typer(categories.app, name="categories")
 app.add_typer(institutions.app, name="institutions")
+app.add_typer(investments.app, name="investments")
 app.add_typer(subscription.app, name="subscription")
 
 

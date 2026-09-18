@@ -63,6 +63,7 @@ EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
     "cashflow detail": frozenset({Effect.READ_ONLY}),
     "categories list": frozenset({Effect.READ_ONLY}),
     "institutions list": frozenset({Effect.READ_ONLY}),
+    "investments holdings": frozenset({Effect.READ_ONLY}),
     "subscription show": frozenset({Effect.READ_ONLY}),
     "transactions batch-update": frozenset({Effect.REMOTE_MUTATION}),
     "transactions get": frozenset({Effect.READ_ONLY}),
