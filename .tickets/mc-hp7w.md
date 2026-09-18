@@ -1,6 +1,6 @@
 ---
 id: mc-hp7w
-status: open
+status: closed
 deps: [mc-k48z, mc-ik8o, mc-hszv, mc-2btg]
 links: [mc-584r]
 created: 2026-09-11T01:23:21Z
