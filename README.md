@@ -293,6 +293,14 @@ monarch transactions list --search "grocery"
 monarch transactions get TXN123 --json
 monarch transactions get TXN123 --strict --json  # Disable posted redirect
 
+# All-time aggregate (the upstream summary method has no filters)
+monarch transactions summary --json
+
+# Upcoming recurring activity (current month by default)
+monarch transactions recurring --json
+monarch transactions recurring --preset this-month --json
+monarch transactions recurring --start 2024-01-01 --end 2024-01-31 --json
+
 # Update a transaction
 monarch --allow-mutations transactions update TXN123 --amount 25.50
 monarch --allow-mutations transactions update TXN123 --description "Coffee Shop"
@@ -304,6 +312,19 @@ monarch transactions update TXN123 --dry-run --amount 30.00  # Preview; no flag 
 # Batch update multiple transactions
 monarch --allow-mutations transactions batch-update TXN1 TXN2 TXN3 --category CAT456
 ```
+
+`transactions summary` is an all-time aggregate: it intentionally does not
+accept transaction-list filters or date options. Its normalized fields include
+count, average, maximums, signed net sum, income, positive expenses, and the
+upstream first/last values. Use `--raw` to preserve the released response.
+
+`transactions recurring` uses the upstream current-month default when no dates
+are supplied. Presets and explicit inclusive ranges are supported; explicit
+`--start` and `--end` must be supplied together, and the start cannot follow
+the end. Recurring output retains stream, merchant, account, category, expected
+and observed amounts, date, approximation/past flags, amount difference, and
+linked transaction identity. Missing values are `null`; no amounts are
+calculated locally. Use `--raw` for the untouched upstream envelope.
 
 **Date Presets:**
 - `today`, `yesterday`

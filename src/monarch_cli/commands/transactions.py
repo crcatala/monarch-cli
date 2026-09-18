@@ -12,7 +12,7 @@ import typer
 
 from ..core.adapter import get_authenticated_client
 from ..core.async_utils import run_async
-from ..core.dates import DatePreset, parse_date_range
+from ..core.dates import DatePreset, parse_date_range, parse_iso_date, validate_date_ordering
 from ..core.error_handler import handle_errors
 from ..core.exceptions import MutationAmbiguousError, ValidationError
 from ..core.mutation_outcomes import (
@@ -36,6 +36,10 @@ from ..core.operations import (
 )
 from ..output import OutputFormat, output
 from ..output.progress import spinner
+from ..transformers.transaction_aggregates import (
+    transform_recurring_transactions,
+    transform_transaction_summary,
+)
 from ..transformers.transactions import transform_transaction_detail, transform_transactions
 from . import transaction_splits, transaction_tags
 
@@ -49,6 +53,8 @@ app.add_typer(transaction_tags.app, name="tags")
 #: Declared effect sets for this group's commands.
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 GET_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+SUMMARY_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+RECURRING_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 
 #: Maximum page size accepted by ``transactions list``. The upstream client
 #: does not document a server-side cap, so the CLI enforces a bounded,
@@ -418,6 +424,105 @@ def _validate_list_query(
             message=f"--start ({start_str}) must be on or before --end ({end_str}).",
             field="dates",
         )
+
+
+def _resolve_recurring_date_range(
+    preset: DatePreset | None,
+    start: str | None,
+    end: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve recurring dates using the released two-sided API contract."""
+    if (start is None) != (end is None):
+        raise ValidationError(
+            message="--start and --end must be provided together.",
+            field="start" if start is not None else "end",
+        )
+    start_date = parse_iso_date(start, field="start")
+    end_date = parse_iso_date(end, field="end")
+    validate_date_ordering(start_date, end_date)
+    return parse_date_range(preset, start_date, end_date)
+
+
+@app.command("summary")
+@handle_errors
+@operation_effects(Effect.READ_ONLY)
+def summary(
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON (shortcut for --format json)"),
+    ] = False,
+    raw: Annotated[
+        bool,
+        typer.Option("--raw", help="Output the all-time upstream response without normalization"),
+    ] = False,
+) -> None:
+    """Show the all-time transaction aggregate.
+
+    The released upstream method accepts no date or transaction-list filters;
+    this command intentionally exposes none. Use ``cashflow summary`` for a
+    date-scoped income/expense report.
+    """
+    output_format = OutputFormat.JSON if json_output else format
+    with spinner("Calculating transaction summary..."):
+        client = get_authenticated_client()
+        raw_data: Any = run_read_call(
+            lambda: client.get_transactions_summary(),
+            Operation(command="transactions summary", effects=SUMMARY_EFFECTS),
+        )
+    output(raw_data if raw else transform_transaction_summary(raw_data), output_format)
+
+
+@app.command("recurring")
+@handle_errors
+@operation_effects(Effect.READ_ONLY)
+def recurring(
+    start: Annotated[
+        str | None,
+        typer.Option("-s", "--start", help="Start date (YYYY-MM-DD; requires --end)"),
+    ] = None,
+    end: Annotated[
+        str | None,
+        typer.Option("-e", "--end", help="End date (YYYY-MM-DD; requires --start)"),
+    ] = None,
+    preset: Annotated[
+        DatePreset | None,
+        typer.Option("-p", "--preset", help="Date range preset (for example, this-month or ytd)"),
+    ] = None,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON (shortcut for --format json)"),
+    ] = False,
+    raw: Annotated[
+        bool,
+        typer.Option("--raw", help="Output the upstream response without normalization"),
+    ] = False,
+) -> None:
+    """Show recurring activity for the current month or a complete date range.
+
+    With no dates, the released client requests its current-month default.
+    Explicit dates must be supplied as a two-sided inclusive range; presets
+    use the same shared date semantics as other reporting commands.
+    """
+    output_format = OutputFormat.JSON if json_output else format
+    start_str, end_str = _resolve_recurring_date_range(preset, start, end)
+    with spinner("Fetching recurring transactions..."):
+        client = get_authenticated_client()
+        raw_data: Any = run_read_call(
+            lambda: client.get_recurring_transactions(
+                start_date=start_str,
+                end_date=end_str,
+            ),
+            Operation(command="transactions recurring", effects=RECURRING_EFFECTS),
+        )
+    output(raw_data if raw else transform_recurring_transactions(raw_data), output_format)
 
 
 @app.command("get")
