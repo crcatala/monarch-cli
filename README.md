@@ -693,7 +693,7 @@ and `--timeframe month|year`. Unknown refresh IDs are reported as
 
 ```bash
 monarch accounts types --json | jq '.[] | select(.group == "assets")'
-# {"group": "assets", "type": "asset", "type_display": "Asset",
+# {"group": "assets", "type": "depository",
 #  "subtype": "checking", "subtype_display": "Checking"}
 ```
 
