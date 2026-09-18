@@ -48,3 +48,9 @@ Refresh status is observational only. The released client returns an aggregate b
 - [ ] Unit/CLI tests verify API mapping, method-specific date behavior, unknown refresh IDs, null/empty responses, hidden/manual accounts, and output formats.
 - [ ] The required upstream-client compatibility floor is verified, user-facing documentation is complete, and repository verification passes.
 
+
+## Notes
+
+**2026-09-18T23:29:04Z**
+
+Human live verification (2026-09-18): authenticated read-only account history, recent balances, aggregate snapshots, account-type-filtered snapshots, and refresh-status commands completed successfully. The PR #70 released-client date-serialization compatibility fix was exercised successfully. No credentials, identifiers, balances, or raw payloads are recorded here.

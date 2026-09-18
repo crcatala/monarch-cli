@@ -43,3 +43,7 @@ Before creating later children, review existing open tickets and link or update 
 **2026-09-17T23:42:05Z**
 
 Human Verification Checkpoint A evidence recorded (2026-09-17): the operator reports all critical verification scenarios completed, including clean shipped-wheel validation and approved disposable-household mutation smoke checks. The read-only live API smoke suite also passed via `MONARCH_LIVE_TESTS=1 make test-live`. Additional medium-priority verification was partially completed; only confirmed scope is recorded on the linked tickets. No credentials or raw financial payloads are recorded here. P0 implementation state remains complete; no downstream ticket is being closed by this note.
+
+**2026-09-18T23:29:04Z**
+
+Verification checkpoint update (2026-09-18): authenticated read-only checks for account reporting, transactions/recurring, cashflow, holdings, institutions, and subscription completed successfully. The disposable live mutation contract test passed for its approved dev household, including fixture lifecycle, notes round-trip, bounded readback, and cleanup. No personal account mutations, credentials, identifiers, balances, or raw payloads are recorded here.

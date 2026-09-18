@@ -40,3 +40,9 @@ Do not add recurring mutations, transaction-list filtering, cashflow detail, ins
 - [ ] Both commands are classified read-only and perform no remote mutation.
 - [ ] Unit/CLI tests verify API mapping, all-time summary behavior, recurring defaults/presets/ranges, validation-before-call, null/empty payloads, formats, and errors.
 - [ ] The required upstream-client compatibility floor is verified, user-facing documentation is complete, and repository verification passes.
+
+## Notes
+
+**2026-09-18T23:29:04Z**
+
+Human live verification (2026-09-18): authenticated read-only transaction summary returned populated normalized aggregates, and recurring activity returned normalized rows. Default/full-calendar and this-month month-to-date semantics were observed as intended; the PR #70 live list-envelope compatibility fix was exercised successfully. No personal financial values, identifiers, credentials, or raw payloads are recorded here.

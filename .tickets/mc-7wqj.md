@@ -41,3 +41,9 @@ The detail response already includes the same overall summary concepts as the ex
 - [ ] Unit/CLI tests verify API mapping, default and explicit date behavior, presets, validation-before-call, null/empty payloads, output contracts, and errors.
 - [ ] User-facing documentation and repository verification are complete.
 
+
+## Notes
+
+**2026-09-18T23:29:04Z**
+
+Human live verification (2026-09-18): authenticated read-only cashflow detail returned populated normalized category, category-group, and merchant sections. The PR #70 live object-summary compatibility fix was exercised successfully. No personal financial values, identifiers, credentials, or raw payloads are recorded here.
