@@ -5,7 +5,118 @@ from __future__ import annotations
 import pytest
 
 from monarch_cli.core.exceptions import APIError
-from monarch_cli.transformers.cashflow import transform_cashflow_summary
+from monarch_cli.transformers.cashflow import (
+    transform_cashflow_detail,
+    transform_cashflow_summary,
+)
+
+
+class TestTransformCashflowDetail:
+    """Tests for the complete get_cashflow normalization contract."""
+
+    def test_normalizes_all_detail_blocks_and_shared_summary(self) -> None:
+        result = transform_cashflow_detail(
+            {
+                "byCategory": [
+                    {
+                        "groupBy": {
+                            "category": {
+                                "id": "cat-food",
+                                "name": "Food",
+                                "group": {"id": "group-need", "type": "needs"},
+                            }
+                        },
+                        "summary": [{"sum": -125.5}],
+                    }
+                ],
+                "byCategoryGroup": [
+                    {
+                        "groupBy": {
+                            "categoryGroup": {"id": "group-need", "name": "Needs", "type": "needs"}
+                        },
+                        "summary": [{"sum": -125.5}],
+                    }
+                ],
+                "byMerchant": [
+                    {
+                        "groupBy": {
+                            "merchant": {
+                                "id": "merchant-1",
+                                "name": "Market",
+                                "logoUrl": "https://logo",
+                            }
+                        },
+                        "summary": [{"sumIncome": 10.0, "sumExpense": -125.5}],
+                    }
+                ],
+                "summary": [
+                    {
+                        "summary": {
+                            "sumIncome": 10.0,
+                            "sumExpense": -125.5,
+                            "savings": -115.5,
+                            "savingsRate": -1155.0,
+                        }
+                    }
+                ],
+            }
+        )
+
+        assert result == {
+            "categories": [
+                {
+                    "id": "cat-food",
+                    "name": "Food",
+                    "group_id": "group-need",
+                    "group_type": "needs",
+                    "amount": -125.5,
+                }
+            ],
+            "category_groups": [
+                {"id": "group-need", "name": "Needs", "type": "needs", "amount": -125.5}
+            ],
+            "merchants": [
+                {
+                    "id": "merchant-1",
+                    "name": "Market",
+                    "logo_url": "https://logo",
+                    "income": 10.0,
+                    "expenses": 125.5,
+                }
+            ],
+            "summary": {
+                "income": 10.0,
+                "expenses": 125.5,
+                "savings": -115.5,
+                "savings_rate": -1155.0,
+            },
+        }
+
+    def test_missing_and_partial_detail_data_is_stable(self) -> None:
+        result = transform_cashflow_detail(
+            {
+                "byCategory": [None, {"groupBy": {"category": None}, "summary": [None]}],
+                "byCategoryGroup": None,
+                "byMerchant": [{"groupBy": {"merchant": None}, "summary": None}],
+                "summary": None,
+            }
+        )
+
+        assert result == {
+            "categories": [
+                {"id": None, "name": None, "group_id": None, "group_type": None, "amount": None},
+                {"id": None, "name": None, "group_id": None, "group_type": None, "amount": None},
+            ],
+            "category_groups": [],
+            "merchants": [
+                {"id": None, "name": None, "logo_url": None, "income": None, "expenses": None}
+            ],
+            "summary": {"income": 0.0, "expenses": 0.0, "savings": 0.0, "savings_rate": 0.0},
+        }
+
+    def test_non_object_root_raises_typed_error(self) -> None:
+        with pytest.raises(APIError):
+            transform_cashflow_detail(None)
 
 
 class TestTransformCashflowSummary:

@@ -23,6 +23,7 @@ class TestMonarchMoneyInterface:
         "get_transaction_details",
         "get_budgets",
         "get_cashflow_summary",
+        "get_cashflow",
         "get_transaction_categories",
         "update_transaction",
         "request_accounts_refresh",
