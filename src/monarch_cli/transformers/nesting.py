@@ -44,6 +44,31 @@ def require_object(value: Any, context: str) -> Mapping[str, Any]:
     return value
 
 
+def require_list(value: Any, context: str) -> list[Any]:
+    """Validate that a top-level payload is a list.
+
+    A malformed (non-list) root is an upstream contract violation and fails
+    deliberately with a stable typed :class:`APIError` rather than surfacing
+    an incidental ``TypeError`` downstream.
+
+    Args:
+        value: The value to validate.
+        context: Human-readable description of the payload, used in the error.
+
+    Returns:
+        The same value, narrowed to a list.
+
+    Raises:
+        APIError: If ``value`` is not a list.
+    """
+    if not isinstance(value, list):
+        raise APIError(
+            message=f"Malformed {context} response: expected a JSON array.",
+            details={"expected": "list", "received": type(value).__name__},
+        )
+    return value
+
+
 def nested_get(source: Any, *path: str) -> Any:
     """Traverse nested mappings, returning ``None`` if any level is unusable.
 
@@ -112,5 +137,6 @@ __all__ = [
     "mapping_or_empty",
     "nested_get",
     "number_or_zero",
+    "require_list",
     "require_object",
 ]

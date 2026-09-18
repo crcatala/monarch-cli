@@ -256,6 +256,15 @@ monarch accounts types           # List supported account groups/types/subtypes
 monarch accounts types --json    # JSON format
 monarch accounts types --raw     # Raw API response
 
+# Read-only balance history and synchronization visibility
+monarch accounts history ACC123 --json
+monarch accounts recent-balances --start 2024-01-01 --json
+monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --json
+monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --account-type asset --json
+monarch accounts snapshots-by-type --start 2024-01-01 --timeframe month --json
+monarch accounts refresh-status --json
+monarch accounts refresh-status --account ACC123 --json
+
 monarch --allow-mutations accounts refresh         # Refresh all account data
 monarch --allow-mutations accounts refresh -a ACC123  # Refresh specific account
 ```
@@ -553,7 +562,24 @@ Use `monarch accounts types` before constructing any operation that needs an
 account group/type/subtype identifier (for example manual-account creation or
 account-type filter validation). The identifiers are authoritative values
 accepted by Monarch, so agents should select `type`/`subtype` values from this
-output instead of guessing display labels:
+output instead of guessing display labels. Snapshot and history reads are
+read-only; their normalized JSON shapes are:
+
+- `history`: a list of `{date, balance, account_id, account_name}` records.
+- `recent-balances`: a list of `{id, recent_balances}` records, where each
+  balance has `{date, balance}`.
+- `snapshots`: a list of `{date, balance}` records.
+- `snapshots-by-type`: `{snapshots, account_types}`, preserving monthly
+  periods as `YYYY-MM` (and yearly periods as `YYYY`).
+- `refresh-status`: `{status, complete, requested_account_ids,
+  known_account_ids, unknown_account_ids, checked_account_count}`.
+
+Missing balances remain `null`, and empty histories/collections remain empty.
+`--raw` preserves the one upstream response without normalization. Date rules
+match the released client: recent balances accept only `--start`; aggregate
+snapshots require both `--start` and `--end`; type snapshots accept `--start`
+and `--timeframe month|year`. Unknown refresh IDs are reported as
+`status: unknown` and never treated as complete:
 
 ```bash
 monarch accounts types --json | jq '.[] | select(.group == "assets")'

@@ -4,10 +4,19 @@ import pytest
 
 from monarch_cli.core.exceptions import APIError
 from monarch_cli.transformers.accounts import (
+    ACCOUNT_HISTORY_RECORD_FIELDS,
     ACCOUNT_TYPE_RECORD_FIELDS,
+    AGGREGATE_SNAPSHOT_RECORD_FIELDS,
+    RECENT_BALANCES_RECORD_FIELDS,
+    SNAPSHOT_BY_TYPE_RECORD_FIELDS,
+    SNAPSHOTS_BY_TYPE_FIELDS,
     transform_account,
+    transform_account_history,
     transform_account_types,
     transform_accounts,
+    transform_aggregate_snapshots,
+    transform_recent_balances,
+    transform_snapshots_by_type,
 )
 
 # Sample raw API response data
@@ -505,3 +514,70 @@ class TestAccountTypeSchemaContract:
         for record in result:
             assert record["type"] != record["type_display"] or record["type"] is None
             assert record["subtype"] != record["subtype_display"] or record["subtype"] is None
+
+
+class TestAccountHistoryAndSnapshots:
+    """Tests for the normalized account history/snapshot contracts."""
+
+    def test_history_preserves_opaque_metadata_and_null_balances(self):
+        raw = [
+            {
+                "date": "2024-01-01",
+                "signedBalance": None,
+                "accountId": "opaque-001",
+                "accountName": "Manual account",
+            }
+        ]
+        assert transform_account_history(raw) == [
+            {
+                "date": "2024-01-01",
+                "balance": None,
+                "account_id": "opaque-001",
+                "account_name": "Manual account",
+            }
+        ]
+
+    def test_empty_history_is_empty_and_malformed_root_fails(self):
+        assert transform_account_history([]) == []
+        with pytest.raises(APIError):
+            transform_account_history(None)  # type: ignore[arg-type]
+
+    def test_recent_balances_normalize_sparse_accounts(self):
+        raw = {
+            "accounts": [
+                {"id": "hidden-id", "recentBalances": [{"date": "2024-01", "balance": None}]},
+                {"id": "manual-id", "recentBalances": None},
+            ]
+        }
+        assert transform_recent_balances(raw) == [
+            {"id": "hidden-id", "recent_balances": [{"date": "2024-01", "balance": None}]},
+            {"id": "manual-id", "recent_balances": []},
+        ]
+
+    def test_snapshot_shapes_preserve_month_precision_and_empty_collections(self):
+        assert transform_aggregate_snapshots({"aggregateSnapshots": None}) == []
+        assert transform_snapshots_by_type({}) == {"snapshots": [], "account_types": []}
+        result = transform_snapshots_by_type(
+            {
+                "snapshotsByAccountType": [
+                    {"accountType": "asset", "month": "2024-01", "balance": 10}
+                ],
+                "accountTypes": [{"name": "asset", "group": "assets"}],
+            }
+        )
+        assert result == {
+            "snapshots": [{"account_type": "asset", "period": "2024-01", "balance": 10}],
+            "account_types": [{"name": "asset", "group": "assets"}],
+        }
+
+    def test_schema_constants_match_normalized_records(self):
+        assert set(ACCOUNT_HISTORY_RECORD_FIELDS) == {
+            "date",
+            "balance",
+            "account_id",
+            "account_name",
+        }
+        assert set(RECENT_BALANCES_RECORD_FIELDS) == {"id", "recent_balances"}
+        assert set(AGGREGATE_SNAPSHOT_RECORD_FIELDS) == {"date", "balance"}
+        assert set(SNAPSHOT_BY_TYPE_RECORD_FIELDS) == {"account_type", "period", "balance"}
+        assert set(SNAPSHOTS_BY_TYPE_FIELDS) == {"snapshots", "account_types"}

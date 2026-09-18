@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from monarch_cli.core.exceptions import APIError, MutationAmbiguousError
+from monarch_cli.core.exceptions import APIError, MutationAmbiguousError, ValidationError
 from monarch_cli.core.operations import (
     Effect,
     Operation,
@@ -16,8 +16,13 @@ from monarch_cli.core.operations import (
     set_mutation_authorized,
 )
 from monarch_cli.services.accounts import (
+    get_account_history,
     get_account_ids,
+    get_account_snapshots_by_type,
     get_account_type_options,
+    get_aggregate_snapshots,
+    get_recent_account_balances,
+    get_refresh_status,
     list_account_types,
     list_accounts,
     refresh_accounts,
@@ -447,3 +452,96 @@ class TestRefreshAccounts:
         assert "summary" in result
         assert "items" in result
         assert "verification" in result
+
+
+class TestAccountHistoryAndSnapshots:
+    """Unit tests for read-only account history and snapshot services."""
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_history_passes_opaque_id_without_numeric_coercion(
+        self, mock_run_read, mock_get_client
+    ):
+        mock_run_read.return_value = [{"date": "2024-01-01", "signedBalance": None}]
+        result = get_account_history("opaque-001")
+        assert result[0]["account_id"] is None
+        factory = mock_run_read.call_args.args[0]
+        factory()
+        mock_get_client.return_value.get_account_history.assert_called_once_with("opaque-001")
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_recent_balances_maps_start_only(self, mock_run_read, mock_get_client):
+        mock_run_read.return_value = {"accounts": []}
+        assert get_recent_account_balances("2024-01-01") == []
+        factory = mock_run_read.call_args.args[0]
+        factory()
+        mock_get_client.return_value.get_recent_account_balances.assert_called_once_with(
+            "2024-01-01"
+        )
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_aggregate_passes_parsed_date_objects(self, mock_run_read, mock_get_client):
+        mock_run_read.return_value = {"aggregateSnapshots": []}
+        assert get_aggregate_snapshots("2024-01-01", "2024-01-31") == []
+        factory = mock_run_read.call_args.args[0]
+        factory()
+        from datetime import date
+
+        mock_get_client.return_value.get_aggregate_snapshots.assert_called_once_with(
+            start_date=date(2024, 1, 1), end_date=date(2024, 1, 31), account_type=None
+        )
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_type_snapshots_preserve_upstream_period(self, mock_run_read, mock_get_client):
+        mock_run_read.return_value = {
+            "snapshotsByAccountType": [{"accountType": "asset", "month": "2024-01", "balance": 1}],
+            "accountTypes": [],
+        }
+        result = get_account_snapshots_by_type("2024-01-01", "month")
+        assert result["snapshots"][0]["period"] == "2024-01"
+        factory = mock_run_read.call_args.args[0]
+        factory()
+        mock_get_client.return_value.get_account_snapshots_by_type.assert_called_once_with(
+            "2024-01-01", "month"
+        )
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_invalid_dates_and_timeframe_fail_before_client_call(
+        self, mock_run_read, mock_get_client
+    ):
+        with pytest.raises(ValidationError):
+            get_recent_account_balances("2024-02-30")
+        with pytest.raises(ValidationError):
+            get_aggregate_snapshots("2024-02-01", "2024-01-01")
+        with pytest.raises(ValidationError):
+            get_account_snapshots_by_type("2024-01-01", "quarter")
+        mock_get_client.assert_not_called()
+        mock_run_read.assert_not_called()
+
+    @patch("monarch_cli.services.accounts.list_account_types")
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_unknown_type_filter_fails_before_snapshot_call(
+        self, mock_run_read, _mock_get_client, mock_list_types
+    ):
+        mock_list_types.return_value = [{"type": "asset"}]
+        with pytest.raises(ValidationError):
+            get_aggregate_snapshots("2024-01-01", "2024-01-31", account_type="liability")
+        mock_run_read.assert_not_called()
+
+    @patch("monarch_cli.services.accounts.list_accounts")
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_unknown_refresh_ids_return_unknown_without_status_call(
+        self, mock_run_read, mock_get_client, mock_list_accounts
+    ):
+        mock_list_accounts.return_value = [{"id": "known"}]
+        result = get_refresh_status(["known", "unknown"])
+        assert result["status"] == "unknown"
+        assert result["unknown_account_ids"] == ["unknown"]
+        mock_run_read.assert_not_called()
+        mock_get_client.assert_not_called()
