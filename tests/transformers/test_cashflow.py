@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from monarch_cli.core.exceptions import APIError
 from monarch_cli.transformers.cashflow import transform_cashflow_summary
 
 
@@ -167,6 +170,61 @@ class TestTransformCashflowSummary:
             "savings": 0.0,
             "savings_rate": 0.0,
         }
+
+    def test_handles_present_but_null_summary_container(self) -> None:
+        """A present-but-null summary container normalizes to the zero summary."""
+        result = transform_cashflow_summary({"summary": None})
+        assert result == {
+            "income": 0.0,
+            "expenses": 0.0,
+            "savings": 0.0,
+            "savings_rate": 0.0,
+        }
+
+    def test_handles_present_but_null_inner_summary(self) -> None:
+        """A null inner summary block normalizes to the zero summary."""
+        result = transform_cashflow_summary({"summary": [{"summary": None}]})
+        assert result == {
+            "income": 0.0,
+            "expenses": 0.0,
+            "savings": 0.0,
+            "savings_rate": 0.0,
+        }
+
+    def test_handles_null_summary_element(self) -> None:
+        """A null element in the summary list normalizes to the zero summary."""
+        result = transform_cashflow_summary({"summary": [None]})
+        assert result == {
+            "income": 0.0,
+            "expenses": 0.0,
+            "savings": 0.0,
+            "savings_rate": 0.0,
+        }
+
+    def test_handles_partial_summary(self) -> None:
+        """Missing aggregate keys fall back to zero without raising."""
+        result = transform_cashflow_summary({"summary": [{"summary": {"sumIncome": 100.0}}]})
+        assert result == {
+            "income": 100.0,
+            "expenses": 0,
+            "savings": 0,
+            "savings_rate": 0,
+        }
+
+    def test_handles_non_numeric_aggregates(self) -> None:
+        """Non-numeric aggregate values degrade to the documented zero default."""
+        result = transform_cashflow_summary(
+            {"summary": [{"summary": {"sumIncome": "oops", "sumExpense": True}}]}
+        )
+        assert result["income"] == 0
+        assert result["expenses"] == 0
+
+    def test_non_object_root_raises_typed_error(self) -> None:
+        """A malformed (non-object) cashflow payload fails deliberately."""
+        with pytest.raises(APIError):
+            transform_cashflow_summary(None)  # type: ignore[arg-type]
+        with pytest.raises(APIError):
+            transform_cashflow_summary(["not", "an", "object"])  # type: ignore[arg-type]
 
     def test_output_keys_are_snake_case(self) -> None:
         """Output uses snake_case keys for consistency."""

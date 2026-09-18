@@ -37,6 +37,8 @@ To upgrade schemas with breaking changes:
 
 """
 
+import pytest
+
 from monarch_cli.transformers.accounts import transform_account, transform_accounts
 from monarch_cli.transformers.transactions import (
     transform_transaction,
@@ -68,7 +70,7 @@ FULL_TRANSACTION_RAW = {
     "plaidName": "COFFEE SHOP #123",
     "category": {"id": "cat-food", "name": "Food & Drink"},
     "account": {"id": "acc-123456", "displayName": "Primary Checking"},
-    "isPending": False,
+    "pending": False,
     "notes": "Team lunch",
 }
 
@@ -213,6 +215,24 @@ class TestAccountSchemaContract:
         assert result["name"] is None
         assert result["balance"] is None
         assert result["type"] is None
+
+    def test_boolean_fields_never_none_for_absent_or_null(self):
+        """is_active/is_manual stay real bools when their sources are absent/null."""
+        absent = transform_account({"id": "acc"})
+        assert absent["is_active"] is True
+        assert absent["is_manual"] is False
+        nulled = transform_account({"id": "acc", "isHidden": None, "isManual": None})
+        assert nulled["is_active"] is True
+        assert nulled["is_manual"] is False
+
+    def test_malformed_root_raises_typed_error(self):
+        """Non-object account/transaction roots raise a typed APIError."""
+        from monarch_cli.core.exceptions import APIError
+
+        with pytest.raises(APIError):
+            transform_accounts(None)  # type: ignore[arg-type]
+        with pytest.raises(APIError):
+            transform_transactions(None)  # type: ignore[arg-type]
 
 
 # =============================================================================
@@ -361,6 +381,15 @@ class TestTransactionSchemaContract:
         assert result["amount"] is None
         assert result["description"] is None
         assert result["category"] is None
+
+    def test_boolean_fields_never_none_for_absent_or_null(self):
+        """is_pending stays a real bool when pending is absent or null."""
+        assert transform_transaction({"id": "t"})["is_pending"] is False
+        assert transform_transaction({"id": "t", "pending": None})["is_pending"] is False
+
+    def test_pending_reads_real_upstream_field(self):
+        """Contract reads upstream `pending`, not a fabricated always-false default."""
+        assert transform_transaction({"id": "t", "pending": True})["is_pending"] is True
 
     def test_date_format_consistent(self):
         """Date field uses ISO format YYYY-MM-DD when present."""
