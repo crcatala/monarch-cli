@@ -63,6 +63,7 @@ GLOBAL_OPTIONS = (
     "--no-color",
     "--timeout",
     "--allow-mutations",
+    "--yes",
     "--non-interactive",
 )
 

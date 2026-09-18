@@ -37,11 +37,13 @@ from ..core.operations import (
 from ..output import OutputFormat, output
 from ..output.progress import spinner
 from ..transformers.transactions import transform_transaction_detail, transform_transactions
+from . import transaction_tags
 
 app = typer.Typer(
     help="Transaction management",
     no_args_is_help=True,
 )
+app.add_typer(transaction_tags.app, name="tags")
 
 #: Declared effect sets for this group's commands.
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})

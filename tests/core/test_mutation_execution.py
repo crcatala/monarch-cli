@@ -323,6 +323,9 @@ class TestRetryClassifications:
             "accounts refresh",
             "transactions update",
             "transactions batch-update",
+            "transactions tags create",
+            "transactions tags replace",
+            "transactions tags clear",
         }
 
     def test_classifications_require_a_named_mechanism_to_change(self) -> None:
