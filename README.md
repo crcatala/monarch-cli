@@ -449,6 +449,23 @@ These output fields are guaranteed stable across versions:
 
 **Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `notes`
 
+#### Normalization semantics (v1)
+
+Normalized output is produced by `monarch_cli.transformers`; `--raw` bypasses
+it and returns the upstream structure verbatim (including null containers and
+unknown fields).
+
+- Unavailable non-boolean values normalize to `null`. Financial values are
+  never invented: a missing balance or transaction amount is `null`, not `0`.
+- `is_active`, `is_manual`, and `is_pending` are always booleans. Absent or
+  `null` sources default to `is_active=true` (not hidden), `is_manual=false`,
+  and `is_pending=false`. `is_pending` reads the upstream `pending` field.
+- `description` falls back deterministically: non-empty `merchant.name`,
+  then `plaidName`, then `null`.
+- Unknown additive upstream fields are ignored by normalized output.
+- Cashflow period aggregates are the one documented numeric-default
+  exception: a period with no data reports `0` totals.
+
 ## Shell Completions
 
 Enable tab completion for commands, options, and arguments:

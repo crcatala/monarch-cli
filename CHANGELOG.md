@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Color auto-detection** - `NO_COLOR`, `TERM=dumb`, and non-TTY now properly disable color
   - Previously, color settings bypassed auto-detection, causing ANSI codes in piped output
 - **Environment variables** - `MONARCH_TIMEOUT`, `MONARCH_MAX_RETRIES` were documented but non-functional; now wired up to actual API calls
+- **Normalization at upstream API boundaries** - Account, transaction, and cashflow transformers now tolerate present-but-null or missing nested relationships, summary blocks, and collection containers instead of raising `AttributeError`/`TypeError`; a non-object top-level payload fails deliberately with a typed `APIError`; raw passthrough is unchanged
+- **Transaction pending state** - `is_pending` now reads the real upstream `pending` field instead of the incorrect `isPending` key (which made it always `false`); `isPending` is retained only as a lower-precedence compatibility alias
 
 ## [0.1.0] - 2026-01-18
 

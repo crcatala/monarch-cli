@@ -140,6 +140,29 @@ class TestAccountsList:
             assert "accounts" in output
             assert len(output["accounts"]) == 2
 
+    def test_list_raw_preserves_null_and_unknown_fields(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Raw mode bypasses normalization: null containers and unknown fields survive."""
+        raw_response = {"accounts": None, "futureField": {"nested": 1}, "count": 0}
+
+        async def async_accounts():
+            return raw_response
+
+        mock_authenticated_client.get_accounts = async_accounts
+
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--raw", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout) == raw_response
+
     def test_list_ndjson_outputs_one_per_line(self, transformed_accounts: list[dict]) -> None:
         """List with --ndjson outputs one JSON object per line."""
         with (

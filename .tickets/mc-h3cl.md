@@ -1,6 +1,6 @@
 ---
 id: mc-h3cl
-status: open
+status: in_progress
 deps: [mc-43s0]
 links: [mc-cd12, mc-c165, mc-kzp9]
 created: 2026-09-11T01:21:50Z
@@ -47,3 +47,9 @@ Do not add a schema library or other runtime dependency for this work.
 - [ ] Existing normalized field names and documented semantics remain backward compatible except for the explicit correction of the pending-state source mapping.
 - [ ] No new runtime dependency is introduced and repository verification passes.
 
+
+## Notes
+
+**2026-09-18T02:05:24Z**
+
+Started implementation on branch feat/mc-h3cl-harden-normalization. Added reusable null-safe traversal helper in transformers/nesting.py (nested_get, list_or_empty, mapping_or_empty, bool_or_default, number_or_zero, require_object -> typed APIError for non-object roots). Hardened account/transaction/cashflow transformers; corrected is_pending to read upstream pending with lower-precedence isPending alias; deterministic description fallback; documented boolean defaults and cashflow zero-for-no-data exception. Expanded transformer/schema/command contract tests (raw passthrough, malformed roots, null/coll containers). make verify passes.
