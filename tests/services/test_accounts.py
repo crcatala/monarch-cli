@@ -17,11 +17,14 @@ from monarch_cli.core.operations import (
 )
 from monarch_cli.services.accounts import (
     get_account_ids,
+    get_account_type_options,
+    list_account_types,
     list_accounts,
     refresh_accounts,
 )
 
 READ_OPERATION = Operation("accounts list", frozenset({Effect.READ_ONLY}))
+TYPES_OPERATION = Operation("accounts types", frozenset({Effect.READ_ONLY}))
 MUTATION_OPERATION = Operation("accounts refresh", frozenset({Effect.REMOTE_MUTATION}))
 
 
@@ -100,6 +103,114 @@ class TestListAccounts:
         result = list_accounts()
 
         assert result == []
+
+
+SAMPLE_TYPE_OPTIONS_RAW = {
+    "accountTypeOptions": [
+        {
+            "type": {
+                "name": "asset",
+                "display": "Asset",
+                "group": "assets",
+                "possibleSubtypes": [
+                    {"name": "checking", "display": "Checking"},
+                ],
+            },
+            "subtype": None,
+        },
+    ]
+}
+
+
+class TestGetAccountTypeOptions:
+    """Tests for the raw account type-discovery accessor."""
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_returns_raw_response_untouched(self, mock_run_async, _mock_get_client):
+        """Should return the upstream response without normalization."""
+        mock_run_async.return_value = SAMPLE_TYPE_OPTIONS_RAW
+
+        result = get_account_type_options()
+
+        assert result == SAMPLE_TYPE_OPTIONS_RAW
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_calls_client_get_account_type_options(self, mock_run_async, mock_get_client):
+        """Should use the authenticated client's get_account_type_options."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_run_async.return_value = SAMPLE_TYPE_OPTIONS_RAW
+
+        get_account_type_options()
+
+        mock_get_client.assert_called_once()
+        # The read executor receives a factory that invokes the upstream method.
+        coro_factory = mock_run_async.call_args[0][0]
+        coro_factory()
+        mock_client.get_account_type_options.assert_called_once_with()
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_accepts_explicit_operation(self, mock_run_async, _mock_get_client):
+        """The operation descriptor is forwarded to the read executor."""
+        mock_run_async.return_value = SAMPLE_TYPE_OPTIONS_RAW
+
+        get_account_type_options(operation=TYPES_OPERATION)
+
+        assert mock_run_async.call_args[0][1] == TYPES_OPERATION
+
+
+class TestListAccountTypes:
+    """Tests for list_account_types normalization orchestration."""
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_returns_normalized_type_records(self, mock_run_async, _mock_get_client):
+        """Should flatten the raw hierarchy into normalized records."""
+        mock_run_async.return_value = SAMPLE_TYPE_OPTIONS_RAW
+
+        result = list_account_types()
+
+        assert result == [
+            {
+                "group": "assets",
+                "type": "asset",
+                "type_display": "Asset",
+                "subtype": "checking",
+                "subtype_display": "Checking",
+            }
+        ]
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_handles_empty_options(self, mock_run_async, _mock_get_client):
+        """Should return an empty list when no options exist."""
+        mock_run_async.return_value = {"accountTypeOptions": []}
+
+        assert list_account_types() == []
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_uses_read_only_operation_descriptor(self, mock_run_async, _mock_get_client):
+        """The default operation descriptor is read-only."""
+        mock_run_async.return_value = SAMPLE_TYPE_OPTIONS_RAW
+
+        list_account_types()
+
+        operation = mock_run_async.call_args[0][1]
+        assert Effect.READ_ONLY in operation.effects
+        assert Effect.REMOTE_MUTATION not in operation.effects
+
+    @patch("monarch_cli.services.accounts.get_authenticated_client")
+    @patch("monarch_cli.services.accounts.run_read_call")
+    def test_propagates_malformed_root_error(self, mock_run_async, _mock_get_client):
+        """A non-object upstream payload surfaces the typed transformer error."""
+        mock_run_async.return_value = ["not", "an", "object"]
+
+        with pytest.raises(APIError):
+            list_account_types()
 
 
 class TestGetAccountIds:

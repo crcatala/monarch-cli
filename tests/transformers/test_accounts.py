@@ -3,7 +3,12 @@
 import pytest
 
 from monarch_cli.core.exceptions import APIError
-from monarch_cli.transformers.accounts import transform_account, transform_accounts
+from monarch_cli.transformers.accounts import (
+    ACCOUNT_TYPE_RECORD_FIELDS,
+    transform_account,
+    transform_account_types,
+    transform_accounts,
+)
 
 # Sample raw API response data
 SAMPLE_ACCOUNT_FULL = {
@@ -223,3 +228,280 @@ class TestSchemaContract:
         result = transform_account(SAMPLE_ACCOUNT_FULL)
         extra = set(result.keys()) - self.REQUIRED_FIELDS
         assert extra == set(), f"Unexpected fields: {extra}"
+
+
+SAMPLE_TYPE_OPTIONS_RAW = {
+    "accountTypeOptions": [
+        {
+            "type": {
+                "name": "asset",
+                "display": "Asset",
+                "group": "assets",
+                "possibleSubtypes": [
+                    {"name": "checking", "display": "Checking"},
+                    {"name": "savings", "display": "Savings"},
+                ],
+            },
+            "subtype": {"name": "checking", "display": "Checking"},
+        },
+        {
+            "type": {
+                "name": "loan",
+                "display": "Loan",
+                "group": "liabilities",
+                "possibleSubtypes": [
+                    {"name": "mortgage", "display": "Mortgage"},
+                ],
+            },
+            "subtype": None,
+        },
+    ]
+}
+
+
+class TestTransformAccountTypes:
+    """Tests for transform_account_types function."""
+
+    def test_flattens_hierarchy_into_leaf_records(self):
+        """Each (group, type, subtype) combination becomes one record."""
+        result = transform_account_types(SAMPLE_TYPE_OPTIONS_RAW)
+
+        keys = [(r["group"], r["type"], r["subtype"]) for r in result]
+        assert keys == [
+            ("assets", "asset", "checking"),
+            ("assets", "asset", "savings"),
+            ("liabilities", "loan", "mortgage"),
+        ]
+
+    def test_preserves_identifiers_and_display_labels(self):
+        """Identifiers come from upstream names; labels from displays."""
+        result = transform_account_types(SAMPLE_TYPE_OPTIONS_RAW)
+
+        assert result[0] == {
+            "group": "assets",
+            "type": "asset",
+            "type_display": "Asset",
+            "subtype": "checking",
+            "subtype_display": "Checking",
+        }
+
+    def test_ordering_follows_upstream_first_seen_order(self):
+        """Types follow option order; subtypes follow possibleSubtypes order."""
+        result = transform_account_types(SAMPLE_TYPE_OPTIONS_RAW)
+
+        assert [r["type"] for r in result] == ["asset", "asset", "loan"]
+        assert [r["subtype"] for r in result] == ["checking", "savings", "mortgage"]
+
+    def test_explicit_subtype_appended_when_missing_from_possible_subtypes(self):
+        """An option subtype absent from possibleSubtypes is still listed."""
+        raw = {
+            "accountTypeOptions": [
+                {
+                    "type": {
+                        "name": "asset",
+                        "group": "assets",
+                        "possibleSubtypes": [
+                            {"name": "checking", "display": "Checking"},
+                        ],
+                    },
+                    "subtype": {"name": "other", "display": "Other"},
+                }
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert [(r["subtype"], r["subtype_display"]) for r in result] == [
+            ("checking", "Checking"),
+            ("other", "Other"),
+        ]
+
+    def test_duplicate_records_collapsed_first_wins(self):
+        """Duplicate (group, type, subtype) identifiers keep the first row."""
+        raw = {
+            "accountTypeOptions": [
+                {
+                    "type": {
+                        "name": "asset",
+                        "group": "assets",
+                        "possibleSubtypes": [
+                            {"name": "checking", "display": "Checking"},
+                        ],
+                    },
+                    "subtype": {"name": "checking", "display": "Checking"},
+                },
+                {
+                    "type": {
+                        "name": "asset",
+                        "group": "assets",
+                        "possibleSubtypes": [
+                            {"name": "checking", "display": "Checking Again"},
+                        ],
+                    },
+                    "subtype": None,
+                },
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert len(result) == 1
+        assert result[0]["subtype_display"] == "Checking"
+
+    def test_type_without_subtypes_yields_single_null_subtype_row(self):
+        """A type with no subtype information still produces one record."""
+        raw = {
+            "accountTypeOptions": [
+                {"type": {"name": "vehicle", "group": "assets"}, "subtype": None}
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert result == [
+            {
+                "group": "assets",
+                "type": "vehicle",
+                "type_display": None,
+                "subtype": None,
+                "subtype_display": None,
+            }
+        ]
+
+    def test_missing_type_object_yields_all_null_record(self):
+        """A partially populated option keeps fields present but null."""
+        raw = {"accountTypeOptions": [{"type": None, "subtype": None}]}
+
+        result = transform_account_types(raw)
+
+        assert result == [
+            {
+                "group": None,
+                "type": None,
+                "type_display": None,
+                "subtype": None,
+                "subtype_display": None,
+            }
+        ]
+
+    def test_null_type_values_become_none_not_invented(self):
+        """Null scalar fields inside type/subtype objects stay null."""
+        raw = {
+            "accountTypeOptions": [
+                {
+                    "type": {"name": None, "display": None, "group": None},
+                    "subtype": {"name": None, "display": None},
+                }
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert result[0] == {
+            "group": None,
+            "type": None,
+            "type_display": None,
+            "subtype": None,
+            "subtype_display": None,
+        }
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            {},
+            {"accountTypeOptions": []},
+            {"accountTypeOptions": None},
+            {"accountTypeOptions": {"unexpected": "object"}},
+        ],
+    )
+    def test_empty_missing_or_non_list_options_normalize_empty(self, raw):
+        """Absent, null, and non-list option containers normalize to []."""
+        assert transform_account_types(raw) == []
+
+    def test_skips_non_mapping_entries_without_inventing(self):
+        """Non-object options and subtypes are skipped, not coerced."""
+        raw = {
+            "accountTypeOptions": [
+                "not-an-object",
+                {
+                    "type": {
+                        "name": "asset",
+                        "group": "assets",
+                        "possibleSubtypes": ["also-not-an-object"],
+                    },
+                    "subtype": 42,
+                },
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert result == [
+            {
+                "group": "assets",
+                "type": "asset",
+                "type_display": None,
+                "subtype": None,
+                "subtype_display": None,
+            }
+        ]
+
+    def test_ignores_unknown_additive_fields(self):
+        """Unknown upstream fields never leak into normalized records."""
+        raw = {
+            "accountTypeOptions": [
+                {
+                    "futureField": {"nested": True},
+                    "type": {
+                        "name": "asset",
+                        "group": "assets",
+                        "newThing": 1,
+                        "possibleSubtypes": [
+                            {"name": "checking", "display": "Checking", "extra": None},
+                        ],
+                    },
+                    "subtype": None,
+                }
+            ]
+        }
+
+        result = transform_account_types(raw)
+
+        assert set(result[0].keys()) == set(ACCOUNT_TYPE_RECORD_FIELDS)
+
+    def test_non_object_root_raises_typed_error(self):
+        """Malformed roots produce a stable typed error."""
+        with pytest.raises(APIError):
+            transform_account_types(None)  # type: ignore[arg-type]
+        with pytest.raises(APIError):
+            transform_account_types(["not", "an", "object"])  # type: ignore[arg-type]
+
+
+class TestAccountTypeSchemaContract:
+    """Tests ensuring account type-discovery schema stability for AI agents."""
+
+    REQUIRED_FIELDS = {"group", "type", "type_display", "subtype", "subtype_display"}
+
+    def test_record_fields_constant_matches_contract(self):
+        """The published field tuple is exactly the stable record schema."""
+        assert set(ACCOUNT_TYPE_RECORD_FIELDS) == self.REQUIRED_FIELDS
+
+    def test_all_fields_present(self):
+        """Every record carries all documented fields, even when null."""
+        result = transform_account_types({"accountTypeOptions": [{"type": None}]})
+        assert set(result[0].keys()) == self.REQUIRED_FIELDS
+
+    def test_no_extra_fields(self):
+        """No undocumented fields should be added."""
+        result = transform_account_types(SAMPLE_TYPE_OPTIONS_RAW)
+        for record in result:
+            extra = set(record.keys()) - self.REQUIRED_FIELDS
+            assert extra == set(), f"Unexpected fields: {extra}"
+
+    def test_identifiers_are_upstream_names_not_displays(self):
+        """Workflow identifiers stay distinct from human labels."""
+        result = transform_account_types(SAMPLE_TYPE_OPTIONS_RAW)
+
+        for record in result:
+            assert record["type"] != record["type_display"] or record["type"] is None
+            assert record["subtype"] != record["subtype_display"] or record["subtype"] is None

@@ -16,6 +16,7 @@ from monarch_cli.core.operations import (
     set_mutation_authorized,
 )
 from monarch_cli.output import set_quiet
+from monarch_cli.transformers.accounts import ACCOUNT_TYPE_RECORD_FIELDS
 
 runner = CliRunner()
 
@@ -306,6 +307,224 @@ class TestAccountsList:
         assert "monarch accounts list" in output
         assert "json" in output.lower()
         assert "format" in output.lower()
+
+
+SAMPLE_TYPE_OPTIONS_RAW = {
+    "accountTypeOptions": [
+        {
+            "type": {
+                "name": "asset",
+                "display": "Asset",
+                "group": "assets",
+                "possibleSubtypes": [
+                    {"name": "checking", "display": "Checking"},
+                    {"name": "savings", "display": "Savings"},
+                ],
+            },
+            "subtype": None,
+        },
+        {
+            "type": {
+                "name": "loan",
+                "display": "Loan",
+                "group": "liabilities",
+                "possibleSubtypes": [
+                    {"name": "mortgage", "display": "Mortgage"},
+                ],
+            },
+            "subtype": None,
+        },
+    ]
+}
+
+SAMPLE_TYPE_RECORDS = [
+    {
+        "group": "assets",
+        "type": "asset",
+        "type_display": "Asset",
+        "subtype": "checking",
+        "subtype_display": "Checking",
+    },
+    {
+        "group": "assets",
+        "type": "asset",
+        "type_display": "Asset",
+        "subtype": "savings",
+        "subtype_display": "Savings",
+    },
+    {
+        "group": "liabilities",
+        "type": "loan",
+        "type_display": "Loan",
+        "subtype": "mortgage",
+        "subtype_display": "Mortgage",
+    },
+]
+
+
+class TestAccountsTypes:
+    """Tests for the accounts types command."""
+
+    def test_types_returns_normalized_records(self) -> None:
+        """Types command returns normalized account type records."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_account_types",
+                return_value=SAMPLE_TYPE_RECORDS,
+            ) as mock_types,
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--json"])
+
+            assert result.exit_code == 0
+            mock_types.assert_called_once_with(
+                Operation(command="accounts types", effects=frozenset({Effect.READ_ONLY}))
+            )
+            output = json.loads(result.stdout)
+            assert len(output) == 3
+            assert output[0] == {
+                "group": "assets",
+                "type": "asset",
+                "type_display": "Asset",
+                "subtype": "checking",
+                "subtype_display": "Checking",
+            }
+
+    def test_types_preserves_upstream_order(self) -> None:
+        """Types command output keeps the service's deterministic order."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_account_types",
+                return_value=SAMPLE_TYPE_RECORDS,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--json"])
+
+            output = json.loads(result.stdout)
+            assert [(r["type"], r["subtype"]) for r in output] == [
+                ("asset", "checking"),
+                ("asset", "savings"),
+                ("loan", "mortgage"),
+            ]
+
+    def test_types_raw_returns_api_response(self, mock_authenticated_client: MagicMock) -> None:
+        """Types with --raw returns the untouched API response."""
+
+        async def async_type_options():
+            return SAMPLE_TYPE_OPTIONS_RAW
+
+        mock_authenticated_client.get_account_type_options = async_type_options
+
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--raw", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout) == SAMPLE_TYPE_OPTIONS_RAW
+
+    def test_types_table_format(self) -> None:
+        """Types with --format table outputs a table."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_account_types",
+                return_value=SAMPLE_TYPE_RECORDS,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--format", "table"])
+
+            assert result.exit_code == 0
+            for field in ACCOUNT_TYPE_RECORD_FIELDS:
+                assert field in result.stdout
+
+    def test_types_csv_format(self) -> None:
+        """Types with --format csv outputs CSV rows."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_account_types",
+                return_value=SAMPLE_TYPE_RECORDS,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--format", "csv"])
+
+            assert result.exit_code == 0
+            lines = result.stdout.strip().split("\n")
+            assert len(lines) == 4  # header + 3 records
+            assert "group" in lines[0]
+            assert "assets" in lines[1]
+
+    def test_types_handles_empty_options(self) -> None:
+        """Types handles the empty option set."""
+        with (
+            patch(
+                "monarch_cli.commands.accounts.list_account_types",
+                return_value=[],
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--json"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.stdout) == []
+
+    def test_types_malformed_root_reports_structured_api_error(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """A non-object top-level payload is a typed APIError, not a traceback."""
+
+        async def async_type_options():
+            return ["not", "an", "object"]
+
+        mock_authenticated_client.get_account_type_options = async_type_options
+
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["types", "--json"])
+
+        assert result.exit_code == 1
+        error = json.loads(result.stderr[result.stderr.index("{") :])
+        assert error["error"] is True
+        assert error["code"] == "API_ERROR"
+        assert error["details"]["expected"] == "object"
+
+    def test_types_does_not_require_mutation_authorization(self) -> None:
+        """The read-only command runs without --allow-mutations authorization."""
+        reset_mutation_authorization()
+        try:
+            with (
+                patch(
+                    "monarch_cli.commands.accounts.list_account_types",
+                    return_value=[],
+                ),
+                patch("monarch_cli.output.progress.is_interactive", return_value=False),
+            ):
+                result = runner.invoke(app, ["types", "--json"])
+
+                assert result.exit_code == 0
+                assert json.loads(result.stdout) == []
+        finally:
+            set_mutation_authorized(True)
+
+    def test_types_help_shows_examples(self) -> None:
+        """Types --help shows examples."""
+        result = runner.invoke(app, ["types", "--help"])
+
+        assert result.exit_code == 0
+        output = result.stdout.replace("\x1b[1m", "").replace("\x1b[0m", "")
+        assert "monarch accounts types" in output
+        assert "raw" in output.lower()
 
 
 class TestAccountsRefresh:
