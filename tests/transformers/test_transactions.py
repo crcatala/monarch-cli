@@ -99,12 +99,10 @@ class TestTransformTransaction:
         assert result["is_pending"] is False
         assert isinstance(result["is_pending"], bool)
 
-    def test_ispending_alias_accepted_with_lower_precedence(self):
-        """`isPending` is accepted only when `pending` is absent."""
-        assert transform_transaction({"id": "t", "isPending": True})["is_pending"] is True
-        # Real `pending` wins over the compatibility alias.
-        both = transform_transaction({"id": "t", "pending": False, "isPending": True})
-        assert both["is_pending"] is False
+    def test_ispending_alias_is_ignored(self):
+        """`isPending` is not a real upstream field and is not consulted."""
+        assert transform_transaction({"id": "t", "isPending": True})["is_pending"] is False
+        assert transform_transaction({"id": "t", "pending": True})["is_pending"] is True
 
     def test_present_but_null_nested_relationships(self):
         """Present-but-null merchant/category/account must not raise."""

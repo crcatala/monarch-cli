@@ -111,13 +111,15 @@ class TestBoolOrDefault:
         assert bool_or_default(None, False) is False
 
     @pytest.mark.parametrize(
-        ("value", "expected"),
-        [(0, False), (1, True), ("", False), ("x", True), ([], False), ([1], True)],
+        "value",
+        [0, 1, "", "false", "x", [], [1], 3.5],
     )
-    def test_present_non_bool_coerced_by_truthiness(self, value: object, expected: bool) -> None:
+    def test_present_non_bool_uses_documented_default(self, value: object) -> None:
+        # A drifted non-bool shape must not silently flip the boolean default.
         result = bool_or_default(value, False)
-        assert result is expected
+        assert result is False
         assert isinstance(result, bool)
+        assert bool_or_default(value, True) is True
 
 
 class TestNumberOrZero:

@@ -57,3 +57,7 @@ Started implementation on branch feat/mc-h3cl-harden-normalization. Added reusab
 **2026-09-18T02:06:26Z**
 
 Implementation complete on feat/mc-h3cl-harden-normalization. PR #59 opened: https://github.com/crcatala/monarch-cli/pull/59. make verify passed (format, lint, typecheck, 795 tests). No new runtime dependency; raw passthrough and stable v1 key set preserved.
+
+**2026-09-18T02:24:00Z**
+
+Simplify/overengineering review at HEAD 07ec3f5. Assessment posted to PR #59: no critical findings; architecture (shared transformers/nesting.py boundary) justified. Addressed two medium findings in-PR: (1) bool_or_default no longer coercing non-bool values by truthiness (only genuine bools accepted; absent/null/drifted -> documented default), removing a silent footgun and matching the strict number_or_zero philosophy; (2) dropped the speculative isPending compatibility alias so pending is single-sourced from the real upstream field. Low findings (per-element require_object, single-call-site mapping_or_empty, docstring verbosity) intentionally left as-is. make verify passes.

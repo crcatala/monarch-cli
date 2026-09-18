@@ -81,17 +81,16 @@ def list_or_empty(value: Any) -> list[Any]:
 
 
 def bool_or_default(value: Any, default: bool) -> bool:
-    """Coerce an upstream boolean field to a real ``bool``.
+    """Normalize an upstream boolean field to a real ``bool``.
 
-    Absent or ``null`` source values use ``default`` so the normalized v1
-    contract keeps non-null booleans. Present non-``bool`` values are
-    coerced with truthiness.
+    Only genuine booleans are accepted. Absent, ``null``, or drifted
+    non-``bool`` values (for example a stringified ``"false"``) use
+    ``default`` rather than being coerced, so a malformed upstream shape can
+    never silently flip a documented boolean default.
     """
     if isinstance(value, bool):
         return value
-    if value is None:
-        return default
-    return bool(value)
+    return default
 
 
 def number_or_zero(value: Any) -> int | float:

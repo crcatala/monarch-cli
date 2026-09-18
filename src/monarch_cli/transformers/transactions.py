@@ -12,8 +12,7 @@ Normalization rules (v1 contract):
 - ``description`` falls back deterministically: non-empty ``merchant.name``,
   then ``plaidName``, then ``null``.
 - ``is_pending`` is always a boolean. It reads the real upstream ``pending``
-  field; ``isPending`` is accepted only as a lower-precedence compatibility
-  alias. Absent or ``null`` values default to ``False``.
+  field. Absent or ``null`` values default to ``False``.
 - A present-but-null nested relationship (for example ``merchant: null``)
   yields ``null`` rather than raising.
 - Unknown additive upstream fields are ignored.
@@ -43,15 +42,8 @@ def _description(raw: Any) -> str | None:
 
 
 def _is_pending(raw: Any) -> bool:
-    """Normalize pending state from the real upstream ``pending`` field.
-
-    ``isPending`` is an accepted lower-precedence compatibility alias so a
-    stale or vendored payload shape cannot silently regress to always-false.
-    """
-    pending = nested_get(raw, "pending")
-    if pending is not None:
-        return bool_or_default(pending, False)
-    return bool_or_default(nested_get(raw, "isPending"), False)
+    """Normalize pending state from the real upstream ``pending`` field."""
+    return bool_or_default(nested_get(raw, "pending"), False)
 
 
 def transform_transaction(raw: Any) -> dict[str, Any]:
