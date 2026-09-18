@@ -13,6 +13,9 @@ Normalization rules (v1 contract):
   then ``plaidName``, then ``null``.
 - ``is_pending`` is always a boolean. It reads the real upstream ``pending``
   field. Absent or ``null`` values default to ``False``.
+- ``needs_review`` and opaque ``review_status`` are exposed independently when
+  supplied by the selected upstream endpoint. ``review_status`` is nullable;
+  detail responses from the released public client may omit it.
 - A present-but-null nested relationship (for example ``merchant: null``)
   yields ``null`` rather than raising.
 - Unknown additive upstream fields are ignored.
@@ -81,6 +84,8 @@ def transform_transaction(raw: Any) -> dict[str, Any]:
         "account": nested_get(transaction, "account", "displayName"),
         "account_id": nested_get(transaction, "account", "id"),
         "is_pending": _is_pending(transaction),
+        "needs_review": bool_or_default(nested_get(transaction, "needsReview"), False),
+        "review_status": _opaque_str(nested_get(transaction, "reviewStatus")),
         "notes": nested_get(transaction, "notes"),
     }
 
@@ -186,7 +191,8 @@ def transform_transaction_detail(raw: Any, requested_id: str | None = None) -> d
         Normalized transaction detail dict with stable field names. Pending
         state (``is_pending``, from the upstream ``pending`` field), review
         state (``needs_review``), and the opaque upstream ``review_status``
-        are exposed as distinct concepts.
+        are exposed as distinct concepts. ``review_status`` remains ``None``
+        when the public detail response omits it.
 
     Raises:
         APIError: If ``raw`` is not an object, or ``getTransaction`` is

@@ -18,7 +18,7 @@ Provide enough read-only transaction coverage to locate, filter, and inspect the
 
 Add `transactions get TRANSACTION_ID` and extend `transactions list` with the filters supported by the released upstream client: repeatable category, account, and tag IDs; attachment, note, report-hidden, split, recurring, pending, import-origin, institution-sync, and needs-review tri-state filters; and transaction visibility scope. Boolean filters must distinguish omitted, true, and false rather than accepting string booleans.
 
-Pending/posted state and review state are orthogonal. Normalized list/detail output exposes them separately and maps pending from the upstream `pending` field. `get_transaction_details` may redirect a pending identifier to its posted replacement; retain the upstream default but expose a strict no-redirect option and always make requested-versus-returned identity observable.
+Pending/posted state and review state are orthogonal. Normalized list/detail output exposes `needs_review` and opaque `review_status` separately, preserving `review_status` wherever the selected public endpoint supplies it (including list responses), and maps pending from the upstream `pending` field. Detail `review_status` is explicitly nullable and remains `null` when the released public detail response omits it. `get_transaction_details` may redirect a pending identifier to its posted replacement; retain the upstream default but expose a strict no-redirect option and always make requested-versus-returned identity observable. Full detail `review_status` coverage is deferred to a follow-up after an upstream public release exposes it.
 
 Validate complete date pairs, date ordering, enum values, positive bounded limits, and nonnegative offsets before client creation or API calls. Keep the existing bare-list normalized output backward compatible. Raw mode exposes untouched upstream pagination metadata; a new normalized metadata envelope is outside this ticket.
 
@@ -31,13 +31,14 @@ Duplicate discovery is explicitly out of scope because it requires a separate ma
 - **Identity redirects are visible.** Detail output never silently hides that a pending ID resolved to a posted transaction.
 - **Normalized pagination remains backward compatible.** Default output remains a list; callers needing upstream `totalCount` use explicit raw mode until a separately designed metadata envelope exists.
 - **No duplicate detector in this PR.** It is not a server capability and needs its own bounded diagnostic design.
+- **Use only the released public review surface.** Preserve list `reviewStatus` when supplied; detail `review_status` is nullable because public `get_transaction_details` currently exposes `needsReview` but does not request opaque `reviewStatus`. Do not add private GraphQL or depend on an unreleased upstream version; complete detail coverage follows a future public release.
 
 ## Acceptance Criteria
 
 - [ ] `transactions get TRANSACTION_ID` returns normalized read-only detail and supports an explicit strict/no-posted-redirect mode.
-- [ ] Detail output includes the requested ID, returned transaction ID, original transaction identity when available, pending state, review state, attachments, tags, and split summary without exposing raw upstream structure by default.
+- [ ] Detail output includes the requested ID, returned transaction ID, original transaction identity when available, pending state, independently populated `needs_review`, nullable `review_status` (null when omitted by the public detail response), attachments, tags, and split summary without exposing raw upstream structure by default; full detail review status is deferred until an upstream public release.
 - [ ] `transactions list` supports repeatable category, account, and tag filters and tri-state filters for attachment presence, note presence, report visibility, split, recurring, pending, import origin, institution sync, and needs-review state, plus the supported visibility enum.
-- [ ] Pending/posted, needs-review, and opaque upstream review status remain distinct normalized concepts and are tested in independent combinations.
+- [ ] Pending/posted, `needs_review`, and opaque upstream `review_status` remain distinct normalized concepts and are tested in independent combinations; `review_status` is preserved wherever supplied by the selected public endpoint, including list responses, while detail omission remains nullable.
 - [ ] The pending transformer uses the real upstream `pending` key and tests use representative upstream fixtures.
 - [ ] Omitted tri-state options are omitted from API filtering; positive and negative forms map deterministically to `True` and `False`.
 - [ ] One-sided ranges, `start > end`, invalid enums, nonpositive or over-cap limits, and negative offsets fail before client creation or an API request.
@@ -54,3 +55,7 @@ Duplicate discovery is explicitly out of scope because it requires a separate ma
 **2026-09-11T01:36:40Z**
 
 P2 planning clarification: this ticket owns the read-only pending/posted filter and the distinction between pending state and review state. Ensure the implementation maps the supported upstream pending filter explicitly, updates the minimum compatible dependency metadata when needed, and tests both positive and negative forms. Do not create a separate pending-filter ticket.
+
+**2026-09-18T03:00:00Z**
+
+Owner-approved contract clarification: monarchmoneycommunity 1.5.2 exposes the complete required list filter surface and list `reviewStatus`, but its public detail query exposes `needsReview` without requesting opaque `reviewStatus`; the current upstream development branch still omits it. This ticket therefore preserves list review status when supplied, keeps detail `review_status` explicitly nullable, and independently populates `needs_review`. Full detail review status is follow-up work after an upstream public release; no private GraphQL workaround or unreleased dependency is in scope.

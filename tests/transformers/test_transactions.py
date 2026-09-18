@@ -19,6 +19,8 @@ SAMPLE_TRANSACTION_FULL = {
     "category": {"id": "cat-1", "name": "Food & Drink"},
     "account": {"id": "acc-1", "displayName": "Primary Checking"},
     "pending": False,
+    "needsReview": True,
+    "reviewStatus": "REVIEWED",
     "notes": "Morning coffee",
 }
 
@@ -83,6 +85,11 @@ class TestTransformTransaction:
     def test_is_pending_true(self):
         result = transform_transaction(SAMPLE_TRANSACTION_NO_MERCHANT)
         assert result["is_pending"] is True
+
+    def test_preserves_list_review_state_independently(self):
+        result = transform_transaction(SAMPLE_TRANSACTION_FULL)
+        assert result["needs_review"] is True
+        assert result["review_status"] == "REVIEWED"
 
     def test_pending_reads_real_upstream_field(self):
         """The real upstream `pending` field drives is_pending."""
@@ -299,6 +306,8 @@ class TestSchemaContract:
         "account",
         "account_id",
         "is_pending",
+        "needs_review",
+        "review_status",
         "notes",
     }
 

@@ -460,7 +460,7 @@ These output fields are guaranteed stable across versions:
 
 **Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
 
-**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `notes`
+**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `notes`
 
 #### Normalization semantics (v1)
 
@@ -475,6 +475,9 @@ unknown fields).
   and `is_pending=false`. `is_pending` reads the upstream `pending` field.
 - `description` falls back deterministically: non-empty `merchant.name`,
   then `plaidName`, then `null`.
+- `needs_review` and opaque `review_status` are independent fields. List
+  responses preserve `review_status` when supplied; detail `review_status` is
+  nullable because the released public detail query may omit it.
 - Unknown additive upstream fields are ignored by normalized output.
 - Cashflow period aggregates are the one documented numeric-default
   exception: a period with no data reports `0` totals.

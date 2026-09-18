@@ -589,6 +589,43 @@ class TestTransactionsGet:
         assert payload["attachments"][0]["id"] == "att_1"
         assert payload["tags"][0]["name"] == "Work"
 
+    def test_get_preserves_needs_review_when_detail_omits_review_status(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Released public detail responses may omit opaque reviewStatus."""
+        detail_response = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "date": "2024-01-15",
+                "amount": -50.0,
+                "merchant": {"name": "Coffee Shop"},
+                "pending": False,
+                "needsReview": True,
+                "attachments": [],
+                "tags": [],
+                "isSplitTransaction": False,
+                "splitTransactions": [],
+            }
+        }
+
+        async def async_get_transaction_details(**_: Any) -> dict[str, Any]:
+            return detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "txn-detail", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["needs_review"] is True
+        assert payload["review_status"] is None
+
     def test_get_strict_disables_posted_redirect(
         self, mock_authenticated_client: MagicMock, sample_detail_response: dict[str, Any]
     ) -> None:

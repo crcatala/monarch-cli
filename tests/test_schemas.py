@@ -259,6 +259,8 @@ class TestTransactionSchemaContract:
     - account: str | None - Account name this transaction belongs to
     - account_id: str | None - Account ID for programmatic use
     - is_pending: bool - Whether transaction is pending (True) or posted (False)
+    - needs_review: bool - Whether the transaction needs review
+    - review_status: str | None - Opaque upstream review status when supplied
     - notes: str | None - User-added notes
 
     Example output:
@@ -273,6 +275,8 @@ class TestTransactionSchemaContract:
       "account": "Primary Checking",
       "account_id": "acc-123456",
       "is_pending": false,
+      "needs_review": false,
+      "review_status": null,
       "notes": "Team lunch"
     }
     ```
@@ -296,6 +300,8 @@ class TestTransactionSchemaContract:
         "account",
         "account_id",
         "is_pending",
+        "needs_review",
+        "review_status",
         "notes",
     }
 
@@ -355,6 +361,8 @@ class TestTransactionSchemaContract:
 
         # Boolean fields (never None)
         assert isinstance(result["is_pending"], bool)
+        assert isinstance(result["needs_review"], bool)
+        assert result["review_status"] is None or isinstance(result["review_status"], str)
 
     def test_snake_case_field_names(self):
         """All field names must be snake_case for consistency."""
