@@ -136,14 +136,20 @@ def _transaction_detail(payload: Any, transaction_id: str) -> Mapping[str, Any]:
 
 
 def _tag_ids(detail: Mapping[str, Any]) -> list[str]:
-    tags = detail.get("tags", [])
+    tags = detail.get("tags")
     if not isinstance(tags, list):
         raise APIError(
             message="Malformed transaction tag assignment response.", details={"field": "tags"}
         )
-    return [
-        tag["id"] for tag in tags if isinstance(tag, Mapping) and isinstance(tag.get("id"), str)
-    ]
+    result: list[str] = []
+    for index, tag in enumerate(tags):
+        if not isinstance(tag, Mapping) or not isinstance(tag.get("id"), str):
+            raise APIError(
+                message="Malformed transaction tag assignment response.",
+                details={"field": "tags", "index": index},
+            )
+        result.append(tag["id"])
+    return result
 
 
 def _dedupe(ids: list[str]) -> list[str]:
@@ -219,12 +225,12 @@ def show_tags(
         data: Any = payload
     else:
         detail = _transaction_detail(payload, transaction_id)
+        _tag_ids(detail)
+        tags = detail["tags"]
         data = {
             "transaction_id": transaction_id,
             "returned_transaction_id": detail.get("id"),
-            "tags": [
-                _normal_tag(tag) for tag in detail.get("tags", []) if isinstance(tag, Mapping)
-            ],
+            "tags": [_normal_tag(tag) for tag in tags],
         }
     output(data, OutputFormat.JSON if json_output else format)
 

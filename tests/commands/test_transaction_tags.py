@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from monarch_cli.commands.transaction_tags import app
 from monarch_cli.core.config import Config, reset_config, set_config
 from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
+from monarch_cli.core.prompting import reset_non_interactive, set_non_interactive
 
 runner = CliRunner()
 
@@ -21,6 +22,7 @@ def policy() -> None:
     set_config(Config(confirm_destructive=False))
     yield
     reset_mutation_authorization()
+    reset_non_interactive()
     reset_config()
 
 
@@ -60,6 +62,16 @@ def test_show_reads_transaction_assignment() -> None:
     result = invoke(mock, ["show", "txn-1", "--json"])
     assert result.exit_code == 0
     assert json.loads(result.stdout)["tags"][0]["id"] == "tag-1"
+
+
+def test_show_rejects_malformed_assignment_instead_of_dropping_it() -> None:
+    mock = client()
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"name": "Work"}]}
+    }
+    result = invoke(mock, ["show", "txn-1", "--json"])
+    assert result.exit_code == 1
+    assert json.loads(result.stderr)["code"] == "API_ERROR"
 
 
 def test_create_validates_and_handles_payload_errors() -> None:
@@ -103,6 +115,54 @@ def test_unknown_id_fails_before_set() -> None:
     assert result.exit_code == 2
     assert "unknown_ids" in result.stderr
     mock.set_transaction_tags.assert_not_called()
+
+
+def test_malformed_current_assignment_fails_closed_before_set() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"name": "Work"}]}
+    }
+    result = invoke(mock, ["clear", "txn-1"])
+    assert result.exit_code == 1
+    assert json.loads(result.stderr)["code"] == "API_ERROR"
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_mutation_is_blocked_before_authenticated_client_lookup() -> None:
+    set_mutation_authorized(False)
+    with patch(
+        "monarch_cli.commands.transaction_tags.get_authenticated_client",
+        side_effect=AssertionError("client lookup must be gated"),
+    ):
+        result = runner.invoke(app, ["create", "--name", "Work", "--color", "#112233"])
+    assert result.exit_code == 3
+    assert json.loads(result.stderr)["code"] == "MUTATION_BLOCKED"
+
+
+def test_noninteractive_confirmation_blocks_before_set() -> None:
+    mock = client()
+    set_non_interactive(True)
+    set_config(Config(confirm_destructive=True))
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
+    result = invoke(mock, ["replace", "txn-1", "tag-1"])
+    assert result.exit_code == 5
+    assert json.loads(result.stderr)["code"] == "PROMPT_BLOCKED"
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_transport_ambiguity_is_structured_and_not_retried() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
+    mock.set_transaction_tags.side_effect = TimeoutError()
+    result = invoke(mock, ["replace", "txn-1", "tag-1"])
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ambiguous"
+    assert payload["verification"]["command"][-1] == "txn-1"
+    mock.set_transaction_tags.assert_called_once()
 
 
 def test_clear_is_explicit_and_noop_is_deterministic() -> None:
