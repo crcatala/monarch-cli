@@ -1,6 +1,6 @@
 ---
 id: mc-87ez
-status: open
+status: in_progress
 deps: [mc-k48z, mc-ik8o, mc-hszv, mc-2btg]
 links: []
 created: 2026-09-11T01:21:50Z

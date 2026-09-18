@@ -59,6 +59,11 @@ EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
     "transactions get": frozenset({Effect.READ_ONLY}),
     "transactions list": frozenset({Effect.READ_ONLY}),
     "transactions update": frozenset({Effect.REMOTE_MUTATION}),
+    "transactions tags create": frozenset({Effect.REMOTE_MUTATION}),
+    "transactions tags replace": frozenset({Effect.REMOTE_MUTATION}),
+    "transactions tags clear": frozenset({Effect.REMOTE_MUTATION}),
+    "transactions tags list": frozenset({Effect.READ_ONLY}),
+    "transactions tags show": frozenset({Effect.READ_ONLY}),
 }
 
 MUTATION_OPERATIONS: dict[str, list[str]] = {

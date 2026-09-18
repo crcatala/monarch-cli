@@ -101,6 +101,19 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "executor per item and never retries an item whose outcome is "
         "unknown."
     ),
+    "transactions tags create": (
+        "no_retry: upstream documents no idempotency key or read-after-write "
+        "verification for tag creation; a timed-out request may already have "
+        "created a tag."
+    ),
+    "transactions tags replace": (
+        "no_retry: complete-set replacement has no documented idempotency key "
+        "or conditional-write mechanism."
+    ),
+    "transactions tags clear": (
+        "no_retry: complete-set clearing has no documented idempotency key or "
+        "conditional-write mechanism."
+    ),
 }
 
 
@@ -211,10 +224,11 @@ def collect_command_effects(root_app: Any) -> dict[str, frozenset[Effect]]:
                 "@operation_effects(...) from monarch_cli.core.operations."
             )
         inventory[_effective_command_name(command_info)] = effects
-    for group_info in root_app.registered_groups:
-        group_name = group_info.name or ""
-        for command_info in group_info.typer_instance.registered_commands:
-            path = f"{group_name} {_effective_command_name(command_info)}".strip()
+
+    def walk_group(group: Any, prefix: str) -> None:
+        for command_info in group.registered_commands:
+            name = _effective_command_name(command_info)
+            path = f"{prefix} {name}".strip()
             effects = declared_effects(command_info.callback)
             if effects is None:
                 raise MissingOperationMetadataError(
@@ -223,6 +237,12 @@ def collect_command_effects(root_app: Any) -> dict[str, frozenset[Effect]]:
                     "@operation_effects(...) from monarch_cli.core.operations."
                 )
             inventory[path] = effects
+        for nested in group.registered_groups:
+            name = nested.name or ""
+            walk_group(nested.typer_instance, f"{prefix} {name}".strip())
+
+    for group_info in root_app.registered_groups:
+        walk_group(group_info.typer_instance, group_info.name or "")
     return inventory
 
 

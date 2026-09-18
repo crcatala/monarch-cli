@@ -78,6 +78,11 @@ def main(
             "or read from the environment."
         ),
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Skip shared destructive confirmation for this invocation.",
+    ),
     non_interactive: bool = typer.Option(
         False,
         "--non-interactive",
@@ -111,6 +116,7 @@ def main(
         quiet=quiet if quiet else None,
         color=False if no_color else None,
         timeout_seconds=timeout,
+        confirm_destructive=False if yes else None,
     )
 
     # Set the global config with overrides applied

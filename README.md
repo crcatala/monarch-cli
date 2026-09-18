@@ -135,6 +135,22 @@ or `--yes` requirement: authorization is checked first, then the second layer
 applies. Login and logout remain available without the flag so users can
 recover credentials.
 
+### Transaction tags
+
+Tag discovery is read-only:
+`monarch transactions tags list` lists available tags and
+`monarch transactions tags show TRANSACTION_ID` inspects one assignment.
+Authorized tag creation uses `--name` and a six-digit `#RRGGBB` `--color`.
+Tag replacement and clearing are explicit full-set operations:
+`monarch --allow-mutations --yes transactions tags replace TRANSACTION_ID TAG_ID...`
+and `monarch --allow-mutations --yes transactions tags clear TRANSACTION_ID`.
+The CLI validates IDs from a read-only discovery request, removes duplicate IDs
+in first-seen order, and never exposes incremental add/remove or batch tagging.
+An already-equal set is a deterministic no-op. The released client provides no
+conditional-write or idempotency guarantee, so concurrent assignments can still
+change between discovery and replacement; verify an ambiguous or mismatched
+write with `transactions tags show` before retrying.
+
 After remote execution is attempted, every remote mutation returns the shared
 `mutation-outcome.v1` envelope on stdout (see
 [docs/mutation-outcomes.md](docs/mutation-outcomes.md)): top-level

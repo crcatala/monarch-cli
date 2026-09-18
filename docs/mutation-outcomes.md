@@ -17,6 +17,9 @@ execution is attempted**:
 - `accounts refresh`
 - `transactions update`
 - `transactions batch-update` (one item per requested transaction)
+- `transactions tags create`
+- `transactions tags replace`
+- `transactions tags clear`
 
 Pre-execution authorization and input-validation failures do **not** use this
 envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
@@ -66,9 +69,10 @@ Per-item statuses are `succeeded`, `failed`, or `ambiguous`.
 - `schema_version`, `operation`, `status`, `summary`, `items`, and
   `verification` are **always present**.
 - `operation` is a stable namespaced identifier (`accounts.refresh`,
-  `transactions.update`, `transactions.batch-update`) supplied by the shared
-  operation descriptor registry — never inferred from an upstream method or
-  GraphQL operation name.
+  `transactions.update`, `transactions.batch-update`,
+  `transactions.tags.create`, `transactions.tags.replace`,
+  `transactions.tags.clear`) supplied by the shared operation descriptor
+  registry — never inferred from an upstream method or GraphQL operation name.
 - Atomic single-effect operations use an `items` array containing exactly one
   item. Batch items preserve normalized input order.
 - A multi-stage workflow uses one ordered item per remote effect that was
