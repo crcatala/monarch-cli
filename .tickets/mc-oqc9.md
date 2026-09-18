@@ -1,6 +1,6 @@
 ---
 id: mc-oqc9
-status: open
+status: closed
 deps: [mc-h3cl]
 links: [mc-7wqj]
 created: 2026-09-11T12:20:08Z
