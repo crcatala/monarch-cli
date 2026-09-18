@@ -269,6 +269,24 @@ monarch --allow-mutations accounts refresh         # Refresh all account data
 monarch --allow-mutations accounts refresh -a ACC123  # Refresh specific account
 ```
 
+### investments
+
+```bash
+monarch investments holdings --json
+monarch investments holdings --include-hidden --format table
+monarch investments holdings --account ACC123 --account ACC456 --json
+monarch investments holdings --aggregate --json
+monarch investments holdings --raw --json
+```
+
+Holdings discovery runs once, excludes hidden accounts by default, and skips
+accounts whose released metadata reports zero holdings. At most four
+account-scoped holdings reads run concurrently through the shared read
+executor. Normalized rows preserve account/security context and nulls. Raw
+mode returns a deterministic account-ID-keyed CLI envelope. See
+[docs/investment-holdings.md](docs/investment-holdings.md) for eligibility,
+aggregation, currency, and hidden-holdings semantics.
+
 ### institutions and subscription
 
 ```bash

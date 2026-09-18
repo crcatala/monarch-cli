@@ -143,6 +143,29 @@ async def _with_timeout_and_retry[T](
     )
 
 
+async def run_api_call_async[T](
+    coro_factory: Callable[[], Awaitable[T]],
+    *,
+    timeout_seconds: float | None = None,
+    max_retries: int | None = None,
+) -> T:
+    """Execute one read API call from an async orchestration context.
+
+    This is the async counterpart to :func:`run_api_call`.  It intentionally
+    uses the same configured per-attempt timeout and bounded retry executor so
+    services can fan out independent read calls without creating a second
+    network policy.
+    """
+    config = get_config()
+    effective_timeout = timeout_seconds if timeout_seconds is not None else config.timeout_seconds
+    effective_retries = max_retries if max_retries is not None else config.max_retries
+    return await _with_timeout_and_retry(
+        coro_factory,
+        timeout_seconds=effective_timeout,
+        max_retries=effective_retries,
+    )
+
+
 def run_api_call[T](
     coro_factory: Callable[[], Awaitable[T]],
     *,

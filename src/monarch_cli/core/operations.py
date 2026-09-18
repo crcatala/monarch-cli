@@ -38,7 +38,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, cast
 
-from .async_utils import run_api_call, run_mutation_api_call, run_mutation_api_call_async
+from .async_utils import (
+    run_api_call,
+    run_api_call_async,
+    run_mutation_api_call,
+    run_mutation_api_call_async,
+)
 from .exceptions import ErrorCode, MonarchCLIError
 from .retry import MutationRetryPolicy
 
@@ -332,6 +337,16 @@ def run_read_call(call: Callable[[], Any], operation: Operation) -> Any:
             "Execute remote mutations through run_mutation_call()."
         )
     return run_api_call(call)
+
+
+async def run_read_async_call(call: Callable[[], Awaitable[Any]], operation: Operation) -> Any:
+    """Execute a read through the shared timeout/retry policy asynchronously."""
+    if Effect.REMOTE_MUTATION in operation.effects:
+        raise PolicyViolationError(
+            f"read executor refuses remote-mutation operation '{operation.command}'. "
+            "Execute remote mutations through run_mutation_call()."
+        )
+    return await run_api_call_async(call)
 
 
 def run_mutation_call(
