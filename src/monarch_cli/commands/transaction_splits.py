@@ -161,8 +161,18 @@ def _normal_split(value: Any, index: int) -> dict[str, Any]:
             details={"index": index},
         )
     amount = _decimal(raw_amount, field="amount", index=index)
+    # The released client serializes GraphQL Float variables as JSON numbers.
+    # Reject cents that would be rounded when converted to that wire type;
+    # silently changing a split amount at the transport boundary is unsafe.
+    wire_amount = float(amount)
+    if Decimal(str(wire_amount)) != amount:
+        raise ValidationError(
+            "amount cannot be represented exactly by the numeric wire format.",
+            field="amount",
+            details={"index": index},
+        )
     # Keep the public wire shape and avoid sending unsupported client fields.
-    return {"merchantName": merchant.strip(), "amount": float(amount), "categoryId": category}
+    return {"merchantName": merchant.strip(), "amount": wire_amount, "categoryId": category}
 
 
 def _reject_json_constant(_: str) -> NoReturn:
@@ -324,15 +334,38 @@ def _payload_errors(errors: Any) -> list[dict[str, Any]]:
 
 def _mutation_container(payload: Any) -> Mapping[str, Any]:
     response = _as_object(payload, "split mutation")
+    if "errors" in response:
+        errors = response["errors"]
+        if not isinstance(errors, list):
+            raise APIError(
+                "The split mutation returned an invalid error payload.",
+                details={"field": "errors"},
+            )
+        if errors:
+            raise APIError(
+                "The split mutation was rejected by the service.",
+                details={"payload_errors": _payload_errors(errors)},
+            )
     container = response.get("updateTransactionSplit")
     if not isinstance(container, Mapping):
         raise APIError(
             "The split mutation returned no result.", details={"field": "updateTransactionSplit"}
         )
-    if container.get("errors"):
+    errors = container.get("errors")
+    if not isinstance(errors, list):
+        raise APIError(
+            "The split mutation returned an invalid error payload.",
+            details={"field": "updateTransactionSplit.errors"},
+        )
+    if errors:
         raise APIError(
             "The split mutation was rejected by the service.",
-            details={"payload_errors": _payload_errors(container["errors"])},
+            details={"payload_errors": _payload_errors(errors)},
+        )
+    if not isinstance(container.get("transaction"), Mapping):
+        raise APIError(
+            "The split mutation returned no transaction result.",
+            details={"field": "updateTransactionSplit.transaction"},
         )
     return container
 
@@ -379,10 +412,16 @@ def _verify(
             or expected["categoryId"] != actual["category_id"]
             or expected_amount != actual_amount
         ):
+            mismatched_fields = []
+            if expected["merchantName"] != actual["merchant_name"]:
+                mismatched_fields.append("merchantName")
+            if expected["categoryId"] != actual["category_id"]:
+                mismatched_fields.append("categoryId")
+            if expected_amount != actual_amount:
+                mismatched_fields.append("amount")
             return {
                 "index": index,
-                "expected": expected,
-                "observed": actual,
+                "mismatched_fields": mismatched_fields,
                 "reason": "verification_mismatch",
             }
     return None

@@ -29,6 +29,8 @@ class TestMonarchMoneyInterface:
         "get_transaction_tags",
         "create_transaction_tag",
         "set_transaction_tags",
+        "get_transaction_splits",
+        "update_transaction_splits",
     ]
 
     @pytest.mark.parametrize("method_name", REQUIRED_METHODS)

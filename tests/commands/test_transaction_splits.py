@@ -156,6 +156,71 @@ def test_replace_rejects_unsupported_fields_and_bad_total_before_write() -> None
     mock.update_transaction_splits.assert_not_awaited()
 
 
+def test_replace_rejects_unrepresentable_wire_amount_before_read() -> None:
+    mock = client()
+    result = invoke(
+        mock,
+        [
+            "replace",
+            "txn-1",
+            "--splits-json",
+            '[{"merchantName":"Store","amount":90071992547409.91,"categoryId":"cat-1"}]',
+        ],
+    )
+    assert result.exit_code == 2
+    mock.get_transaction_splits.assert_not_awaited()
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "parent_amount,split_amount",
+    [(-10.0, 1.0), (10.0, -1.0), (0.0, 1.0)],
+)
+def test_replace_rejects_invalid_signs_and_zero_parent(
+    parent_amount: float, split_amount: float
+) -> None:
+    mock = client()
+    mock.get_transaction_splits.return_value = payload(amount=parent_amount)
+    result = invoke(
+        mock,
+        [
+            "replace",
+            "txn-1",
+            "--splits-json",
+            json.dumps([{"merchantName": "Store", "amount": split_amount, "categoryId": "cat-1"}]),
+        ],
+    )
+    assert result.exit_code == 2
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "split_json",
+    [
+        '[{"merchantName":"Store","amount":-10.001,"categoryId":"cat-1"}]',
+        '[{"merchantName":"Store","amount":10000000000000000.00,"categoryId":"cat-1"}]',
+    ],
+)
+def test_replace_rejects_scale_and_precision_before_read(split_json: str) -> None:
+    mock = client()
+    result = invoke(mock, ["replace", "txn-1", "--splits-json", split_json])
+    assert result.exit_code == 2
+    mock.get_transaction_splits.assert_not_awaited()
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_replace_rejects_more_than_maximum_rows_before_read() -> None:
+    mock = client()
+    splits = [
+        {"merchantName": "Store", "amount": -1, "categoryId": f"cat-{index}"}
+        for index in range(101)
+    ]
+    result = invoke(mock, ["replace", "txn-1", "--splits-json", json.dumps(splits)])
+    assert result.exit_code == 2
+    mock.get_transaction_splits.assert_not_awaited()
+    mock.update_transaction_splits.assert_not_awaited()
+
+
 def test_clear_sends_empty_list_and_verifies() -> None:
     mock = client()
     mock.get_transaction_splits.return_value = payload()
@@ -179,7 +244,27 @@ def test_payload_errors_are_definitive_failure() -> None:
     assert output["items"][0]["error"]["details"]["payload_errors"][0]["code"] == "PENDING"
 
 
-def test_verification_mismatch_is_ambiguous() -> None:
+@pytest.mark.parametrize(
+    "mutation_result",
+    [
+        {"updateTransactionSplit": {"transaction": {"id": "txn-1"}}},
+        {"updateTransactionSplit": {"errors": [], "transaction": None}},
+        {"updateTransactionSplit": {"errors": "not-an-array", "transaction": {}}},
+        {"errors": [{"message": "graphql failure"}], "updateTransactionSplit": {"errors": []}},
+    ],
+)
+def test_malformed_mutation_payload_is_definitive_failure(mutation_result: dict) -> None:
+    mock = client()
+    mock.get_transaction_splits.return_value = payload()
+    mock.update_transaction_splits.return_value = mutation_result
+    result = invoke(mock, ["clear", "txn-1"])
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["status"] == "failed"
+    mock.get_transaction_splits.assert_not_awaited()
+
+
+def test_verification_mismatch_is_ambiguous_and_sanitized() -> None:
     mock = client()
     mock.get_transaction_splits.side_effect = [payload(), payload(rows=[row(category="other")])]
     mock.update_transaction_splits.return_value = mutation_payload([row(category="cat-1")])
@@ -196,6 +281,10 @@ def test_verification_mismatch_is_ambiguous() -> None:
     output = json.loads(result.stdout)
     assert output["status"] == "ambiguous"
     assert output["verification"]["command"][-1] == "txn-1"
+    details = output["items"][0]["error"]["details"]
+    assert "expected" not in details
+    assert "observed" not in details
+    assert details["mismatched_fields"] == ["categoryId"]
 
 
 def test_mutation_is_blocked_before_client_lookup() -> None:

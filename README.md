@@ -168,8 +168,10 @@ Exactly one source is required. Inline and file JSON are bounded to 64 KiB;
 replacement arrays contain 1–100 records, each with exactly non-empty
 `merchantName`, finite `amount`, and opaque non-empty `categoryId`. Amounts use
 signed decimal dollars with precision 18 and scale 2 (at most two fractional
-digits, maximum absolute value `9999999999999999.99`). Expenses and their
-splits are negative; income and its splits are positive; a zero parent may only
+digits, maximum absolute value `9999999999999999.99`); values that cannot be
+represented exactly by the released client's numeric wire format are rejected.
+Expenses and their splits are negative; income and its splits are positive; a
+zero parent may only
 have zero-valued rows. A replacement must contain at least one row and its
 signed total must equal the parent amount at two-decimal precision. Clear is
 the only way to send the canonical empty list; pending/unsupported server
