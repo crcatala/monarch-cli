@@ -3,7 +3,16 @@
 import typer
 
 from monarch_cli import __version__
-from monarch_cli.commands import accounts, auth, budgets, cashflow, categories, transactions
+from monarch_cli.commands import (
+    accounts,
+    auth,
+    budgets,
+    cashflow,
+    categories,
+    institutions,
+    subscription,
+    transactions,
+)
 from monarch_cli.core.config import get_config, set_config
 from monarch_cli.core.operations import set_mutation_authorized
 from monarch_cli.core.prompting import resolve_non_interactive, set_non_interactive
@@ -18,6 +27,8 @@ app.add_typer(transactions.app, name="transactions")
 app.add_typer(budgets.app, name="budgets")
 app.add_typer(cashflow.app, name="cashflow")
 app.add_typer(categories.app, name="categories")
+app.add_typer(institutions.app, name="institutions")
+app.add_typer(subscription.app, name="subscription")
 
 
 def version_callback(value: bool) -> None:

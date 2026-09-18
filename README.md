@@ -269,6 +269,38 @@ monarch --allow-mutations accounts refresh         # Refresh all account data
 monarch --allow-mutations accounts refresh -a ACC123  # Refresh specific account
 ```
 
+### institutions and subscription
+
+```bash
+monarch institutions list                    # Credential-centric connection status
+monarch institutions list --include-deleted   # Include accounts marked deleted
+monarch institutions list --json
+monarch institutions list --raw               # Explicit upstream response
+
+monarch subscription show                     # Trial and premium entitlement state
+monarch subscription show --json
+monarch subscription show --raw               # Explicit upstream response
+```
+
+`institutions list` groups associated accounts under their upstream
+credential. Deleted accounts are omitted by default; `--include-deleted`
+retains them with `is_deleted` and `deleted_at`. Normalized institution
+records contain `credential_id`, `provider`, `institution_id`,
+`institution_name`, `update_required`, `disconnected`, `disconnected_at`,
+`last_updated`, `issue`, `balance_status`, `transaction_status`, and
+`accounts`. Missing status values are `null` rather than a healthy default;
+`issue` is either `null` or `{reported, message}`. Each account contains
+`id`, `name`, `subtype`, `mask`, `is_deleted`, and `deleted_at`.
+
+`subscription show` is the only normalized subscription contract. It returns
+`available`, `is_on_free_trial`, and `has_premium_entitlement`; absent or
+partial subscription data without a usable state boolean sets `available` to
+`false` and state fields to null, while known false values retain `available`
+set to `true`. Normalized output excludes payment source and referral metadata.
+`--raw` is an explicit opt-in passthrough of the released upstream response
+and may contain those sensitive fields. Both commands are read-only and never
+initiate an institution refresh.
+
 ### transactions
 
 ```bash
@@ -572,6 +604,13 @@ These output fields are guaranteed stable across versions:
 
 **Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `notes`
 
+**Institutions:** `credential_id`, `provider`, `institution_id`,
+`institution_name`, `update_required`, `disconnected`, `disconnected_at`,
+`last_updated`, `issue`, `balance_status`, `transaction_status`, `accounts`
+
+**Subscription:** `available`, `is_on_free_trial`,
+`has_premium_entitlement`
+
 #### Normalization semantics (v1)
 
 Normalized output is produced by `monarch_cli.transformers`; `--raw` bypasses
@@ -589,6 +628,16 @@ unknown fields).
   responses preserve `review_status` when supplied; detail `review_status` is
   nullable because the released public detail query may omit it.
 - Unknown additive upstream fields are ignored by normalized output.
+- Institution status is credential-centric; missing/disconnected/update/issue
+  values remain nullable and are never treated as a healthy connection.
+  Deleted institution-associated accounts are excluded unless
+  `institutions list --include-deleted` is requested; included records retain
+  their deletion timestamp and `is_deleted` state.
+- `subscription show` is the sole normalized subscription contract. Its
+  `available` flag distinguishes an absent subscription object from known
+  false entitlement/trial values. Payment-source and referral fields are
+  excluded from normalized output and are available only through explicit
+  `--raw` passthrough.
 - Cashflow period aggregates are the one documented numeric-default
   exception: a period with no data reports `0` totals.
 - Account type discovery flattens the upstream hierarchy into one record per
@@ -659,7 +708,7 @@ source ~/.config/fish/completions/monarch.fish
 
 ```bash
 monarch <TAB>
-# Shows: accounts  auth  budgets  cashflow  categories  transactions
+# Shows: accounts  auth  budgets  cashflow  categories  institutions  subscription  transactions
 ```
 
 ## Troubleshooting

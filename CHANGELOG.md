@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Institution and Subscription Status
+- **`monarch institutions list`** - Credential-centric connection diagnostics with provider/institution status and associated accounts
+- **Deleted-account safety** - Deleted accounts are excluded by default; `--include-deleted` opts in while retaining `is_deleted` and `deleted_at`
+- **`monarch subscription show`** - One normalized contract for trial and premium-entitlement state, with unavailable data distinct from known false values
+- **Privacy-minimized defaults** - Referral and payment-source metadata are excluded from normalized output; explicit `--raw` preserves the upstream response
+- **Read-only operations** - Both commands use the released `monarchmoneycommunity>=1.5.2` client methods and never initiate remote mutations
+
 #### Account Type Discovery
 - **`monarch accounts types`** - Read-only discovery of the supported account groups, types, and subtypes accepted by account workflows, so callers no longer have to guess identifiers
 - **Normalized hierarchy records** - One stable record per `(group, type, subtype)` leaf with `group`, `type`, `type_display`, `subtype`, and `subtype_display` fields; identifiers are the upstream `name` values and labels are human-readable `display` values
