@@ -253,7 +253,8 @@ class LiveFixtureAdapter:
             name = account.get("displayName")
             account_id = account.get("id")
             if (
-                marker in name
+                isinstance(name, str)
+                and marker in name
                 and isinstance(account_id, str)
                 and account_id
                 and account_id not in matches

@@ -100,6 +100,26 @@ def test_record_drops_forbidden_metadata_keys(tmp_path: Path) -> None:
     assert "pw" not in serialized
 
 
+def test_record_redacts_forbidden_keys_nested_in_sequences(tmp_path: Path) -> None:
+    manifest = RecoveryManifest.create(tmp_path, "run-abc")
+    entry = manifest.record(
+        operation="live-fixture account create",
+        phase="intent",
+        status="pending",
+        metadata={
+            "steps": [
+                {"token": "secret-in-list", "keep": "ok"},
+                [{"password": "pw-in-list"}],
+                "plain",
+            ],
+        },
+    )
+    assert entry["metadata"]["steps"] == [{"keep": "ok"}, [{}], "plain"]
+    serialized = json.dumps(json.loads(manifest.path.read_text()))
+    assert "secret-in-list" not in serialized
+    assert "pw-in-list" not in serialized
+
+
 def test_record_rejects_payload_without_forbidden_keys(tmp_path: Path) -> None:
     manifest = RecoveryManifest.create(tmp_path, "run-abc")
     # The public record() path only accepts safe fields, so a forbidden key can

@@ -309,6 +309,23 @@ def test_find_account_ids_by_marker_filters_by_name() -> None:
     assert adapter.find_account_ids_by_marker("mark") == ["acct-1"]
 
 
+def test_find_account_ids_by_marker_ignores_missing_or_nonstring_names() -> None:
+    # Recovery must stay usable when an unrelated account record has no usable
+    # display name; a non-string name must never raise out of the lookup.
+    client = FakeClient(
+        get_accounts={
+            "accounts": [
+                {"id": "acct-none", "displayName": None},
+                {"id": "acct-num", "displayName": 1234},
+                "not-a-mapping",
+                {"id": "acct-1", "displayName": "MC584R fixture mark"},
+            ]
+        }
+    )
+    adapter = LiveFixtureAdapter(client)
+    assert adapter.find_account_ids_by_marker("mark") == ["acct-1"]
+
+
 # --- Operation descriptors are mutations ------------------------------------
 
 

@@ -96,11 +96,22 @@ def _redact_metadata(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
     for key, value in metadata.items():
         if key.lower() in FORBIDDEN_KEYS:
             continue
-        if isinstance(value, Mapping):
-            redacted[key] = _redact_metadata(value)
-        else:
-            redacted[key] = value
+        redacted[key] = _redact_value(value)
     return redacted
+
+
+def _redact_value(value: Any) -> Any:
+    """Recursively redact forbidden keys from a metadata value.
+
+    Handles nested mappings and sequences so a caller-supplied list of
+    mappings cannot smuggle a forbidden key past redaction. Scalar values are
+    returned unchanged.
+    """
+    if isinstance(value, Mapping):
+        return _redact_metadata(value)
+    if isinstance(value, (list, tuple)):
+        return [_redact_value(item) for item in value]
+    return value
 
 
 def assert_manifest_is_safe(data: Mapping[str, Any]) -> None:
