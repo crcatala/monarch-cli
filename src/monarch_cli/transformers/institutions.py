@@ -137,10 +137,10 @@ def transform_institutions(raw: Any, *, include_deleted: bool = False) -> list[d
 def transform_subscription(raw: Any) -> dict[str, Any]:
     """Normalize ``get_subscription_details`` without exposing sensitive data.
 
-    ``available`` is false when the upstream subscription object is absent;
-    that state is distinct from an available subscription reporting either
-    entitlement boolean as false.  Referral and payment-source fields are not
-    copied to this contract.
+    ``available`` is false when the upstream subscription object is absent or
+    contains no usable trial/entitlement boolean; that state is distinct from
+    an available subscription reporting either boolean as false. Referral and
+    payment-source fields are not copied to this contract.
     """
     response = require_object(raw, "subscription")
     subscription = _mapping(response.get("subscription"))
@@ -150,10 +150,15 @@ def transform_subscription(raw: Any) -> dict[str, Any]:
             "is_on_free_trial": None,
             "has_premium_entitlement": None,
         }
+
+    is_on_free_trial = _optional_bool(subscription.get("isOnFreeTrial"))
+    has_premium_entitlement = _optional_bool(subscription.get("hasPremiumEntitlement"))
     return {
-        "available": True,
-        "is_on_free_trial": _optional_bool(subscription.get("isOnFreeTrial")),
-        "has_premium_entitlement": _optional_bool(subscription.get("hasPremiumEntitlement")),
+        # A partial object carrying only sensitive metadata, nulls, or drifted
+        # values does not establish that subscription state is available.
+        "available": is_on_free_trial is not None or has_premium_entitlement is not None,
+        "is_on_free_trial": is_on_free_trial,
+        "has_premium_entitlement": has_premium_entitlement,
     }
 
 

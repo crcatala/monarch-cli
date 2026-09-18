@@ -41,9 +41,10 @@ def show(
 ) -> None:
     """Show normalized trial and premium-entitlement state.
 
-    ``available: false`` means the upstream subscription object was absent;
-    this is distinct from an available subscription reporting false booleans.
-    Normalized output intentionally excludes referral and payment-source data.
+    ``available: false`` means the upstream subscription object was absent or
+    lacked usable trial/entitlement booleans; this is distinct from an
+    available subscription reporting false booleans. Normalized output
+    intentionally excludes referral and payment-source data.
     This command is read-only.
     """
     with spinner("Fetching subscription..."):

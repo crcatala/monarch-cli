@@ -132,6 +132,19 @@ def test_subscription_unavailable_is_not_known_false() -> None:
     assert transform_subscription({})["available"] is False
 
 
+def test_partial_subscription_without_usable_state_is_unavailable() -> None:
+    assert transform_subscription({"subscription": {"paymentSource": "card"}}) == {
+        "available": False,
+        "is_on_free_trial": None,
+        "has_premium_entitlement": None,
+    }
+    assert transform_subscription({"subscription": {"isOnFreeTrial": False}}) == {
+        "available": True,
+        "is_on_free_trial": False,
+        "has_premium_entitlement": None,
+    }
+
+
 def test_malformed_roots_are_typed_errors() -> None:
     with pytest.raises(APIError):
         transform_institutions([])

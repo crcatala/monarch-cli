@@ -293,12 +293,13 @@ records contain `credential_id`, `provider`, `institution_id`,
 `id`, `name`, `subtype`, `mask`, `is_deleted`, and `deleted_at`.
 
 `subscription show` is the only normalized subscription contract. It returns
-`available`, `is_on_free_trial`, and `has_premium_entitlement`; unavailable
-subscription data has `available: false` and null state fields, while known
-false values retain `available: true`. Normalized output excludes payment
-source and referral metadata. `--raw` is an explicit opt-in passthrough of
-the released upstream response and may contain those sensitive fields. Both
-commands are read-only and never initiate an institution refresh.
+`available`, `is_on_free_trial`, and `has_premium_entitlement`; absent or
+partial subscription data without a usable state boolean sets `available` to
+`false` and state fields to null, while known false values retain `available`
+set to `true`. Normalized output excludes payment source and referral metadata.
+`--raw` is an explicit opt-in passthrough of the released upstream response
+and may contain those sensitive fields. Both commands are read-only and never
+initiate an institution refresh.
 
 ### transactions
 
