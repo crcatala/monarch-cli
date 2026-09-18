@@ -7,6 +7,8 @@ rather than at runtime.
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from monarchmoney import MonarchMoney
 
@@ -18,6 +20,7 @@ class TestMonarchMoneyInterface:
     REQUIRED_METHODS = [
         "get_accounts",
         "get_transactions",
+        "get_transaction_details",
         "get_budgets",
         "get_cashflow_summary",
         "get_transaction_categories",
@@ -32,6 +35,25 @@ class TestMonarchMoneyInterface:
             f"MonarchMoney is missing required method: {method_name}. "
             f"The upstream library may have changed its API."
         )
+
+    def test_get_transactions_exposes_released_filter_surface(self) -> None:
+        """The pinned minimum client exposes every CLI filter argument."""
+        parameters = inspect.signature(MonarchMoney.get_transactions).parameters
+        assert {
+            "category_ids",
+            "account_ids",
+            "tag_ids",
+            "has_attachments",
+            "has_notes",
+            "hidden_from_reports",
+            "is_split",
+            "is_recurring",
+            "is_pending",
+            "imported_from_mint",
+            "synced_from_institution",
+            "needs_review",
+            "transaction_visibility",
+        } <= set(parameters)
 
     @pytest.mark.parametrize("method_name", REQUIRED_METHODS)
     def test_required_method_is_callable(self, method_name: str) -> None:

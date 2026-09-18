@@ -2,9 +2,10 @@
 
 import pytest
 
-from monarch_cli.core.exceptions import APIError
+from monarch_cli.core.exceptions import APIError, NotFoundError
 from monarch_cli.transformers.transactions import (
     transform_transaction,
+    transform_transaction_detail,
     transform_transactions,
 )
 
@@ -247,6 +248,42 @@ class TestTransformTransactions:
             transform_transactions(None)  # type: ignore[arg-type]
         with pytest.raises(APIError):
             transform_transactions(["not", "an", "object"])  # type: ignore[arg-type]
+
+
+class TestTransformTransactionDetail:
+    """Tests for null-safe detail normalization and state separation."""
+
+    def test_pending_and_review_are_independent(self):
+        raw = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "pending": True,
+                "needsReview": False,
+                "reviewStatus": "REVIEWED",
+                "attachments": None,
+                "tags": [],
+                "splitTransactions": None,
+            }
+        }
+        result = transform_transaction_detail(raw, requested_id="txn-detail")
+        assert result["is_pending"] is True
+        assert result["needs_review"] is False
+        assert result["review_status"] == "REVIEWED"
+        assert result["attachments"] == []
+        assert result["tags"] == []
+        assert result["split"]["splits"] == []
+
+    def test_null_detail_is_not_found(self):
+        with pytest.raises(NotFoundError):
+            transform_transaction_detail({"getTransaction": None}, requested_id="missing")
+        with pytest.raises(NotFoundError):
+            transform_transaction_detail({}, requested_id="missing")
+
+    def test_malformed_detail_is_api_error(self):
+        with pytest.raises(APIError):
+            transform_transaction_detail({"getTransaction": []})
+        with pytest.raises(APIError):
+            transform_transaction_detail(None)  # type: ignore[arg-type]
 
 
 class TestSchemaContract:

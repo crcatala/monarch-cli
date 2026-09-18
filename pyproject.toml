@@ -30,7 +30,7 @@ dependencies = [
     # rendering, and option parsing. Widening the range requires the same
     # framework-sensitive suite (tests/test_cli_framework.py) to be re-run.
     "typer>=0.27.1,<0.28",
-    "monarchmoneycommunity>=1.0.0",
+    "monarchmoneycommunity>=1.5.2",
     # Imported directly by monarch_cli.core.retry; it must not rely on being
     # pulled in transitively by monarchmoneycommunity. Floor matches the
     # verified resolution (monarchmoneycommunity 1.5.2 requires aiohttp>=3.14.3).

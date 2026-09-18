@@ -988,7 +988,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.3" },
     { name = "keyring", specifier = ">=24.0.0" },
-    { name = "monarchmoneycommunity", specifier = ">=1.0.0" },
+    { name = "monarchmoneycommunity", specifier = ">=1.5.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "platformdirs", specifier = ">=4.0.0" },
     { name = "prek", marker = "extra == 'dev'", specifier = ">=0.2.30" },

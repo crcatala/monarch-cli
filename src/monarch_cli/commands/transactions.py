@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from datetime import date
+from enum import StrEnum
 from typing import Annotated, Any
 
 import typer
@@ -35,7 +36,7 @@ from ..core.operations import (
 )
 from ..output import OutputFormat, output
 from ..output.progress import spinner
-from ..transformers.transactions import transform_transactions
+from ..transformers.transactions import transform_transaction_detail, transform_transactions
 
 app = typer.Typer(
     help="Transaction management",
@@ -44,6 +45,21 @@ app = typer.Typer(
 
 #: Declared effect sets for this group's commands.
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+GET_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+
+#: Maximum page size accepted by ``transactions list``. The upstream client
+#: does not document a server-side cap, so the CLI enforces a bounded,
+#: documented limit to prevent unbounded fetch requests.
+MAX_PAGE_SIZE = 1000
+
+
+class TransactionVisibility(StrEnum):
+    """Visibility scopes supported by the released upstream list filter."""
+
+    HIDDEN_TRANSACTIONS_ONLY = "hidden_transactions_only"
+    ALL_TRANSACTIONS = "all_transactions"
+
+
 UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 BATCH_UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 
@@ -79,7 +95,10 @@ def list_cmd(
         typer.Option(
             "-l",
             "--limit",
-            help="Maximum number of transactions to return (API default: 100)",
+            help=(
+                "Maximum number of transactions to return (API default: 100; "
+                f"maximum page size: {MAX_PAGE_SIZE})"
+            ),
         ),
     ] = 100,
     offset: Annotated[
@@ -122,6 +141,95 @@ def list_cmd(
             help="Filter by account ID (repeatable)",
         ),
     ] = None,
+    category: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-c",
+            "--category",
+            help="Filter by category ID (repeatable)",
+        ),
+    ] = None,
+    tag: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-t",
+            "--tag",
+            help="Filter by tag ID (repeatable)",
+        ),
+    ] = None,
+    has_attachments: Annotated[
+        bool | None,
+        typer.Option(
+            "--has-attachments/--no-has-attachments",
+            help="Filter by attachment presence (default: no filter)",
+        ),
+    ] = None,
+    has_notes: Annotated[
+        bool | None,
+        typer.Option(
+            "--has-notes/--no-has-notes",
+            help="Filter by note presence (default: no filter)",
+        ),
+    ] = None,
+    hidden_from_reports: Annotated[
+        bool | None,
+        typer.Option(
+            "--hidden-from-reports/--no-hidden-from-reports",
+            help="Filter by report visibility (default: no filter)",
+        ),
+    ] = None,
+    is_split: Annotated[
+        bool | None,
+        typer.Option(
+            "--split/--no-split",
+            help="Filter by split state (default: no filter)",
+        ),
+    ] = None,
+    is_recurring: Annotated[
+        bool | None,
+        typer.Option(
+            "--recurring/--no-recurring",
+            help="Filter by recurring state (default: no filter)",
+        ),
+    ] = None,
+    is_pending: Annotated[
+        bool | None,
+        typer.Option(
+            "--pending/--no-pending",
+            help="Filter by pending state (default: no filter)",
+        ),
+    ] = None,
+    imported_from_mint: Annotated[
+        bool | None,
+        typer.Option(
+            "--imported-from-mint/--no-imported-from-mint",
+            help="Filter by Mint import origin (default: no filter)",
+        ),
+    ] = None,
+    synced_from_institution: Annotated[
+        bool | None,
+        typer.Option(
+            "--synced-from-institution/--no-synced-from-institution",
+            help="Filter by institution sync origin (default: no filter)",
+        ),
+    ] = None,
+    needs_review: Annotated[
+        bool | None,
+        typer.Option(
+            "--needs-review/--no-needs-review",
+            help="Filter by review-queue state (default: no filter)",
+        ),
+    ] = None,
+    visibility: Annotated[
+        TransactionVisibility | None,
+        typer.Option(
+            "--visibility",
+            help=(
+                "Transaction visibility scope (default: non-hidden only; "
+                "hidden_transactions_only or all_transactions)"
+            ),
+        ),
+    ] = None,
     search: Annotated[
         str | None,
         typer.Option(
@@ -162,7 +270,9 @@ def list_cmd(
     """List transactions with filters.
 
     Fetches transactions from your linked accounts. Supports date filtering
-    via explicit dates or presets, account filtering, and text search.
+    via explicit dates or presets, account/category/tag ID filtering,
+    tri-state boolean filters (omitted means no filter), visibility scope,
+    and text search.
 
     Examples:
         monarch transactions list                      # Recent transactions
@@ -171,6 +281,11 @@ def list_cmd(
         monarch transactions list -s 2024-01-01 -e 2024-01-31  # Date range
         monarch transactions list --account ACC123     # Specific account
         monarch transactions list --search "coffee"    # Search by text
+        monarch transactions list --pending            # Only pending transactions
+        monarch transactions list --no-pending         # Exclude pending transactions
+        monarch transactions list --needs-review       # Review queue
+        monarch transactions list --has-attachments    # With attachments
+        monarch transactions list -c CAT1 -c CAT2 -t TAG1  # Repeatable filters
         monarch transactions list | jq .              # Auto-JSON when piped
     """
     # Determine output format
@@ -185,20 +300,60 @@ def list_cmd(
     end_date = _parse_date(end)
     start_str, end_str = parse_date_range(preset, start_date, end_date)
 
-    # Prepare account IDs
+    # Validate everything that can be validated locally BEFORE client
+    # creation or any API call: bad input is a structured usage error, never
+    # a wasted authenticated request.
+    _validate_list_query(
+        limit=limit,
+        offset=offset,
+        start_str=start_str,
+        end_str=end_str,
+    )
+
+    # Prepare ID filters
     account_ids = list(account) if account else []
+    category_ids = list(category) if category else []
+    tag_ids = list(tag) if tag else []
+
+    api_kwargs: dict[str, Any] = {
+        "limit": limit,
+        "offset": offset,
+        "start_date": start_str,
+        "end_date": end_str,
+        "search": search or "",
+        "account_ids": account_ids,
+    }
+    # Omitted tri-state filters are omitted from the API call entirely so
+    # upstream filtering is untouched; present forms map to True/False.
+    if category_ids:
+        api_kwargs["category_ids"] = category_ids
+    if tag_ids:
+        api_kwargs["tag_ids"] = tag_ids
+    if has_attachments is not None:
+        api_kwargs["has_attachments"] = has_attachments
+    if has_notes is not None:
+        api_kwargs["has_notes"] = has_notes
+    if hidden_from_reports is not None:
+        api_kwargs["hidden_from_reports"] = hidden_from_reports
+    if is_split is not None:
+        api_kwargs["is_split"] = is_split
+    if is_recurring is not None:
+        api_kwargs["is_recurring"] = is_recurring
+    if is_pending is not None:
+        api_kwargs["is_pending"] = is_pending
+    if imported_from_mint is not None:
+        api_kwargs["imported_from_mint"] = imported_from_mint
+    if synced_from_institution is not None:
+        api_kwargs["synced_from_institution"] = synced_from_institution
+    if needs_review is not None:
+        api_kwargs["needs_review"] = needs_review
+    if visibility is not None:
+        api_kwargs["transaction_visibility"] = visibility.value
 
     with spinner("Fetching transactions..."):
         client = get_authenticated_client()
         raw_data: Any = run_read_call(
-            lambda: client.get_transactions(
-                limit=limit,
-                offset=offset,
-                start_date=start_str,
-                end_date=end_str,
-                search=search or "",
-                account_ids=account_ids,
-            ),
+            lambda: client.get_transactions(**api_kwargs),
             Operation(command="transactions list", effects=LIST_EFFECTS),
         )
 
@@ -216,6 +371,131 @@ def list_cmd(
             # For raw mode with dict, output as single line
             print(json.dumps(data, default=str))
         return
+
+    output(data, output_format, raw=False)
+
+
+def _validate_list_query(
+    limit: int,
+    offset: int,
+    start_str: str | None,
+    end_str: str | None,
+) -> None:
+    """Validate list query parameters before any client creation or API call.
+
+    Raises:
+        ValidationError: On a nonpositive or over-cap limit, a negative
+            offset, a one-sided date range, or an inverted date range.
+    """
+    if limit < 1:
+        raise ValidationError(
+            message=f"--limit must be a positive integer (got {limit}).",
+            field="limit",
+        )
+    if limit > MAX_PAGE_SIZE:
+        raise ValidationError(
+            message=(
+                f"--limit must not exceed the maximum page size of {MAX_PAGE_SIZE} (got {limit})."
+            ),
+            field="limit",
+        )
+    if offset < 0:
+        raise ValidationError(
+            message=f"--offset must be a nonnegative integer (got {offset}).",
+            field="offset",
+        )
+    if (start_str is None) != (end_str is None):
+        raise ValidationError(
+            message="--start and --end must be provided together (one-sided "
+            "date ranges are not supported).",
+            field="dates",
+        )
+    if start_str is not None and end_str is not None and start_str > end_str:
+        raise ValidationError(
+            message=f"--start ({start_str}) must be on or before --end ({end_str}).",
+            field="dates",
+        )
+
+
+@app.command("get")
+@handle_errors
+@operation_effects(Effect.READ_ONLY)
+def get_cmd(
+    transaction_id: Annotated[
+        str,
+        typer.Argument(help="Transaction ID to inspect"),
+    ],
+    strict: Annotated[
+        bool,
+        typer.Option(
+            "--strict",
+            help=(
+                "Do not redirect a pending transaction ID to its posted "
+                "replacement (upstream redirects by default)"
+            ),
+        ),
+    ] = False,
+    format: Annotated[
+        OutputFormat | None,
+        typer.Option(
+            "-f",
+            "--format",
+            help="Output format (plain, json, table, csv, compact)",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output as JSON (shortcut for --format json)",
+        ),
+    ] = False,
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Output raw API response without transformation",
+        ),
+    ] = False,
+) -> None:
+    """Get a single transaction's normalized read-only detail.
+
+    Shows the full normalized detail for one transaction, including pending
+    and review state, attachments, tags, and split summary. By default the
+    upstream service may redirect a pending transaction ID to its posted
+    replacement; the requested ID, returned ID, and any original transaction
+    identity are always visible in the output so a redirect is never silent.
+    Use --strict to request the exact identifier without redirection.
+
+    Examples:
+        monarch transactions get TXN123
+        monarch transactions get TXN123 --json
+        monarch transactions get TXN123 --strict   # No posted redirect
+        monarch transactions get TXN123 --raw      # Untouched upstream envelope
+    """
+    # Validate locally before any client creation or API call.
+    if not transaction_id.strip():
+        raise ValidationError(
+            message="Transaction ID must not be empty.",
+            field="transaction_id",
+        )
+
+    output_format = OutputFormat.JSON if json_output else format
+
+    with spinner("Fetching transaction..."):
+        client = get_authenticated_client()
+        raw_data: Any = run_read_call(
+            lambda: client.get_transaction_details(
+                transaction_id=transaction_id,
+                redirect_posted=not strict,
+            ),
+            Operation(command="transactions get", effects=GET_EFFECTS),
+        )
+
+        # Transform unless raw mode
+        data = (
+            raw_data if raw else transform_transaction_detail(raw_data, requested_id=transaction_id)
+        )
 
     output(data, output_format, raw=False)
 
