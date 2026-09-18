@@ -292,6 +292,8 @@ class TestOperationRegistry:
             "transactions tags create": "transactions.tags.create",
             "transactions tags replace": "transactions.tags.replace",
             "transactions tags clear": "transactions.tags.clear",
+            "transactions splits replace": "transactions.splits.replace",
+            "transactions splits clear": "transactions.splits.clear",
             # Test-only disposable-fixture operations (mc-584r): real remote
             # effects used only by the gated live mutation adapter.
             "live-fixture account create": "live-fixture.account.create",

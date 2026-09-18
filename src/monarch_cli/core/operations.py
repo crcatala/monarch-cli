@@ -114,6 +114,14 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "no_retry: complete-set clearing has no documented idempotency key or "
         "conditional-write mechanism."
     ),
+    "transactions splits replace": (
+        "no_retry: complete-set split replacement has no documented idempotency "
+        "key or conditional-write mechanism; verify after uncertain writes."
+    ),
+    "transactions splits clear": (
+        "no_retry: complete-set split clearing has no documented idempotency key "
+        "or conditional-write mechanism; verify after uncertain writes."
+    ),
 }
 
 

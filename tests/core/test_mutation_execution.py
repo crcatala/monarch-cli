@@ -326,6 +326,8 @@ class TestRetryClassifications:
             "transactions tags create",
             "transactions tags replace",
             "transactions tags clear",
+            "transactions splits replace",
+            "transactions splits clear",
         }
 
     def test_classifications_require_a_named_mechanism_to_change(self) -> None:

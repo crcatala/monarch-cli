@@ -20,6 +20,8 @@ execution is attempted**:
 - `transactions tags create`
 - `transactions tags replace`
 - `transactions tags clear`
+- `transactions splits replace`
+- `transactions splits clear`
 
 Pre-execution authorization and input-validation failures do **not** use this
 envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
