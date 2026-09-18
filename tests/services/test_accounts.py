@@ -482,15 +482,14 @@ class TestAccountHistoryAndSnapshots:
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")
     @patch("monarch_cli.services.accounts.run_read_call")
-    def test_aggregate_passes_parsed_date_objects(self, mock_run_read, mock_get_client):
+    def test_aggregate_passes_iso_date_strings(self, mock_run_read, mock_get_client):
         mock_run_read.return_value = {"aggregateSnapshots": []}
         assert get_aggregate_snapshots("2024-01-01", "2024-01-31") == []
         factory = mock_run_read.call_args.args[0]
         factory()
-        from datetime import date
 
         mock_get_client.return_value.get_aggregate_snapshots.assert_called_once_with(
-            start_date=date(2024, 1, 1), end_date=date(2024, 1, 31), account_type=None
+            start_date="2024-01-01", end_date="2024-01-31", account_type=None
         )
 
     @patch("monarch_cli.services.accounts.get_authenticated_client")

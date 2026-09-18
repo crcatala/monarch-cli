@@ -452,7 +452,9 @@ def get_aggregate_snapshots(
     client = get_authenticated_client()
     data = run_read_call(
         lambda: client.get_aggregate_snapshots(
-            start_date=start, end_date=end, account_type=account_type
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            account_type=account_type,
         ),
         operation,
     )

@@ -366,7 +366,7 @@ def snapshots(
 
     Examples:
         monarch accounts snapshots --start 2024-01-01 --end 2024-12-31 --json
-        monarch accounts snapshots -s 2024-01-01 -e 2024-06-30 -t asset
+        monarch accounts snapshots -s 2024-01-01 -e 2024-06-30 -t depository
     """
     output_format = format
     if json_output:
