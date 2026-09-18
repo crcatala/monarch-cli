@@ -20,6 +20,8 @@ execution is attempted**:
 - `transactions tags create`
 - `transactions tags replace`
 - `transactions tags clear`
+- `transactions splits replace`
+- `transactions splits clear`
 
 Pre-execution authorization and input-validation failures do **not** use this
 envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
@@ -167,5 +169,9 @@ $ monarch --allow-mutations transactions update txn_123 --notes "Review"
 }
 ```
 
-On an ambiguous transport failure the same command exits `4` with
-`status: "ambiguous"` and a required `verification` object.
+On an ambiguous transport failure, or when a dispatched split mutation
+returns an incomplete or malformed response, the same command exits `4` with
+`status: "ambiguous"` and a required `verification` object. A nullable
+`updateTransactionSplit.errors: null` is a valid upstream no-error response
+when the mutation also returns its transaction result; the command then uses
+its normal read-after-write verification.

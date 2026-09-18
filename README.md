@@ -151,6 +151,42 @@ conditional-write or idempotency guarantee, so concurrent assignments can still
 change between discovery and replacement; verify an ambiguous or mismatched
 write with `transactions tags show` before retrying.
 
+### Transaction splits
+
+`monarch transactions splits show TRANSACTION_ID` is read-only and displays the
+parent amount and current split rows. Replace is a complete-set operation:
+
+```bash
+monarch --allow-mutations --yes transactions splits replace TXN123 \\
+  --splits-json '[{"merchantName":"Store","amount":-10.00,"categoryId":"CAT1"}]'
+monarch --allow-mutations --yes transactions splits replace TXN123 \\
+  --splits-file ./splits.json
+monarch --allow-mutations --yes transactions splits clear TXN123
+```
+
+Exactly one source is required. Inline and file JSON are bounded to 64 KiB;
+replacement arrays contain 1–100 records, each with exactly non-empty
+`merchantName`, finite `amount`, and opaque non-empty `categoryId`. Amounts use
+signed decimal dollars with precision 18 and scale 2 (at most two fractional
+digits, maximum absolute value `9999999999999999.99`); values that cannot be
+represented exactly by the released client's numeric wire format are rejected.
+Expenses and their splits are negative; income and its splits are positive; a
+zero parent may only
+have zero-valued rows. A replacement must contain at least one row and its
+signed total must equal the parent amount at two-decimal precision. Clear is
+the only way to send the canonical empty list; pending/unsupported server
+responses remain explicit failures rather than being simulated locally.
+
+Split writes read the parent before mutation, inspect payload-level errors, and
+read the resulting splits back. The released upstream client may return a
+nullable `updateTransactionSplit.errors` value of `null` when no payload errors
+exist; that is accepted only with a valid transaction result. Missing or other
+malformed response fields are reported as ambiguous because the write may have
+applied. Never retry an ambiguous or verification-mismatched write until
+`transactions splits show` confirms remote state.
+Merge, per-split edits, notes/tags/goals, merchant IDs, and multi-transaction
+split updates are intentionally not exposed.
+
 After remote execution is attempted, every remote mutation returns the shared
 `mutation-outcome.v1` envelope on stdout (see
 [docs/mutation-outcomes.md](docs/mutation-outcomes.md)): top-level
