@@ -65,6 +65,8 @@ EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
     "transactions batch-update": frozenset({Effect.REMOTE_MUTATION}),
     "transactions get": frozenset({Effect.READ_ONLY}),
     "transactions list": frozenset({Effect.READ_ONLY}),
+    "transactions recurring": frozenset({Effect.READ_ONLY}),
+    "transactions summary": frozenset({Effect.READ_ONLY}),
     "transactions update": frozenset({Effect.REMOTE_MUTATION}),
     "transactions tags create": frozenset({Effect.REMOTE_MUTATION}),
     "transactions tags replace": frozenset({Effect.REMOTE_MUTATION}),
