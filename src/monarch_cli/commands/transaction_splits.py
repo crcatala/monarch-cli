@@ -351,11 +351,22 @@ def _mutation_container(payload: Any) -> Mapping[str, Any]:
         raise APIError(
             "The split mutation returned no result.", details={"field": "updateTransactionSplit"}
         )
-    errors = container.get("errors")
-    if not isinstance(errors, list):
-        raise APIError(
-            "The split mutation returned an invalid error payload.",
-            details={"field": "updateTransactionSplit.errors"},
+    # The released client/API returns null, rather than [], when the
+    # nullable payload-error field has no errors. A missing or otherwise
+    # malformed field is different: the request was already dispatched and
+    # its remote outcome cannot be established safely.
+    if "errors" not in container:
+        raise MutationAmbiguousError(
+            "The split write returned an incomplete response; remote state is unknown.",
+            details={"reason": "malformed_response", "field": "updateTransactionSplit.errors"},
+        )
+    errors = container["errors"]
+    if errors is None:
+        errors = []
+    elif not isinstance(errors, list):
+        raise MutationAmbiguousError(
+            "The split write returned a malformed response; remote state is unknown.",
+            details={"reason": "malformed_response", "field": "updateTransactionSplit.errors"},
         )
     if errors:
         raise APIError(
@@ -363,9 +374,9 @@ def _mutation_container(payload: Any) -> Mapping[str, Any]:
             details={"payload_errors": _payload_errors(errors)},
         )
     if not isinstance(container.get("transaction"), Mapping):
-        raise APIError(
-            "The split mutation returned no transaction result.",
-            details={"field": "updateTransactionSplit.transaction"},
+        raise MutationAmbiguousError(
+            "The split write returned no transaction result; remote state is unknown.",
+            details={"reason": "malformed_response", "field": "updateTransactionSplit.transaction"},
         )
     return container
 

@@ -28,10 +28,12 @@ def payload(amount: float = -10.0, rows: list[dict] | None = None) -> dict:
     }
 
 
-def mutation_payload(rows: list[dict], errors: list | None = None) -> dict:
+def mutation_payload(
+    rows: list[dict], errors: list | None = None, *, nullable_errors: bool = False
+) -> dict:
     return {
         "updateTransactionSplit": {
-            "errors": errors or [],
+            "errors": None if nullable_errors else (errors or []),
             "transaction": {"id": "txn-1", "splitTransactions": rows},
         }
     }
@@ -84,7 +86,7 @@ def test_show_is_read_only_and_normalized() -> None:
 def test_replace_inline_reads_parent_then_writes_then_verifies() -> None:
     mock = client()
     mock.get_transaction_splits.side_effect = [payload(), payload(rows=[row()])]
-    mock.update_transaction_splits.return_value = mutation_payload([row()])
+    mock.update_transaction_splits.return_value = mutation_payload([row()], nullable_errors=True)
     result = invoke(
         mock,
         [
@@ -224,7 +226,7 @@ def test_replace_rejects_more_than_maximum_rows_before_read() -> None:
 def test_clear_sends_empty_list_and_verifies() -> None:
     mock = client()
     mock.get_transaction_splits.return_value = payload()
-    mock.update_transaction_splits.return_value = mutation_payload([])
+    mock.update_transaction_splits.return_value = mutation_payload([], nullable_errors=True)
     result = invoke(mock, ["clear", "txn-1"])
     assert result.exit_code == 0
     mock.update_transaction_splits.assert_awaited_once_with(transaction_id="txn-1", split_data=[])
@@ -250,13 +252,28 @@ def test_payload_errors_are_definitive_failure() -> None:
         {"updateTransactionSplit": {"transaction": {"id": "txn-1"}}},
         {"updateTransactionSplit": {"errors": [], "transaction": None}},
         {"updateTransactionSplit": {"errors": "not-an-array", "transaction": {}}},
-        {"errors": [{"message": "graphql failure"}], "updateTransactionSplit": {"errors": []}},
     ],
 )
-def test_malformed_mutation_payload_is_definitive_failure(mutation_result: dict) -> None:
+def test_malformed_mutation_payload_is_ambiguous(mutation_result: dict) -> None:
     mock = client()
     mock.get_transaction_splits.return_value = payload()
     mock.update_transaction_splits.return_value = mutation_result
+    result = invoke(mock, ["clear", "txn-1"])
+    assert result.exit_code == 4
+    output = json.loads(result.stdout)
+    assert output["status"] == "ambiguous"
+    assert output["verification"]["required"] is True
+    assert output["items"][0]["error"]["details"]["reason"] == "malformed_response"
+    mock.get_transaction_splits.assert_not_awaited()
+
+
+def test_graphql_payload_errors_remain_definitive_failure() -> None:
+    mock = client()
+    mock.get_transaction_splits.return_value = payload()
+    mock.update_transaction_splits.return_value = {
+        "errors": [{"message": "graphql failure"}],
+        "updateTransactionSplit": {"errors": [], "transaction": {}},
+    }
     result = invoke(mock, ["clear", "txn-1"])
     assert result.exit_code == 1
     output = json.loads(result.stdout)

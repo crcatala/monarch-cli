@@ -178,8 +178,12 @@ the only way to send the canonical empty list; pending/unsupported server
 responses remain explicit failures rather than being simulated locally.
 
 Split writes read the parent before mutation, inspect payload-level errors, and
-read the resulting splits back. Never retry an ambiguous or verification-
-mismatched write until `transactions splits show` confirms remote state.
+read the resulting splits back. The released upstream client may return a
+nullable `updateTransactionSplit.errors` value of `null` when no payload errors
+exist; that is accepted only with a valid transaction result. Missing or other
+malformed response fields are reported as ambiguous because the write may have
+applied. Never retry an ambiguous or verification-mismatched write until
+`transactions splits show` confirms remote state.
 Merge, per-split edits, notes/tags/goals, merchant IDs, and multi-transaction
 split updates are intentionally not exposed.
 
