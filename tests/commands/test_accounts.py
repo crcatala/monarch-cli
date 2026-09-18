@@ -163,6 +163,32 @@ class TestAccountsList:
             assert result.exit_code == 0
             assert json.loads(result.stdout) == raw_response
 
+    def test_list_malformed_root_reports_structured_api_error(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """A non-object top-level payload is a typed APIError, not a traceback."""
+
+        async def async_accounts():
+            return ["not", "an", "object"]
+
+        mock_authenticated_client.get_accounts = async_accounts
+
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--json"])
+
+        assert result.exit_code == 1
+        error = json.loads(result.stderr[result.stderr.index("{") :])
+        assert error["error"] is True
+        assert error["code"] == "API_ERROR"
+        assert error["details"]["expected"] == "object"
+        assert error["details"]["received"] == "list"
+
     def test_list_ndjson_outputs_one_per_line(self, transformed_accounts: list[dict]) -> None:
         """List with --ndjson outputs one JSON object per line."""
         with (
