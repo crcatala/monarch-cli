@@ -175,6 +175,25 @@ def test_clear_is_explicit_and_noop_is_deterministic() -> None:
     mock.set_transaction_tags.assert_not_called()
 
 
+def test_clear_payload_error_is_failed_outcome() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    mock.set_transaction_tags.return_value = {
+        "setTransactionTags": {
+            "errors": [{"message": "cannot clear", "code": "DENIED"}],
+            "transaction": None,
+        }
+    }
+    result = invoke(mock, ["clear", "txn-1"])
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "failed"
+    assert payload["items"][0]["error"]["details"]["payload_errors"][0]["code"] == "DENIED"
+
+
 def test_replace_verification_mismatch_is_ambiguous() -> None:
     mock = client()
     mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
