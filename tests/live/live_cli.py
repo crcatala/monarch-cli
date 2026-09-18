@@ -58,7 +58,12 @@ def resolve_monarch_executable(python_executable: str | None = None) -> str:
         InstalledCLINotFoundError: If the entry point is absent. The message
             includes setup guidance and never suggests a silent fallback.
     """
-    interpreter = Path(python_executable or sys.executable).resolve()
+    # Use abspath, not resolve(): a venv interpreter (e.g. ``.venv/bin/python``)
+    # is commonly a symlink to a base interpreter. Following that symlink would
+    # look for ``monarch`` in the base interpreter's scripts directory instead
+    # of the environment that actually installed the console script, causing a
+    # spurious fail-closed error for a correctly installed CLI.
+    interpreter = Path(os.path.abspath(python_executable or sys.executable))
     scripts_dir = interpreter.parent
     script_name = "monarch.exe" if sys.platform == "win32" else "monarch"
     candidate = scripts_dir / script_name
