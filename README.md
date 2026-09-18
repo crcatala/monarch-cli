@@ -213,7 +213,20 @@ monarch transactions list --limit 50 --offset 0
 monarch transactions list --preset this-month
 monarch transactions list --start 2024-01-01 --end 2024-01-31
 monarch transactions list --account ACC123
+monarch transactions list --category CAT123 --tag TAG456
+monarch transactions list --pending              # Tri-state filter
+monarch transactions list --no-pending           # Explicit negative filter
+monarch transactions list --needs-review
+monarch transactions list --visibility all_transactions
 monarch transactions list --search "grocery"
+# Repeat --account, --category, and --tag for multiple IDs.
+# --limit accepts 1-1000; use --offset for subsequent pages.
+# Normal output is a backward-compatible list; --raw preserves totalCount
+# and the complete upstream pagination envelope.
+
+# Inspect one transaction (redirects pending IDs by default)
+monarch transactions get TXN123 --json
+monarch transactions get TXN123 --strict --json  # Disable posted redirect
 
 # Update a transaction
 monarch --allow-mutations transactions update TXN123 --amount 25.50
@@ -447,7 +460,7 @@ These output fields are guaranteed stable across versions:
 
 **Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
 
-**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `notes`
+**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `notes`
 
 #### Normalization semantics (v1)
 
@@ -462,6 +475,9 @@ unknown fields).
   and `is_pending=false`. `is_pending` reads the upstream `pending` field.
 - `description` falls back deterministically: non-empty `merchant.name`,
   then `plaidName`, then `null`.
+- `needs_review` and opaque `review_status` are independent fields. List
+  responses preserve `review_status` when supplied; detail `review_status` is
+  nullable because the released public detail query may omit it.
 - Unknown additive upstream fields are ignored by normalized output.
 - Cashflow period aggregates are the one documented numeric-default
   exception: a period with no data reports `0` totals.

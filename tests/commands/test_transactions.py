@@ -455,6 +455,238 @@ class TestTransactionsList:
         assert "preset" in output.lower()
         assert "search" in output.lower()
 
+    def test_list_maps_all_released_filters_and_tri_state_flags(
+        self, mock_authenticated_client: MagicMock, sample_transactions_response: dict
+    ) -> None:
+        captured: dict[str, Any] = {}
+
+        async def async_get_transactions(**kwargs: Any) -> dict:
+            captured.update(kwargs)
+            return sample_transactions_response
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "list",
+                    "--category",
+                    "cat_1",
+                    "--category",
+                    "cat_2",
+                    "--tag",
+                    "tag_1",
+                    "--has-attachments",
+                    "--no-has-notes",
+                    "--hidden-from-reports",
+                    "--no-split",
+                    "--recurring",
+                    "--no-pending",
+                    "--imported-from-mint",
+                    "--no-synced-from-institution",
+                    "--needs-review",
+                    "--visibility",
+                    "all_transactions",
+                    "--json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert captured == {
+            "limit": 100,
+            "offset": 0,
+            "start_date": None,
+            "end_date": None,
+            "search": "",
+            "account_ids": [],
+            "category_ids": ["cat_1", "cat_2"],
+            "tag_ids": ["tag_1"],
+            "has_attachments": True,
+            "has_notes": False,
+            "hidden_from_reports": True,
+            "is_split": False,
+            "is_recurring": True,
+            "is_pending": False,
+            "imported_from_mint": True,
+            "synced_from_institution": False,
+            "needs_review": True,
+            "transaction_visibility": "all_transactions",
+        }
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--limit", "0"],
+            ["--limit", "1001"],
+            ["--offset", "-1"],
+            ["--start", "2024-02-01"],
+            ["--start", "2024-02-02", "--end", "2024-02-01"],
+        ],
+    )
+    def test_list_validation_happens_before_client_creation(self, args: list[str]) -> None:
+        with patch("monarch_cli.commands.transactions.get_authenticated_client") as get_client:
+            result = runner.invoke(app, ["list", *args, "--json"])
+        assert result.exit_code == 2
+        assert get_client.call_count == 0
+        assert "INVALID_INPUT" in result.stderr
+
+
+class TestTransactionsGet:
+    """Tests for normalized transaction detail discovery."""
+
+    @pytest.fixture
+    def sample_detail_response(self) -> dict[str, Any]:
+        return {
+            "getTransaction": {
+                "id": "posted_123",
+                "date": "2024-01-15",
+                "amount": -50.0,
+                "merchant": {"name": "Coffee Shop"},
+                "pending": False,
+                "needsReview": True,
+                "reviewStatus": "PENDING",
+                "attachments": [{"id": "att_1", "filename": "receipt.pdf"}],
+                "tags": [{"id": "tag_1", "name": "Work", "color": "blue"}],
+                "isSplitTransaction": True,
+                "hasSplitTransactions": True,
+                "splitTransactions": [],
+                "originalTransaction": {"id": "pending_123"},
+            }
+        }
+
+    def test_get_normalizes_detail_and_exposes_redirect_identity(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict[str, Any]
+    ) -> None:
+        async def async_get_transaction_details(**kwargs: Any) -> dict[str, Any]:
+            assert kwargs == {"transaction_id": "pending_123", "redirect_posted": True}
+            return sample_detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "pending_123", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["requested_id"] == "pending_123"
+        assert payload["id"] == "posted_123"
+        assert payload["redirected"] is True
+        assert payload["original_transaction"]["id"] == "pending_123"
+        assert payload["is_pending"] is False
+        assert payload["needs_review"] is True
+        assert payload["review_status"] == "PENDING"
+        assert payload["attachments"][0]["id"] == "att_1"
+        assert payload["tags"][0]["name"] == "Work"
+
+    def test_get_preserves_needs_review_when_detail_omits_review_status(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        """Released public detail responses may omit opaque reviewStatus."""
+        detail_response = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "date": "2024-01-15",
+                "amount": -50.0,
+                "merchant": {"name": "Coffee Shop"},
+                "pending": False,
+                "needsReview": True,
+                "attachments": [],
+                "tags": [],
+                "isSplitTransaction": False,
+                "splitTransactions": [],
+            }
+        }
+
+        async def async_get_transaction_details(**_: Any) -> dict[str, Any]:
+            return detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "txn-detail", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["needs_review"] is True
+        assert payload["review_status"] is None
+
+    def test_get_strict_disables_posted_redirect(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict[str, Any]
+    ) -> None:
+        captured: dict[str, Any] = {}
+
+        async def async_get_transaction_details(**kwargs: Any) -> dict[str, Any]:
+            captured.update(kwargs)
+            return sample_detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "pending_123", "--strict", "--json"])
+
+        assert result.exit_code == 0
+        assert captured == {"transaction_id": "pending_123", "redirect_posted": False}
+
+    def test_get_raw_preserves_upstream_envelope(
+        self, mock_authenticated_client: MagicMock, sample_detail_response: dict[str, Any]
+    ) -> None:
+        async def async_get_transaction_details(**_: Any) -> dict[str, Any]:
+            return sample_detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "pending_123", "--raw", "--json"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) == sample_detail_response
+
+    @pytest.mark.parametrize("raw_response", [{"getTransaction": None}, {}])
+    def test_get_not_found_is_structured_error(
+        self, mock_authenticated_client: MagicMock, raw_response: dict[str, Any]
+    ) -> None:
+        async def async_get_transaction_details(**_: Any) -> dict[str, Any]:
+            return raw_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "missing", "--json"])
+
+        assert result.exit_code == 1
+        assert '"code": "NOT_FOUND"' in result.stderr
+
 
 class TestTransactionsUpdate:
     """Tests for the transactions update command."""
