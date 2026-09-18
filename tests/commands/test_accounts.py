@@ -711,6 +711,68 @@ class TestAccountsRefresh:
         assert "account" in output.lower()
 
 
+class TestAccountHistoryAndSnapshotsCommands:
+    """CLI contract tests for the read-only account history surface."""
+
+    def test_history_json(self) -> None:
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_account_history",
+                return_value=[{"date": "2024-01-01", "balance": None}],
+            ) as mock_history,
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["history", "opaque-id", "--json"])
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)[0]["balance"] is None
+        mock_history.assert_called_once_with("opaque-id", raw=False)
+
+    def test_recent_balances_has_no_end_option(self) -> None:
+        result = runner.invoke(app, ["recent-balances", "--help"])
+        assert result.exit_code == 0
+        plain = result.stdout.replace("\x1b[1m", "").replace("\x1b[0m", "")
+        assert "start" in plain
+        assert "end-date filter" in plain
+        assert "--end" not in plain
+
+    def test_snapshots_by_type_preserves_month_precision(self) -> None:
+        payload = {
+            "snapshots": [{"account_type": "asset", "period": "2024-01", "balance": 1}],
+            "account_types": [],
+        }
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_account_snapshots_by_type",
+                return_value=payload,
+            ) as mock_snapshots,
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                ["snapshots-by-type", "--start", "2024-01-01", "--timeframe", "month", "--json"],
+            )
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["snapshots"][0]["period"] == "2024-01"
+        mock_snapshots.assert_called_once_with("2024-01-01", "month", raw=False)
+
+    def test_refresh_status_unknown_ids_are_explicit(self) -> None:
+        payload = {
+            "status": "unknown",
+            "complete": None,
+            "requested_account_ids": ["missing"],
+            "known_account_ids": [],
+            "unknown_account_ids": ["missing"],
+            "checked_account_count": 0,
+        }
+        with (
+            patch("monarch_cli.commands.accounts.get_refresh_status", return_value=payload),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["refresh-status", "-a", "missing", "--json"])
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["status"] == "unknown"
+
+
 class TestAccountsApp:
     """Tests for the accounts app structure."""
 

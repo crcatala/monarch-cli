@@ -1,7 +1,86 @@
 """Date utilities and presets for filtering transactions and reports."""
 
+from __future__ import annotations
+
+import re
 from datetime import date, timedelta
 from enum import StrEnum
+
+from .exceptions import ValidationError
+
+#: Strict ``YYYY-MM-DD`` shape. ``date.fromisoformat`` alone also accepts
+#: compact ISO forms (for example ``20240115``) on Python 3.11+, which the
+#: documented CLI contract does not accept.
+_ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def parse_iso_date(value: str | None, *, field: str) -> date | None:
+    """Parse a strict ``YYYY-MM-DD`` date string into a :class:`date`.
+
+    Shared parsing helper for every command that accepts an explicit date
+    option. Validation failures raise the structured usage
+    :class:`~monarch_cli.core.exceptions.ValidationError` (exit code 2) so
+    bad input never reaches an authenticated API call.
+
+    Args:
+        value: Raw date string in ``YYYY-MM-DD`` format, or ``None``.
+        field: CLI option name (without dashes) used in error messages and
+            structured error details.
+
+    Returns:
+        The parsed date, or ``None`` when the input is ``None``.
+
+    Raises:
+        ValidationError: If the value is not a valid ``YYYY-MM-DD`` date.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _ISO_DATE_PATTERN.match(value):
+        raise ValidationError(
+            message=f"Invalid date format for --{field}: '{value}'. Use YYYY-MM-DD format.",
+            field=field,
+        )
+    try:
+        return date.fromisoformat(value)
+    except ValueError as e:
+        raise ValidationError(
+            message=f"Invalid date for --{field}: '{value}'. Use YYYY-MM-DD format.",
+            field=field,
+        ) from e
+
+
+def validate_date_ordering(
+    start: date | None,
+    end: date | None,
+    *,
+    start_field: str = "start",
+    end_field: str = "end",
+) -> None:
+    """Reject an inverted explicit date range.
+
+    Args:
+        start: Parsed start date, or ``None`` (one-sided ranges are checked
+            by the caller where the API requires both bounds).
+        end: Parsed end date, or ``None``.
+        start_field: CLI option name for error messages.
+        end_field: CLI option name for error messages.
+
+    Raises:
+        ValidationError: If both bounds are present and ``start`` is after
+            ``end``.
+    """
+    if start is not None and end is not None and start > end:
+        raise ValidationError(
+            message=(
+                f"--{start_field} ({start.isoformat()}) must not be after "
+                f"--{end_field} ({end.isoformat()})."
+            ),
+            field=start_field,
+            details={
+                start_field: start.isoformat(),
+                end_field: end.isoformat(),
+            },
+        )
 
 
 class DatePreset(StrEnum):
