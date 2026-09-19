@@ -16,7 +16,7 @@ Allow receipts and supporting documents to be attached to a known transaction fr
 
 ## Design
 
-Add `transactions attachments add TRANSACTION_ID PATH` as a three-stage remote workflow: obtain transaction-specific signed upload parameters, upload the asset to the third-party media host, then register that asset on the transaction. Each stage has distinct definitive, ambiguous, and partial outcomes; successful media upload followed by failed registration may leave an orphaned asset, while a lost registration response may leave an attachment that exists remotely but is not yet known locally.
+Add `transactions attachments add --transaction-id TXN_ID --file PATH` as a three-stage remote workflow: obtain transaction-specific signed upload parameters, upload the asset to the third-party media host, then register that asset on the transaction. Each stage has distinct definitive, ambiguous, and partial outcomes; successful media upload followed by failed registration may leave an orphaned asset, while a lost registration response may leave an attachment that exists remotely but is not yet known locally. Target selection follows the `mc-qv0q` mutation convention: an explicit required `--transaction-id` option plus a `--file` option, never positional arguments.
 
 Credential-safe third-party transport is owned by prerequisite `mc-sr92`. This ticket consumes that public adapter boundary and does not reproduce its header-isolation, redirect, or upstream-version logic.
 
@@ -34,6 +34,7 @@ Do not automatically retry any stage after bytes or a registration request may h
 ## Acceptance Criteria
 
 - [ ] A user can attach one supported readable local file to one explicitly identified transaction.
+- [ ] The command selects the target with a required `--transaction-id` option and the file with a `--file` option, with no positional arguments.
 - [ ] The command is classified `remote_mutation`, is blocked by default, and requires the shared per-invocation mutation authorization mechanism.
 - [ ] Required dry-run performs no authentication lookup or network call and reports only target transaction ID, sanitized remote basename, local size, and locally inferred type.
 - [ ] Execution opens the file once and rejects nonexistent, unreadable, non-regular, empty, over-limit, or unsupported inputs before authentication or any remote operation.

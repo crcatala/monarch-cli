@@ -1,7 +1,7 @@
 ---
 id: mc-7lm1
 status: open
-deps: []
+deps: [mc-46gq, mc-s6s6]
 links: []
 created: 2026-09-19T01:19:38Z
 type: feature
@@ -16,20 +16,27 @@ Transaction updates already offer `--dry-run`, but complete-set tag and split mu
 
 ## Design
 
-Add `--dry-run` to tag `replace`/`set`, tag `add`, tag `clear`, split `replace`, and split `clear`. A dry run may authenticate and perform read-only discovery/validation, including reading a split parent amount, but must never call a mutation endpoint, require `--allow-mutations`, or prompt for destructive confirmation.
+Add `--dry-run` to tag `replace`, tag `add`, tag `clear`, split `replace`, and split `clear`. A dry run may authenticate and perform read-only discovery/validation, including reading a split parent amount, but must never call a mutation endpoint, require `--allow-mutations`, or prompt for destructive confirmation. `--dry-run --yes` is accepted and documented as irrelevant: a preview has no confirmation step to skip.
 
-Use a clear preview result rather than `mutation-outcome.v1`, because no remote write was attempted. Include the resolved target, current state when read, requested/final state, and the operation-specific facts needed to explain what would happen. For additive operations, report added/already-present IDs; for split replacement, report the validated parent total and requested rows.
+Preview results follow one rule for every command:
+
+- `status` is always `"dry_run"`, so a preview can never be confused with an applied write or with `mutation-outcome.v1`.
+- Include the operation and the resolved target, plus a command-specific detail object explaining what would happen: for tags, resolved IDs/names, current assignment, requested/final assignment, added/already-present IDs, and no-op state; for splits, the validated parent total and the intended rows.
+- The detail object is informational. It is not a second stable schema family, and `mc-cpzi` may decide later whether previews are schematized.
+- Previews use the same JSON emission path as mutation outcomes and are never re-rendered or swallowed by `--quiet`/`--format` (`mc-hu2c`).
+
+Reuse the shared mutation primitives extracted by `mc-46gq` where applicable; do not add command-local preview frameworks.
 
 ## Acceptance Criteria
 
-- [ ] `transactions tags replace` and its `set` alias accept `--dry-run`.
-- [ ] `transactions tags add` and `transactions tags clear` accept `--dry-run`.
+- [ ] `transactions tags replace`, `transactions tags add`, and `transactions tags clear` accept `--dry-run`.
 - [ ] `transactions splits replace` and `transactions splits clear` accept `--dry-run`.
 - [ ] Dry-run executions perform only authentication/read/discovery/validation work and never invoke the corresponding mutation endpoint.
 - [ ] Dry-run executions do not require `--allow-mutations`, do not require `--yes`, and do not prompt for confirmation.
+- [ ] `--dry-run --yes` is accepted and documented as a no-op rather than rejected.
 - [ ] Tag previews show resolved tag IDs/names, current assignment, requested/final assignment, and no-op/additive details where relevant.
 - [ ] Split previews validate the parent amount and input constraints and show the intended split set without claiming remote application.
-- [ ] Dry-run output has a documented stable status and remains distinct from `mutation-outcome.v1` because no remote effect was attempted.
-- [ ] Tests prove no mutation call occurs, including non-interactive and malformed-input paths.
+- [ ] Every dry-run result carries the documented `status: "dry_run"` discriminator plus the operation and target, and remains distinct from `mutation-outcome.v1`; it is not registered as a new stable schema family.
+- [ ] Previews are never rendered through or silenced by `--quiet`/`--format`; they use the shared JSON emission path.
+- [ ] Tests prove no mutation call occurs, including non-interactive and malformed-input paths, and cover the preview discriminator.
 - [ ] Help and documentation include safe preview examples and repository verification passes.
-

@@ -16,7 +16,7 @@ Allow shared households to assign one transaction to a member or return it to Sh
 
 ## Design
 
-Add the focused command `monarch transactions ownership set TRANSACTION_ID` with exactly one of `--member MEMBER_ID` or `--shared`. Do not add ownership flags to the general `transactions update` command: a dedicated operation keeps authorization, preview, verification, and recovery semantics independent from unrelated transaction edits. The stable operation identifier is `transactions.ownership.set`.
+Add the focused command `monarch transactions ownership set --transaction-id TXN_ID` with exactly one of `--member MEMBER_ID` or `--shared`. Target selection follows the `mc-qv0q` mutation convention: an explicit required `--transaction-id` option, never a positional argument. Do not add ownership flags to the general `transactions update` command: a dedicated operation keeps authorization, preview, verification, and recovery semantics independent from unrelated transaction edits. The stable operation identifier is `transactions.ownership.set`.
 
 The CLI options never expose the upstream empty-string/null wire convention. `--member` supplies a non-empty opaque member ID; `--shared` deliberately requests Shared ownership. Omitting both, supplying both, or supplying an empty member ID fails validation before authentication, client construction, or any request. This ticket does not define a separate “unassigned” state because the verified upstream contract distinguishes only a member assignment and Shared ownership.
 
@@ -40,7 +40,7 @@ Shared ownership is stricter: consistent with mc-8dfd, a null or missing owner r
 
 ## Acceptance Criteria
 
-- [ ] `monarch transactions ownership set TRANSACTION_ID` accepts exactly one of non-empty `--member MEMBER_ID` or `--shared` and uses stable operation ID `transactions.ownership.set`.
+- [ ] `monarch transactions ownership set --transaction-id TXN_ID` accepts exactly one of non-empty `--member MEMBER_ID` or `--shared` and uses stable operation ID `transactions.ownership.set`.
 - [ ] Member assignment and Shared ownership are the only public v1 states; no empty-string, null, boolean, or inferred “unassigned” option is exposed.
 - [ ] Missing options, both options, and an empty member ID fail before authentication lookup, client creation, discovery, mutation, or prompting.
 - [ ] Dry-run performs local validation only, makes no API/client call, states that remote membership was not validated, and emits the shared preview contract.
