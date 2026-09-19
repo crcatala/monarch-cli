@@ -39,3 +39,9 @@ Do not build a generic output-resolution framework; the behavior above plus the 
 - [ ] Piped read output, `--quiet` (for id-bearing read output), NDJSON, and local format shortcuts retain their documented behavior.
 - [ ] Tests cover root/local JSON equivalence, TTY and non-TTY mutation output, stderr separation, quiet/format rejection on mutations, and global-option placement; the misnamed `test_global_options_after_subcommand` test is repurposed to assert real global-option placement behavior.
 - [ ] Help/documentation work is reconciled with `mc-4z49`, and repository verification passes.
+
+## Notes
+
+**2026-09-19T13:14:53Z**
+
+Supplemental human verification (2026-09-19): against the owner-approved test account, a real pseudo-TTY preview and an actual tag mutation emitted valid JSON without an explicit --json flag, and the resulting state was verified and restored. The gated live mutation suite also passed the corrected explicit --transaction-id update path. No credentials or record identifiers are recorded.

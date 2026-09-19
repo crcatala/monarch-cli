@@ -64,3 +64,9 @@ README currently guarantees that the CLI "never exposes incremental add/remove o
 - [ ] Command help and README documentation show explicit-option, multi-tag, ID-based, name-based, mixed, add, clear, and mutation-authorization examples, and no longer state that incremental tag additions are never exposed.
 - [ ] Unit/CLI tests cover parsing, required flags, multiple IDs/names, mixed references, exact matching, unknown/ambiguous names, deduplication, add union/no-op behavior, stale current IDs, API call payloads, confirmation, authorization, malformed reads, verification mismatch, and ambiguous writes.
 - [ ] Repository verification passes.
+
+## Notes
+
+**2026-09-19T13:14:53Z**
+
+Supplemental human verification (2026-09-19): tag add using an exact tag name and using a tag ID both succeeded; complete replace and clear also succeeded. The final tag assignment was verified empty, matching the original test transaction state. No credentials or record identifiers are recorded.

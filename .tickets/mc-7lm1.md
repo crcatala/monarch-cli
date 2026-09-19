@@ -40,3 +40,9 @@ Reuse the shared mutation primitives extracted by `mc-46gq` where applicable; do
 - [ ] Previews are never rendered through or silenced by `--quiet`/`--format`; they use the shared JSON emission path.
 - [ ] Tests prove no mutation call occurs, including non-interactive and malformed-input paths, and cover the preview discriminator.
 - [ ] Help and documentation include safe preview examples and repository verification passes.
+
+## Notes
+
+**2026-09-19T13:14:53Z**
+
+Supplemental human verification (2026-09-19): tag and split dry-run previews returned the dry_run discriminator without changing remote state. A split set applied afterward matched the preview, and the split assignment was cleared back to its original empty state. No credentials or record identifiers are recorded.

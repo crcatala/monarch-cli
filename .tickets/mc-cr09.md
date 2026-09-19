@@ -47,3 +47,9 @@ Human Verification Checkpoint A evidence recorded (2026-09-17): the operator rep
 **2026-09-18T23:29:04Z**
 
 Verification checkpoint update (2026-09-18): authenticated read-only checks for account reporting, transactions/recurring, cashflow, holdings, institutions, and subscription completed successfully. The disposable live mutation contract test passed for its approved dev household, including fixture lifecycle, notes round-trip, bounded readback, and cleanup. No personal account mutations, credentials, identifiers, balances, or raw payloads are recorded here.
+
+**2026-09-19T13:14:53Z**
+
+Human verification checkpoint (2026-09-19): the owner-authenticated test development account was confirmed to expose exactly two accounts. The household identity gate matched, and no household ID or account/transaction identifiers were recorded.
+
+The corrected disposable-fixture live mutation suite passed (1 selected test, 88 deselected), covering the explicit --transaction-id mutation path, mutation outcome handling, bounded readback, and cleanup. Supplemental verification for the delivered CLI UX work also passed: real-TTY preview and mutation JSON emission, tag add-by-name/add-by-ID/replace/clear, tag and split dry-run no-write behavior, split preview-to-apply fidelity, and real-TTY help review. Test-account tags and splits were restored to their original state. No credentials or raw financial payloads are recorded here.
