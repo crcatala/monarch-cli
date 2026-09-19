@@ -1,8 +1,8 @@
 # Mutation outcomes (`mutation-outcome.v1`)
 
-Every remote mutation in Monarch CLI — account refresh, transaction update,
-and each item of a transaction batch update — returns one stable,
-machine-readable result contract: **`mutation-outcome.v1`**. Human and
+Every current remote mutation in Monarch CLI — including account refresh,
+transaction updates, batch updates, tag writes, and split writes — returns one
+stable, machine-readable result contract: **`mutation-outcome.v1`**. Human and
 automated callers get one envelope for single-step, batch, and multi-stage
 remote mutations; domain commands never invent incompatible response shapes.
 
@@ -119,9 +119,10 @@ Per-item statuses are `succeeded`, `failed`, or `ambiguous`.
 - `operation` is a stable namespaced identifier (`accounts.refresh`,
   `transactions.update`, `transactions.batch-update`,
   `transactions.tags.create`, `transactions.tags.replace`,
-  `transactions.tags.add`, `transactions.tags.clear`) supplied by the shared
-  operation descriptor registry — never inferred from an upstream method or
-  GraphQL operation name.
+  `transactions.tags.add`, `transactions.tags.clear`,
+  `transactions.splits.replace`, and `transactions.splits.clear`) supplied by
+  the shared operation descriptor registry — never inferred from an upstream
+  method or GraphQL operation name.
 - Atomic single-effect operations use an `items` array containing exactly one
   item. Batch items preserve normalized input order.
 - A multi-stage workflow uses one ordered item per remote effect that was
@@ -197,7 +198,9 @@ diagnostics are written to stderr.
 ## Example
 
 ```console
-$ monarch --allow-mutations transactions update txn_123 --notes "Review"
+$ monarch --allow-mutations transactions update \
+    --transaction-id txn_123 \
+    --notes "Review"
 {
   "schema_version": "mutation-outcome.v1",
   "operation": "transactions.update",
