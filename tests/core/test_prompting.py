@@ -211,6 +211,10 @@ class TestCliNonInteractive:
         with (
             patch("monarch_cli.core.prompting.typer.prompt", return_value="user@x.com") as p,
             patch("monarch_cli.core.prompting.getpass.getpass", return_value="pw"),
+            # Pin keyring availability so the storage-backend choice prompt is
+            # skipped deterministically. Otherwise this asserts one prompt on
+            # headless CI but two on a workstation with an available keyring.
+            patch("monarch_cli.commands.auth._is_keyring_available", return_value=False),
             patch("monarch_cli.commands.auth.MonarchMoney") as mm_cls,
         ):
             mm_cls.return_value.login.side_effect = RuntimeError("offline")

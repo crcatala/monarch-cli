@@ -15,6 +15,67 @@ if TYPE_CHECKING:
     pass
 
 
+@pytest.fixture(autouse=True)
+def _isolate_credentials(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Keep every test hermetic from real credential sources and global state.
+
+    Without this, tests that assume "no credential is available" fall through
+    to the developer's real OS keyring (on macOS this triggers a Keychain
+    access prompt) and the real Monarch API, and the cached authenticated
+    client leaks between tests via ``core.adapter._client``. That makes the
+    suite environment-dependent: it passes on headless CI but fails on a
+    workstation that has a stored token.
+
+    Specifically, per test we:
+
+    - reset the module-level authenticated-client cache before and after;
+    - stub the ``keyring`` library read to ``None`` (tests that exercise
+      keyring behaviour replace ``session.keyring`` or the helper explicitly);
+    - point the legacy pickle path at ``tmp_path`` so a developer's real
+      ``~/.mm/mm_session.pickle`` cannot change the result;
+    - clear credential / prompt env vars and point the config dir at the
+      test's ``tmp_path`` so no real config file is read;
+    - reset the shared prompt-policy, mutation-authorization and config
+      globals so state cannot leak between invocations.
+    """
+    # Imported lazily to avoid import-time side effects during collection.
+    import keyring
+
+    from monarch_cli.core import adapter, session
+    from monarch_cli.core.config import reset_config
+    from monarch_cli.core.operations import reset_mutation_authorization
+    from monarch_cli.core.prompting import reset_non_interactive
+
+    for var in (
+        "MONARCH_TOKEN",
+        "MONARCH_SESSION_PATH",
+        "MONARCH_CONFIG_DIR",
+        "MONARCH_NON_INTERACTIVE",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("MONARCH_CONFIG_DIR", str(tmp_path))
+
+    # Stub the library-level read rather than the application helper, so no
+    # test can reach the real OS keyring (the macOS Keychain prompt) even via a
+    # code path that does not go through ``session._get_from_keyring``.
+    def _no_keyring_password(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(keyring, "get_password", _no_keyring_password)
+    # A real legacy pickle in the developer's home must not affect tests.
+    monkeypatch.setattr(session, "COMPAT_SESSION_PATH", tmp_path / "mm_session.pickle")
+
+    adapter.reset_client()
+    reset_non_interactive()
+    reset_mutation_authorization()
+    reset_config()
+    yield
+    adapter.reset_client()
+    reset_non_interactive()
+    reset_mutation_authorization()
+    reset_config()
+
+
 @pytest.fixture
 def mock_monarch_client() -> MagicMock:
     """Create a mock MonarchMoney client.
