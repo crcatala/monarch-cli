@@ -271,8 +271,20 @@ remove the legacy file manually if desired.
 
 ## Development
 
+From the repository root, set up the development environment and run the
+checkout directly with `uv run`:
+
 ```bash
 make setup
+uv run monarch --help
+uv run monarch accounts list --json
+```
+
+`uv run` uses the project's environment and the current source tree, so no
+separate global CLI installation is needed while developing. Run the checks
+before releasing changes:
+
+```bash
 make verify
 ```
 
