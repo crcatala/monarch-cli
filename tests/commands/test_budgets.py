@@ -228,7 +228,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["list", "--json"])
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -255,7 +255,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "plain"])
+            result = runner.invoke(app, ["list", "--format", "plain"])
 
             assert result.exit_code == 0
             # Plain format uses emoji icons
@@ -281,7 +281,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["list", "--json"])
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -306,7 +306,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "table"])
+            result = runner.invoke(app, ["list", "--format", "table"])
 
             assert result.exit_code == 0
             # Table output has table chars and column headers
@@ -334,7 +334,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--format", "csv"])
+            result = runner.invoke(app, ["list", "--format", "csv"])
 
             assert result.exit_code == 0
             lines = result.stdout.strip().split("\n")
@@ -361,7 +361,7 @@ class TestBudgetsList:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["--json"])
+            result = runner.invoke(app, ["list", "--json"])
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -369,7 +369,7 @@ class TestBudgetsList:
 
     def test_list_help_shows_examples(self) -> None:
         """List --help shows examples."""
-        result = runner.invoke(app, ["--help"])
+        result = runner.invoke(app, ["list", "--help"])
 
         assert result.exit_code == 0
         # Strip ANSI codes for comparison
@@ -383,15 +383,15 @@ class TestBudgetsApp:
     """Tests for the budgets app structure."""
 
     def test_help_shows_description(self) -> None:
-        """Running budgets --help shows description and examples."""
+        """Running budgets --help lists the available subcommands."""
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
         # Strip ANSI codes for comparison
         output = result.stdout.replace("\x1b[1m", "").replace("\x1b[0m", "")
-        # Single command app shows the command's help directly
         assert "budget" in output.lower()
-        assert "format" in output.lower()
+        assert "list" in output.lower()
+        assert "set" in output.lower()
 
     def test_invalid_option_shows_error(self) -> None:
         """Invalid option shows error."""

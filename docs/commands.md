@@ -283,6 +283,40 @@ monarch budgets list --format table
 monarch budgets list --json
 ```
 
+### `budgets set`
+
+Sets the monthly amount for exactly one category in one explicitly identified
+month. `--start` is required and must be the first day of a month
+(`YYYY-MM-01`). `--amount` must be a finite, non-negative value with at most two
+decimal places; a zero amount deliberately resets the category's monthly budget
+to zero. The command validates the exact category against read-only category
+discovery before the write and reads the exact category/month amount back
+afterward.
+
+This scope never propagates to future months, targets a category group, updates
+flexible budgets, resets an entire budget, or changes rollover settings. It
+therefore exposes no `--group`, `--future`, flexible-budget, reset, or rollover
+options.
+
+Options:
+
+- `--category-id CATEGORY_ID` — required; exact category target
+- `--amount AMOUNT` — required; finite, non-negative, max 2 decimals
+- `--start YYYY-MM-01` — required; monthly period start (first of month)
+- `--dry-run` — validate and preview without writing
+
+This is a remote mutation and requires the global `--allow-mutations` option
+**before** the command path. It uses the shared single-attempt mutation executor
+and emits `mutation-outcome.v1` with operation `budgets.set` and entity `budget`;
+an unknown category, transport ambiguity, or a readback mismatch is never
+reported as success and is never retried blindly. The readback comparison is
+exact equality after normalizing both amounts to whole cents.
+
+```bash
+monarch --allow-mutations budgets set --category-id CAT123 --amount 500.00 --start 2026-09-01
+monarch budgets set --category-id CAT123 --amount 500.00 --start 2026-09-01 --dry-run
+```
+
 ## Cashflow
 
 ### `cashflow summary`

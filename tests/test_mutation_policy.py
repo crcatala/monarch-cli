@@ -59,6 +59,7 @@ EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
     "auth setup": frozenset({Effect.READ_ONLY}),
     "auth status": frozenset({Effect.READ_ONLY}),
     "budgets list": frozenset({Effect.READ_ONLY}),
+    "budgets set": frozenset({Effect.REMOTE_MUTATION}),
     "cashflow summary": frozenset({Effect.READ_ONLY}),
     "cashflow detail": frozenset({Effect.READ_ONLY}),
     "categories list": frozenset({Effect.READ_ONLY}),
@@ -125,6 +126,16 @@ MUTATION_OPERATIONS: dict[str, list[str]] = {
         "TXN1",
     ],
     "accounts refresh": ["accounts", "refresh"],
+    "budgets set": [
+        "budgets",
+        "set",
+        "--category-id",
+        "CAT1",
+        "--amount",
+        "1.0",
+        "--start",
+        "2026-01-01",
+    ],
 }
 
 

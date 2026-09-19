@@ -156,6 +156,12 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "mechanism for review-state updates; a timed-out request may already "
         "have changed the review state, so it must be verified before repeating."
     ),
+    "budgets set": (
+        "no_retry: upstream documents no idempotency key or conditional-write "
+        "mechanism for budget-item updates; a timed-out request may already "
+        "have applied the new monthly amount, so it must be verified by "
+        "readback before repeating."
+    ),
 }
 
 
