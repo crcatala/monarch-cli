@@ -1,6 +1,6 @@
 ---
 id: mc-qv0q
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-09-19T01:19:38Z
