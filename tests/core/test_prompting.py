@@ -224,7 +224,15 @@ class TestCliNonInteractive:
     def test_non_interactive_does_not_bypass_mutation_authorization(self) -> None:
         result = runner.invoke(
             app,
-            ["--non-interactive", "transactions", "update", "TXN1", "--amount", "1.0"],
+            [
+                "--non-interactive",
+                "transactions",
+                "update",
+                "--transaction-id",
+                "TXN1",
+                "--amount",
+                "1.0",
+            ],
         )
         assert result.exit_code == 3, result.output
         stderr = result.stderr or ""

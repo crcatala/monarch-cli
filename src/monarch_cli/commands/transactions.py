@@ -652,13 +652,44 @@ def _finish_mutation(outcome: dict[str, Any]) -> None:
     emit_mutation_outcome(outcome)
 
 
-@app.command()
+def _reject_positional_targets(legacy: list[str] | None) -> None:
+    """Reject a removed positional transaction ID with an actionable error.
+
+    The removed positional form is never silently accepted or reinterpreted;
+    callers are pointed at the replacement option instead.
+    """
+    if legacy:
+        raise ValidationError(
+            "Positional transaction IDs are no longer supported; use --transaction-id.",
+            field="transaction_id",
+            details={"removed_positional": True, "replacement_option": "--transaction-id"},
+        )
+
+
+def _validate_transaction_id(transaction_id: str) -> None:
+    if not transaction_id.strip():
+        raise ValidationError("Transaction ID must not be empty.", field="transaction_id")
+
+
+def _dedupe_ids(ids: list[str]) -> list[str]:
+    """Deduplicate IDs in first-seen order."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in ids:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
+@app.command(context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def update(
+    ctx: typer.Context,
     transaction_id: Annotated[
         str,
-        typer.Argument(help="Transaction ID to update"),
+        typer.Option("--transaction-id", help="Transaction ID to update"),
     ],
     amount: Annotated[
         float | None,
@@ -709,12 +740,15 @@ def update(
     Use --dry-run to preview changes without applying them.
 
     Examples:
-        monarch transactions update TXN123 --amount 25.50
-        monarch transactions update TXN123 --description "Coffee Shop"
-        monarch transactions update TXN123 --category CAT456
-        monarch transactions update TXN123 --notes "Business lunch"
-        monarch transactions update TXN123 --dry-run --amount 30.00
+        monarch transactions update --transaction-id TXN123 --amount 25.50
+        monarch transactions update --transaction-id TXN123 --description "Coffee Shop"
+        monarch transactions update --transaction-id TXN123 --category CAT456
+        monarch transactions update --transaction-id TXN123 --notes "Business lunch"
+        monarch transactions update --transaction-id TXN123 --dry-run --amount 30.00
     """
+    _reject_positional_targets(ctx.args)
+    _validate_transaction_id(transaction_id)
+
     # Collect changes
     changes: dict[str, Any] = {}
 
@@ -830,13 +864,14 @@ def update(
     )
 
 
-@app.command("batch-update")
+@app.command("batch-update", context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def batch_update(
-    transaction_ids: Annotated[
+    ctx: typer.Context,
+    transaction_id: Annotated[
         list[str] | None,
-        typer.Argument(help="Transaction IDs to update"),
+        typer.Option("--transaction-id", help="Transaction ID to update (repeatable)"),
     ] = None,
     stdin: Annotated[
         bool,
@@ -879,23 +914,28 @@ def batch_update(
     """Batch update multiple transactions at once.
 
     Apply the same changes to multiple transactions efficiently using
-    parallel API calls. Transaction IDs can be passed as arguments or
-    piped via stdin.
+    parallel API calls. Transaction IDs can be passed with repeatable
+    --transaction-id options, piped via stdin, or both. Repeatable option
+    values are consumed first, then stdin lines; the combined list is
+    deduplicated in first-seen order before any update is attempted.
 
     Examples:
         # Update specific transactions
-        monarch transactions batch-update TXN001 TXN002 --category CAT123
+        monarch transactions batch-update --transaction-id TXN001 --transaction-id TXN002 \\
+            --category CAT123
 
         # Pipe IDs from a search
         monarch transactions list --search "Coffee" --quiet | \\
             monarch transactions batch-update --stdin --category CAT456
 
         # Preview changes first
-        monarch transactions batch-update TXN001 TXN002 --category CAT123 --dry-run
+        monarch transactions batch-update --transaction-id TXN001 --category CAT123 --dry-run
 
         # Set notes on multiple transactions
         monarch transactions batch-update --stdin --notes "Q1 Expenses" < ids.txt
     """
+    _reject_positional_targets(ctx.args)
+
     # Classify this parsed invocation before any prompt or client creation.
     operation = resolve_invocation(
         "transactions batch-update", BATCH_UPDATE_EFFECTS, dry_run=dry_run
@@ -908,11 +948,11 @@ def batch_update(
     if not dry_run:
         require_mutation_authorization(operation)
 
-    # Collect transaction IDs
+    # Collect transaction IDs: repeatable option values first, then stdin.
     ids: list[str] = []
 
-    if transaction_ids:
-        ids.extend(transaction_ids)
+    if transaction_id:
+        ids.extend(item.strip() for item in transaction_id)
 
     if stdin:
         for line in sys.stdin:
@@ -924,8 +964,19 @@ def batch_update(
     # failures use the structured error contract, never a mutation outcome.
     if not ids:
         raise ValidationError(
-            message="No transaction IDs provided. Pass IDs as arguments or use --stdin.",
+            message="No transaction IDs provided. Pass --transaction-id or use --stdin.",
+            field="transaction_id",
         )
+    empty = [item for item in ids if not item]
+    if empty:
+        raise ValidationError(
+            message="Transaction IDs must not be empty.",
+            field="transaction_id",
+            details={"empty_count": len(empty)},
+        )
+
+    # Deduplicate in first-seen order so a transaction is never updated twice.
+    ids = _dedupe_ids(ids)
 
     # Validate we have at least one change
     changes: dict[str, Any] = {}

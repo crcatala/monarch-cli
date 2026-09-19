@@ -127,14 +127,14 @@ there is no environment-variable equivalent:
 
 ```bash
 # Blocked safely before authentication or any API call:
-monarch transactions update TXN123 --notes "Review"
+monarch transactions update --transaction-id TXN123 --notes "Review"
 
 # Explicitly authorized for this invocation only:
-monarch --allow-mutations transactions update TXN123 --notes "Review"
+monarch --allow-mutations transactions update --transaction-id TXN123 --notes "Review"
 monarch --allow-mutations accounts refresh -a ACC123
 
 # Safe preview; no client or mutation API call is made:
-monarch transactions update TXN123 --dry-run --notes "Review"
+monarch transactions update --transaction-id TXN123 --dry-run --notes "Review"
 ```
 
 A blocked mutation exits with code `3` and structured `MUTATION_BLOCKED`
@@ -165,11 +165,11 @@ write with `transactions tags show` before retrying.
 parent amount and current split rows. Replace is a complete-set operation:
 
 ```bash
-monarch --allow-mutations --yes transactions splits replace TXN123 \\
+monarch --allow-mutations --yes transactions splits replace --transaction-id TXN123 \\
   --splits-json '[{"merchantName":"Store","amount":-10.00,"categoryId":"CAT1"}]'
-monarch --allow-mutations --yes transactions splits replace TXN123 \\
+monarch --allow-mutations --yes transactions splits replace --transaction-id TXN123 \\
   --splits-file ./splits.json
-monarch --allow-mutations --yes transactions splits clear TXN123
+monarch --allow-mutations --yes transactions splits clear --transaction-id TXN123
 ```
 
 Exactly one source is required. Inline and file JSON are bounded to 64 KiB;
@@ -360,15 +360,16 @@ monarch transactions recurring --preset this-month --json
 monarch transactions recurring --start 2024-01-01 --end 2024-01-31 --json
 
 # Update a transaction
-monarch --allow-mutations transactions update TXN123 --amount 25.50
-monarch --allow-mutations transactions update TXN123 --description "Coffee Shop"
-monarch --allow-mutations transactions update TXN123 --category CAT456
-monarch --allow-mutations transactions update TXN123 --notes "Business expense"
-monarch --allow-mutations transactions update TXN123 --date 2024-01-15
-monarch transactions update TXN123 --dry-run --amount 30.00  # Preview; no flag needed
+monarch --allow-mutations transactions update --transaction-id TXN123 --amount 25.50
+monarch --allow-mutations transactions update --transaction-id TXN123 --description "Coffee Shop"
+monarch --allow-mutations transactions update --transaction-id TXN123 --category CAT456
+monarch --allow-mutations transactions update --transaction-id TXN123 --notes "Business expense"
+monarch --allow-mutations transactions update --transaction-id TXN123 --date 2024-01-15
+monarch transactions update --transaction-id TXN123 --dry-run --amount 30.00  # Preview; no flag needed
 
 # Batch update multiple transactions
-monarch --allow-mutations transactions batch-update TXN1 TXN2 TXN3 --category CAT456
+monarch --allow-mutations transactions batch-update \
+  --transaction-id TXN1 --transaction-id TXN2 --transaction-id TXN3 --category CAT456
 ```
 
 `transactions summary` is an all-time aggregate: it intentionally does not

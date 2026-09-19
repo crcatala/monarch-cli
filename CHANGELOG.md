@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+#### Explicit transaction mutation targets
+- `transactions update`, `transactions batch-update`, `transactions splits replace`, and `transactions splits clear` now require `--transaction-id` and no longer accept positional transaction IDs; a removed positional produces an actionable usage error pointing at `--transaction-id` (mc-vv11)
+- `transactions batch-update` accepts repeatable `--transaction-id` options (repeatable values first, then `--stdin`), deduplicated in first-seen order
+- The legacy split source aliases `--json-input`, `--input-json`, `--file`, and `--input-file` are removed; use `--splits-json` or `--splits-file`
+
 #### Consistent global options and machine-readable mutation output
 - Root global options must precede the command path (`monarch [GLOBAL OPTIONS] GROUP COMMAND [COMMAND OPTIONS]`); README/help examples that placed `--timeout`, `--no-color`, `--verbose`, or `--quiet` after the command path are corrected (mc-hu2c)
 - `auth status` and `auth ping` now resolve output through the shared effective format, so `monarch --json auth status` matches `monarch auth status --json` and a piped `monarch auth status` emits JSON
