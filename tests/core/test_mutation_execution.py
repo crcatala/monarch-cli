@@ -510,6 +510,34 @@ class TestRealGqlTransportClassification:
             )
 
     @pytest.mark.asyncio
+    async def test_protocol_error_is_ambiguous(self) -> None:
+        """A malformed/incomplete response was received, so state is unknown."""
+        from gql.transport.exceptions import TransportProtocolError
+
+        async def bad_response() -> Any:
+            raise TransportProtocolError("response was not valid GraphQL")
+
+        with pytest.raises(MutationAmbiguousError):
+            await run_mutation_api_call_async(
+                bad_response,
+                operation="transactions update",
+            )
+
+    @pytest.mark.asyncio
+    async def test_server_error_without_status_is_ambiguous(self) -> None:
+        """An unknown/absent status could still be post-commit, so ambiguous."""
+        from gql.transport.exceptions import TransportServerError
+
+        async def unknown_status() -> Any:
+            raise TransportServerError("server error with no status")
+
+        with pytest.raises(MutationAmbiguousError):
+            await run_mutation_api_call_async(
+                unknown_status,
+                operation="transactions update",
+            )
+
+    @pytest.mark.asyncio
     async def test_reads_retry_gql_wrapped_transport_failure(self) -> None:
         """Reads keep bounded retries for the gql-wrapped transport failure."""
         import aiohttp

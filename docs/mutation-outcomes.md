@@ -202,7 +202,8 @@ otherwise:
   exceptions are classified as transport failures too, so a real
   `TransportConnectionFailed` after dispatch is reported `ambiguous`, never as
   a definitive `failed`. A definitive service rejection — a GraphQL `errors`
-  payload or a 4xx HTTP response — stays on the normal `failed` path.
+  payload (regardless of any partial `data` it carries) or a 4xx HTTP
+  response — stays on the normal `failed` path.
 - When the outcome is unknown, affected items are reported `ambiguous`, the
   envelope's `verification` object is required, and the process exits `4`.
   The verification message tells you how to check remote state safely (read
