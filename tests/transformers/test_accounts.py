@@ -224,6 +224,8 @@ class TestSchemaContract:
         "institution",
         "is_active",
         "is_manual",
+        "owner_id",
+        "owner_name",
         "last_updated",
     }
 
@@ -237,6 +239,68 @@ class TestSchemaContract:
         result = transform_account(SAMPLE_ACCOUNT_FULL)
         extra = set(result.keys()) - self.REQUIRED_FIELDS
         assert extra == set(), f"Unexpected fields: {extra}"
+
+
+class TestOwnershipNormalization:
+    """Owner attribution mirrors the optional upstream ownedByUser relationship.
+
+    A missing, null, or malformed owner relationship yields null normalized
+    owner fields. Null ownership must never be relabeled as a shared or
+    unassigned state: the released upstream response has no field that
+    distinguishes those meanings.
+    """
+
+    def test_complete_owner_relationship(self):
+        raw = {**SAMPLE_ACCOUNT_FULL, "ownedByUser": {"id": "user-1", "displayName": "Alex"}}
+        result = transform_account(raw)
+        assert result["owner_id"] == "user-1"
+        assert result["owner_name"] == "Alex"
+
+    def test_missing_owner_relationship(self):
+        result = transform_account(SAMPLE_ACCOUNT_FULL)
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    def test_null_owner_relationship(self):
+        result = transform_account({**SAMPLE_ACCOUNT_FULL, "ownedByUser": None})
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    @pytest.mark.parametrize(
+        "malformed",
+        ["not-an-object", 42, ["user-1"], True],
+        ids=["string", "number", "list", "boolean"],
+    )
+    def test_non_object_owner_relationship_yields_nulls(self, malformed):
+        result = transform_account({**SAMPLE_ACCOUNT_FULL, "ownedByUser": malformed})
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    def test_partially_populated_owner_relationship(self):
+        id_only = transform_account({**SAMPLE_ACCOUNT_FULL, "ownedByUser": {"id": "user-1"}})
+        assert id_only["owner_id"] == "user-1"
+        assert id_only["owner_name"] is None
+
+        name_only = transform_account(
+            {**SAMPLE_ACCOUNT_FULL, "ownedByUser": {"displayName": "Alex"}}
+        )
+        assert name_only["owner_id"] is None
+        assert name_only["owner_name"] == "Alex"
+
+    def test_owner_null_values_inside_object_yield_nulls(self):
+        result = transform_account(
+            {**SAMPLE_ACCOUNT_FULL, "ownedByUser": {"id": None, "displayName": None}}
+        )
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    def test_no_invented_shared_or_unassigned_label(self):
+        """Null owner fields stay null; no synthetic shared/unassigned state is added."""
+        result = transform_account(SAMPLE_ACCOUNT_FULL)
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+        assert "is_shared" not in result
+        assert "ownership_state" not in result
 
 
 SAMPLE_TYPE_OPTIONS_RAW = {

@@ -72,3 +72,51 @@ class TestMonarchMoneyInterface:
             f"MonarchMoney.{method_name} exists but is not callable. "
             f"Expected a method, got {type(method)}."
         )
+
+
+class TestMonarchMoneyOwnershipSurface:
+    """Contract for the declared upstream-client compatibility floor.
+
+    Household ownership normalization (``owner_id``/``owner_name``/
+    ``ownership_overridden_at``) is only meaningful when the pinned client
+    floor (``monarchmoneycommunity>=1.5.2``) actually selects the upstream
+    ``ownedByUser`` relationship and ``ownershipOverriddenAt`` timestamp.
+    The CLI declares that floor in pyproject; clean installs resolve at least
+    it, so these tests inspect the installed client source and fail loudly
+    if a future resolution drops the fields this CLI normalizes.
+    """
+
+    @staticmethod
+    def _client_source() -> str:
+        import inspect
+
+        return inspect.getsource(MonarchMoney)
+
+    def test_accounts_query_selects_owned_by_user_with_display_name(
+        self,
+    ) -> None:
+        """The accounts read selects ``ownedByUser { id displayName ... }``."""
+        import re
+
+        match = re.search(r"ownedByUser\s*\{[^}]*\}", self._client_source())
+        assert match, "No ownedByUser selection found in the installed client"
+        assert "id" in match.group(0)
+        assert "displayName" in match.group(0)
+
+    def test_transaction_queries_select_owned_by_user_with_name(self) -> None:
+        """Transaction reads select ``ownedByUser { id name ... }``."""
+        import re
+
+        selections = re.findall(r"ownedByUser\s*\{[^}]*\}", self._client_source())
+        assert selections, "No ownedByUser selection found in the installed client"
+        assert any("name" in selection for selection in selections), (
+            "No ownedByUser selection with `name` found; transaction owner_name "
+            "normalization requires the declared client floor"
+        )
+
+    def test_client_selects_ownership_overridden_at(self) -> None:
+        """Transaction reads select the literal ``ownershipOverriddenAt`` timestamp."""
+        assert "ownershipOverriddenAt" in self._client_source(), (
+            "ownershipOverriddenAt missing from the installed client; "
+            "the declared monarchmoneycommunity>=1.5.2 floor must be preserved"
+        )

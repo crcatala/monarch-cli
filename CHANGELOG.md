@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Household Ownership Visibility
+- **`owner_id` / `owner_name` in account output** - Normalized account records mirror the optional upstream `ownedByUser` relationship (`id` and `displayName`), so shared-household activity can be separated by person
+- **`owner_id` / `owner_name` / `ownership_overridden_at` in transaction output** - List and detail records expose the upstream ownership relationship (`id` and `name`) and pass the override timestamp through literally; no actor, previous owner, or boolean shared state is ever derived
+- **Null ownership stays null** - A missing, null, or malformed owner relationship yields null owner fields; null ownership does not distinguish shared, unassigned, unavailable, or unsupported upstream states because the released upstream response cannot
+- **Read-only attribution** - No command mutates ownership or any remote state; `--raw` remains byte-for-structure untouched and quiet mode remains ID-only
+
 #### Institution and Subscription Status
 - **`monarch institutions list`** - Credential-centric connection diagnostics with provider/institution status and associated accounts
 - **Deleted-account safety** - Deleted accounts are excluded by default; `--include-deleted` opts in while retaining `is_deleted` and `deleted_at`

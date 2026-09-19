@@ -211,12 +211,32 @@ def print_csv(items: list[dict[str, Any]]) -> None:
     writer.writerows(items)
 
 
+def _project_display(data: Any, display_fields: tuple[str, ...] | None) -> Any:
+    """Restrict records to the human display fields, preserving order.
+
+    Only dict records are projected; non-dict entries pass through untouched.
+    A ``None`` selection returns ``data`` unchanged.
+    """
+    if display_fields is None:
+        return data
+
+    def project(item: Any) -> Any:
+        if isinstance(item, dict):
+            return {field: item.get(field) for field in display_fields}
+        return item
+
+    if isinstance(data, list):
+        return [project(item) for item in data]
+    return project(data)
+
+
 def output(
     data: Any,
     format: OutputFormat | None = None,
     raw: bool = False,
     quiet: bool | None = None,
     id_field: str = "id",
+    display_fields: tuple[str, ...] | None = None,
 ) -> None:
     """Output data in specified format.
 
@@ -227,6 +247,10 @@ def output(
         raw: If True, print data as-is (pass-through).
         quiet: If True, output only IDs (one per line). If None, uses module flag.
         id_field: Field name to extract when in quiet mode (default: "id").
+        display_fields: Optional ordered field selection for the concise human
+            formats (plain, table). Machine-readable formats (JSON, CSV,
+            compact/NDJSON) always keep the complete normalized fields;
+            --raw is untouched. When ``None``, no projection is applied.
 
     Note:
         TABLE and CSV only work with list[dict] data.
@@ -260,15 +284,17 @@ def output(
     # Format-specific output
     if format == OutputFormat.PLAIN:
         # Plain text with emoji icons - use color detection
-        print(format_plain(data))
+        print(format_plain(_project_display(data, display_fields)))
 
     elif format == OutputFormat.COMPACT:
+        # Machine-readable: always the complete normalized record, so stable
+        # owner fields survive for automation.
         print(json.dumps(data, default=str))
 
     elif format == OutputFormat.TABLE:
         # TABLE only works for list of dicts
         if isinstance(data, list) and (not data or isinstance(data[0], dict)):
-            print_table(data)
+            print_table(_project_display(data, display_fields))
         else:
             # Fall back to JSON for non-list data
             print(json.dumps(data, indent=2, default=str))

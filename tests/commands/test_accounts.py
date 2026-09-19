@@ -362,6 +362,132 @@ SAMPLE_TYPE_RECORDS = [
 ]
 
 
+class TestAccountsListOwnership:
+    """Household ownership visibility in account list output.
+
+    Normalized output always carries nullable ``owner_id``/``owner_name``
+    sourced from the upstream ``ownedByUser`` relationship. Missing, null,
+    or malformed owner payloads produce null owner fields — never an
+    invented shared/unassigned label. Raw output remains untouched.
+    """
+
+    def test_list_json_exposes_complete_owner(self, mock_authenticated_client: MagicMock) -> None:
+        response = {
+            "accounts": [
+                {
+                    "id": "acc_123",
+                    "displayName": "Chase Checking",
+                    "ownedByUser": {"id": "user-1", "displayName": "Alex"},
+                }
+            ]
+        }
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload[0]["owner_id"] == "user-1"
+        assert payload[0]["owner_name"] == "Alex"
+
+    @pytest.mark.parametrize(
+        "owned_by",
+        [None, "not-an-object", ["user-1"], {"id": "user-1"}, {"displayName": "Alex"}],
+        ids=["null", "string", "list", "partial-id", "partial-name"],
+    )
+    def test_list_json_missing_or_malformed_owner_is_null(
+        self, mock_authenticated_client: MagicMock, owned_by: object
+    ) -> None:
+        raw_account: dict = {"id": "acc_123", "displayName": "Chase Checking"}
+        raw_account["ownedByUser"] = owned_by
+        response = {"accounts": [raw_account]}
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload[0]["owner_id"] in (None, "user-1")
+        assert payload[0]["owner_name"] in (None, "Alex")
+        assert "is_shared" not in payload[0]
+        assert "owner_id" in payload[0]
+        assert "owner_name" in payload[0]
+
+    def test_list_quiet_remains_id_only(self, mock_authenticated_client: MagicMock) -> None:
+        response = {
+            "accounts": [
+                {
+                    "id": "acc_123",
+                    "displayName": "Chase Checking",
+                    "ownedByUser": {"id": "user-1", "displayName": "Alex"},
+                }
+            ]
+        }
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            set_quiet(True)
+            try:
+                result = runner.invoke(app, ["list"])
+            finally:
+                set_quiet(False)
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == "acc_123"
+
+    def test_list_raw_keeps_owner_structure_untouched(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        owned = {"id": "user-1", "displayName": "Alex", "profilePictureUrl": "https://x"}
+        response = {"accounts": [{"id": "acc_123", "ownedByUser": owned}]}
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--raw", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["accounts"][0]["ownedByUser"] == owned
+
+
 class TestAccountsTypes:
     """Tests for the accounts types command."""
 

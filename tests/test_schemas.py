@@ -98,6 +98,8 @@ class TestAccountSchemaContract:
     - subtype: str | None - Account subtype if available
     - institution: str | None - Financial institution name
     - is_manual: bool - Whether manually tracked (True) or linked (False)
+    - owner_id: str | None - Upstream ownedByUser.id when provided, else None
+    - owner_name: str | None - Upstream ownedByUser.displayName when provided
     - last_updated: str | None - ISO timestamp of last sync
 
     Example output:
@@ -129,6 +131,8 @@ class TestAccountSchemaContract:
         "subtype",
         "institution",
         "is_manual",
+        "owner_id",
+        "owner_name",
         "last_updated",
     }
 
@@ -225,6 +229,27 @@ class TestAccountSchemaContract:
         assert nulled["is_active"] is True
         assert nulled["is_manual"] is False
 
+    def test_owner_fields_nullable_and_null_safe(self):
+        """Owner fields exist for every shape and stay null without an owner object."""
+        complete = transform_account(
+            {**FULL_ACCOUNT_RAW, "ownedByUser": {"id": "user-1", "displayName": "Alex"}}
+        )
+        assert complete["owner_id"] == "user-1"
+        assert complete["owner_name"] == "Alex"
+
+        for raw in (
+            FULL_ACCOUNT_RAW,
+            {**FULL_ACCOUNT_RAW, "ownedByUser": None},
+            {**FULL_ACCOUNT_RAW, "ownedByUser": "not-an-object"},
+            {**FULL_ACCOUNT_RAW, "ownedByUser": {}},
+            {**FULL_ACCOUNT_RAW, "ownedByUser": {"id": "user-1"}},
+            {**FULL_ACCOUNT_RAW, "ownedByUser": {"displayName": "Alex"}},
+        ):
+            result = transform_account(raw)
+            assert "owner_id" in result and "owner_name" in result
+            assert result["owner_id"] is None or isinstance(result["owner_id"], str)
+            assert result["owner_name"] is None or isinstance(result["owner_name"], str)
+
     def test_malformed_root_raises_typed_error(self):
         """Non-object account/transaction roots raise a typed APIError."""
         from monarch_cli.core.exceptions import APIError
@@ -261,6 +286,10 @@ class TestTransactionSchemaContract:
     - is_pending: bool - Whether transaction is pending (True) or posted (False)
     - needs_review: bool - Whether the transaction needs review
     - review_status: str | None - Opaque upstream review status when supplied
+    - owner_id: str | None - Upstream ownedByUser.id when provided, else None
+    - owner_name: str | None - Upstream ownedByUser.name when provided
+    - ownership_overridden_at: str | None - Literal upstream override timestamp
+      when provided; never implies an actor, previous owner, or shared state
     - notes: str | None - User-added notes
 
     Example output:
@@ -302,6 +331,9 @@ class TestTransactionSchemaContract:
         "is_pending",
         "needs_review",
         "review_status",
+        "owner_id",
+        "owner_name",
+        "ownership_overridden_at",
         "notes",
     }
 
@@ -394,6 +426,38 @@ class TestTransactionSchemaContract:
         """is_pending stays a real bool when pending is absent or null."""
         assert transform_transaction({"id": "t"})["is_pending"] is False
         assert transform_transaction({"id": "t", "pending": None})["is_pending"] is False
+
+    def test_owner_fields_nullable_and_null_safe(self):
+        """Owner fields exist for every shape and stay null without an owner object."""
+        complete = transform_transaction(
+            {**FULL_TRANSACTION_RAW, "ownedByUser": {"id": "user-1", "name": "Alex"}}
+        )
+        assert complete["owner_id"] == "user-1"
+        assert complete["owner_name"] == "Alex"
+
+        for raw in (
+            FULL_TRANSACTION_RAW,
+            {**FULL_TRANSACTION_RAW, "ownedByUser": None},
+            {**FULL_TRANSACTION_RAW, "ownedByUser": "not-an-object"},
+            {**FULL_TRANSACTION_RAW, "ownedByUser": {}},
+        ):
+            result = transform_transaction(raw)
+            assert result["owner_id"] is None
+            assert result["owner_name"] is None
+
+    def test_ownership_overridden_at_is_literal_passthrough(self):
+        """The override timestamp passes through literally; nothing is derived."""
+        assert (
+            transform_transaction(
+                {**FULL_TRANSACTION_RAW, "ownershipOverriddenAt": "2026-01-02T03:04:05Z"}
+            )["ownership_overridden_at"]
+            == "2026-01-02T03:04:05Z"
+        )
+        result = transform_transaction(FULL_TRANSACTION_RAW)
+        assert result["ownership_overridden_at"] is None
+        assert "is_shared" not in result
+        assert "previous_owner" not in result
+        assert "overridden_by" not in result
 
     def test_pending_reads_real_upstream_field(self):
         """Contract reads upstream `pending`, not a fabricated always-false default."""

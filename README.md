@@ -616,11 +616,11 @@ print(f"Found {len(transactions)} transactions")
 
 These output fields are guaranteed stable across versions:
 
-**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `last_synced`
+**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `owner_id`, `owner_name`, `last_updated`
 
 **Account types:** `group`, `type`, `type_display`, `subtype`, `subtype_display`
 
-**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `notes`
+**Transactions:** `id`, `date`, `amount`, `description`, `category`, `account_id`, `is_pending`, `needs_review`, `review_status`, `owner_id`, `owner_name`, `ownership_overridden_at`, `notes`
 
 **Institutions:** `credential_id`, `provider`, `institution_id`,
 `institution_name`, `update_required`, `disconnected`, `disconnected_at`,
@@ -645,6 +645,18 @@ unknown fields).
 - `needs_review` and opaque `review_status` are independent fields. List
   responses preserve `review_status` when supplied; detail `review_status` is
   nullable because the released public detail query may omit it.
+- `owner_id` and `owner_name` mirror the optional upstream `ownedByUser`
+  relationship. Accounts map the upstream `displayName`; transactions map the
+  upstream `name`. A missing, `null`, or non-object owner relationship yields
+  `null` normalized owner fields. **Null ownership does not distinguish
+  shared, unassigned, unavailable, or unsupported upstream states** — the
+  released upstream response provides no field that separates those meanings,
+  so none is invented.
+- `ownership_overridden_at` mirrors the upstream override timestamp literally.
+  It proves only that an override timestamp exists; it never identifies the
+  actor, the previous owner, or the direction of reassignment, and no boolean
+  "shared" state is derived from it. These read-only fields never mutate
+  ownership or any remote state.
 - Unknown additive upstream fields are ignored by normalized output.
 - Institution status is credential-centric; missing/disconnected/update/issue
   values remain nullable and are never treated as a healthy connection.
