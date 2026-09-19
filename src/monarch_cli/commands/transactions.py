@@ -40,7 +40,7 @@ from ..transformers.transaction_aggregates import (
     transform_transaction_summary,
 )
 from ..transformers.transactions import transform_transaction_detail, transform_transactions
-from . import transaction_attachments, transaction_splits, transaction_tags
+from . import transaction_attachments, transaction_review, transaction_splits, transaction_tags
 
 app = typer.Typer(
     help="Transaction management",
@@ -49,6 +49,7 @@ app = typer.Typer(
 app.add_typer(transaction_splits.app, name="splits")
 app.add_typer(transaction_tags.app, name="tags")
 app.add_typer(transaction_attachments.app, name="attachments")
+app.add_typer(transaction_review.app, name="review")
 
 #: Declared effect sets for this group's commands.
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})

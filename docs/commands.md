@@ -768,6 +768,56 @@ monarch --allow-mutations transactions attachments add \
 Receipt-inbox upload and follow-up transaction edits (including `--notes`
 convenience updates) are out of scope.
 
+## Transaction review state
+
+The upstream `reviewed` and `needsReview` inputs are not interchangeable, so the
+CLI exposes two explicit, intent-oriented operations. Users never supply a pair
+of review booleans:
+
+- `transactions review mark` sends `reviewed=True` and omits `needsReview`;
+- `transactions review return` sends `needsReview=True` and omits `reviewed`.
+
+`reviewed=False` and `needsReview=False` are never sent by this surface. Each
+command targets exactly one transaction through a required `--transaction-id`
+option (never a positional argument).
+
+### `transactions review mark`
+
+Marks one transaction reviewed.
+
+Options:
+
+- Required `--transaction-id TXN_ID`
+- `--dry-run`
+
+```bash
+monarch --allow-mutations transactions review mark --transaction-id TXN_ID
+monarch transactions review mark --transaction-id TXN_ID --dry-run
+```
+
+### `transactions review return`
+
+Returns one transaction to the review queue.
+
+Options:
+
+- Required `--transaction-id TXN_ID`
+- `--dry-run`
+
+```bash
+monarch --allow-mutations transactions review return --transaction-id TXN_ID
+```
+
+Both operations read the transaction detail first (without a pending-ID
+redirect) to verify exact identity and to report a deterministic no-op when the
+requested state is already observed. After writing, the detail is read again to
+confirm the intended review state and that category and merchant identity were
+unchanged. The serialized mutation input contains only the transaction ID and
+the one intended review-state field; unrelated fields such as `category`,
+`name`, `amount`, `date`, `notes`, and `goalId` are never sent. The stable
+output reports the observed `needs_review`, `reviewed_at`, and
+`reviewed_by_user` fields and never invents a `reviewed` boolean.
+
 ## Mutation behavior
 
 Remote mutations are:
@@ -778,6 +828,7 @@ Remote mutations are:
 - `transactions tags create`, `replace`, `add`, and `clear`
 - `transactions splits replace` and `clear`
 - `transactions attachments add`
+- `transactions review mark` and `transactions review return`
 
 All require `--allow-mutations` after validation, except dry-run previews.
 `--yes` is needed only to skip confirmation for destructive tag and split

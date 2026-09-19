@@ -188,6 +188,12 @@ monarch --allow-mutations transactions attachments add \
 monarch --allow-mutations --yes transactions splits replace \
   --transaction-id TXN_ID \
   --splits-file ./splits.json
+
+# Mark a transaction reviewed or return it to the review queue
+monarch --allow-mutations transactions review mark \
+  --transaction-id TXN_ID
+monarch --allow-mutations transactions review return \
+  --transaction-id TXN_ID
 ```
 
 `--yes` skips a destructive confirmation; it never authorizes a write.
