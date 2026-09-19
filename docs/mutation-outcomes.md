@@ -23,6 +23,7 @@ execution is attempted**:
 - `transactions tags clear`
 - `transactions splits replace`
 - `transactions splits clear`
+- `transactions attachments add`
 
 Pre-execution authorization and input-validation failures do **not** use this
 envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
@@ -54,12 +55,14 @@ a preview carries `status: "dry_run"` and is explicitly distinct from
 ## Dry-run previews
 
 `transactions update`, `transactions batch-update`, `transactions tags
-replace`/`add`/`clear`, and `transactions splits replace`/`clear` accept
-`--dry-run`. A preview may authenticate and perform read-only
-validation/discovery (including reading the current assignment or a split
-parent amount) but **never calls a mutation endpoint, never requires
-`--allow-mutations`, and never prompts for confirmation**. `--dry-run --yes`
-is accepted and documented as irrelevant.
+replace`/`add`/`clear`, `transactions splits replace`/`clear`, and
+`transactions attachments add` accept `--dry-run`. A preview may authenticate
+and perform read-only validation/discovery (including reading the current
+assignment or a split parent amount) but **never calls a mutation endpoint,
+never requires `--allow-mutations`, and never prompts for confirmation**.
+`--dry-run --yes` is accepted and documented as irrelevant. The attachment
+preview is stricter: it validates local file metadata only and performs no
+authentication lookup or network call at all.
 
 A preview result is a JSON object with:
 
@@ -120,7 +123,8 @@ Per-item statuses are `succeeded`, `failed`, or `ambiguous`.
   `transactions.update`, `transactions.batch-update`,
   `transactions.tags.create`, `transactions.tags.replace`,
   `transactions.tags.add`, `transactions.tags.clear`,
-  `transactions.splits.replace`, and `transactions.splits.clear`) supplied by
+  `transactions.splits.replace`, `transactions.splits.clear`, and
+  `transactions.attachments.add`) supplied by
   the shared operation descriptor registry — never inferred from an upstream
   method or GraphQL operation name.
 - Atomic single-effect operations use an `items` array containing exactly one

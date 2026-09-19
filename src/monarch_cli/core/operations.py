@@ -127,6 +127,14 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "no_retry: complete-set split clearing has no documented idempotency key "
         "or conditional-write mechanism; verify after uncertain writes."
     ),
+    "transactions attachments add": (
+        "no_retry: the attachment upload is a three-stage workflow (acquire "
+        "signed parameters, third-party media upload, registration) with no "
+        "upstream idempotency key; a retry after bytes or a registration "
+        "request may have been dispatched could create a second orphaned "
+        "asset or a duplicate attachment, so an uncertain stage must be "
+        "verified before repeating."
+    ),
 }
 
 
