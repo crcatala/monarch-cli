@@ -414,10 +414,15 @@ def _project_param(param: Any) -> dict[str, Any]:
         default_repr = default
     else:
         default_repr = str(default)
+    # A positional argument is addressed by name, not by a flag; only options
+    # carry flags (including boolean ``--no-`` secondary flags).
+    flags: list[str] = []
+    if not is_argument:
+        flags = [*getattr(param, "opts", []), *getattr(param, "secondary_opts", [])]
     return {
         "name": param.name,
         "kind": "argument" if is_argument else "option",
-        "flags": [*getattr(param, "opts", []), *getattr(param, "secondary_opts", [])],
+        "flags": flags,
         "required": bool(getattr(param, "required", False)),
         "repeatable": bool(getattr(param, "multiple", False)),
         "type": type_name,

@@ -10,9 +10,7 @@
         {
           "choices": [],
           "default": null,
-          "flags": [
-            "account_id"
-          ],
+          "flags": [],
           "kind": "argument",
           "name": "account_id",
           "repeatable": false,
@@ -1890,9 +1888,7 @@
         {
           "choices": [],
           "default": null,
-          "flags": [
-            "transaction_id"
-          ],
+          "flags": [],
           "kind": "argument",
           "name": "transaction_id",
           "repeatable": false,
@@ -2687,9 +2683,7 @@
         {
           "choices": [],
           "default": null,
-          "flags": [
-            "transaction_id"
-          ],
+          "flags": [],
           "kind": "argument",
           "name": "transaction_id",
           "repeatable": false,
@@ -3169,9 +3163,7 @@
         {
           "choices": [],
           "default": null,
-          "flags": [
-            "transaction_id"
-          ],
+          "flags": [],
           "kind": "argument",
           "name": "transaction_id",
           "repeatable": false,

@@ -222,6 +222,12 @@ class TestManifestContent:
             assert {item["name"] for item in command["options"]} == expected_options
             assert {item["name"] for item in command["arguments"]} == expected_arguments
 
+    def test_positional_arguments_are_not_represented_as_flags(self) -> None:
+        for command in _manifest()["commands"]:
+            for argument in command["arguments"]:
+                assert argument["kind"] == "argument"
+                assert argument["flags"] == [], command["name"]
+
     def test_required_inputs_and_defaults_are_represented(self) -> None:
         document = _manifest()
         commands = {command["name"]: command for command in document["commands"]}
