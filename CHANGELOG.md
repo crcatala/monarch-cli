@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+#### Consistent global options and machine-readable mutation output
+- Root global options must precede the command path (`monarch [GLOBAL OPTIONS] GROUP COMMAND [COMMAND OPTIONS]`); README/help examples that placed `--timeout`, `--no-color`, `--verbose`, or `--quiet` after the command path are corrected (mc-hu2c)
+- `auth status` and `auth ping` now resolve output through the shared effective format, so `monarch --json auth status` matches `monarch auth status --json` and a piped `monarch auth status` emits JSON
+- Remote mutation outcomes and dry-run previews always emit JSON on stdout regardless of TTY state; `--quiet` and an explicit non-JSON format are rejected with `INVALID_INPUT` (exit 2) before any mutation is attempted
+
 ### Added
 
 #### Liability and Debt-Service Account Metadata

@@ -17,7 +17,6 @@ from ..core.mutation_outcomes import (
     build_mutation_outcome,
     error_from_exception,
     failed_item,
-    outcome_exit_code,
     succeeded_item,
     verification_object,
 )
@@ -30,7 +29,7 @@ from ..core.operations import (
     run_read_call,
 )
 from ..core.prompting import confirm_action
-from ..output import OutputFormat, output
+from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
 
 app = typer.Typer(help="Discover and safely assign transaction tags", no_args_is_help=True)
 
@@ -168,10 +167,7 @@ def _validate_transaction_id(transaction_id: str) -> None:
 
 
 def _emit(outcome: dict[str, Any]) -> None:
-    output(outcome)
-    code = outcome_exit_code(outcome["status"])
-    if code:
-        raise typer.Exit(code)
+    emit_mutation_outcome(outcome)
 
 
 def _confirm(operation: str, transaction_id: str, tag_ids: list[str]) -> None:
@@ -248,6 +244,7 @@ def create_tag(
     if color is None or not _COLOR_RE.fullmatch(color):
         raise ValidationError("Color must match #[0-9A-Fa-f]{6}.", field="color")
     operation = Operation(command="transactions tags create", effects=MUTATION_EFFECTS)
+    validate_mutation_output()
     require_mutation_authorization(operation)
     client = get_authenticated_client()
     try:
@@ -295,6 +292,7 @@ def create_tag(
 
 def _set_tags(transaction_id: str, requested: list[str], operation_name: str) -> None:
     operation = Operation(command=operation_name, effects=MUTATION_EFFECTS)
+    validate_mutation_output()
     require_mutation_authorization(operation)
     client = get_authenticated_client()
     # Discovery is read-only and deliberately precedes confirmation/mutation.

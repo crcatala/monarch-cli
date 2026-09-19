@@ -9,7 +9,6 @@ import typer
 
 from ..core.adapter import get_authenticated_client
 from ..core.error_handler import handle_errors
-from ..core.mutation_outcomes import outcome_exit_code
 from ..core.operations import (
     Effect,
     Operation,
@@ -17,7 +16,7 @@ from ..core.operations import (
     require_mutation_authorization,
     run_read_call,
 )
-from ..output import OutputFormat, output
+from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
 from ..output.progress import spinner
 from ..services.accounts import (
     get_account_history,
@@ -561,18 +560,18 @@ def refresh(
 
     # Authorize before authentication lookup, client creation, or any prompt.
     operation = Operation(command="accounts refresh", effects=frozenset({Effect.REMOTE_MUTATION}))
+    validate_mutation_output()
     require_mutation_authorization(operation)
 
     with spinner("Requesting account refresh..."):
         result = refresh_accounts(account_ids, operation=operation)
 
-    output(result)
-
     # All-succeeded outcomes exit 0; ambiguous outcomes exit 4 with the
     # required verification object in the envelope. Definitive failures exit
     # with the normal operation/API nonzero code. The no_accounts notice is
-    # a pre-execution result, not a mutation outcome, and exits 0.
+    # a pre-execution result, not a mutation outcome, and exits 0. The
+    # outcome is always emitted as JSON on stdout regardless of TTY state.
     if result.get("schema_version") == "mutation-outcome.v1":
-        code = outcome_exit_code(result["status"])
-        if code:
-            raise typer.Exit(code)
+        emit_mutation_outcome(result)
+    else:
+        output(result)

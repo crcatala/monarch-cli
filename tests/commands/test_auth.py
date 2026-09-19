@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from monarch_cli.core.session import StorageBackend
 from monarch_cli.main import app
+from monarch_cli.output import OutputFormat
 
 runner = CliRunner()
 
@@ -82,9 +83,15 @@ class TestAuthStatus:
             "has_legacy_artifact": False,
             "active_backend": "keyring",
         }
-        with mock.patch(
-            "monarch_cli.commands.auth.get_storage_info",
-            return_value=mock_info,
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_storage_info",
+                return_value=mock_info,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
+            ),
         ):
             result = runner.invoke(app, ["auth", "status"])
 
@@ -102,9 +109,15 @@ class TestAuthStatus:
             "has_legacy_artifact": False,
             "active_backend": "file",
         }
-        with mock.patch(
-            "monarch_cli.commands.auth.get_storage_info",
-            return_value=mock_info,
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_storage_info",
+                return_value=mock_info,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
+            ),
         ):
             result = runner.invoke(app, ["auth", "status"])
 
@@ -122,9 +135,15 @@ class TestAuthStatus:
             "has_legacy_artifact": False,
             "active_backend": "env",
         }
-        with mock.patch(
-            "monarch_cli.commands.auth.get_storage_info",
-            return_value=mock_info,
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_storage_info",
+                return_value=mock_info,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
+            ),
         ):
             result = runner.invoke(app, ["auth", "status"])
 
@@ -142,9 +161,15 @@ class TestAuthStatus:
             "has_legacy_artifact": False,
             "active_backend": None,
         }
-        with mock.patch(
-            "monarch_cli.commands.auth.get_storage_info",
-            return_value=mock_info,
+        with (
+            mock.patch(
+                "monarch_cli.commands.auth.get_storage_info",
+                return_value=mock_info,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
+            ),
         ):
             result = runner.invoke(app, ["auth", "status"])
 
@@ -229,6 +254,10 @@ class TestAuthStatus:
             mock.patch(
                 "monarch_cli.commands.auth.COMPAT_SESSION_PATH",
                 Path("/tmp/fake-mm_session.pickle"),
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
             ),
         ):
             result = runner.invoke(app, ["auth", "status"])
@@ -341,6 +370,10 @@ class TestAuthPing:
             mock.patch(
                 "monarch_cli.commands.auth.run_read_call",
                 return_value=mock_accounts,
+            ),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
             ),
         ):
             result = runner.invoke(app, ["auth", "ping"])
@@ -605,6 +638,10 @@ class TestLegacyArtifactSafety:
         with (
             mock.patch("monarch_cli.core.session.COMPAT_SESSION_PATH", hostile_path),
             mock.patch("monarch_cli.core.session._get_from_keyring", return_value=None),
+            mock.patch(
+                "monarch_cli.commands.auth.get_default_format",
+                return_value=OutputFormat.PLAIN,
+            ),
         ):
             result = runner.invoke(app, ["auth", "status"])
 

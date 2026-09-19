@@ -17,10 +17,12 @@ import sys
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+import typer
 from rich.console import Console
 from rich.table import Table
 
-from ..core.exceptions import MonarchCLIError
+from ..core.exceptions import MonarchCLIError, ValidationError
+from ..core.mutation_outcomes import outcome_exit_code
 from .plain import format_plain, set_color_enabled, should_use_color
 
 if TYPE_CHECKING:
@@ -314,6 +316,62 @@ def output(
         print(json.dumps(data, indent=2, default=str))
 
 
+def validate_mutation_output() -> None:
+    """Reject output selections incompatible with the mutation contract.
+
+    Mutation outcomes and previews are always machine-readable JSON. ``--quiet``
+    and an explicit format other than ``json`` would swallow or re-render the
+    result, so they are rejected with a structured input error. This is called
+    before any remote mutation is attempted (validation precedes authorization)
+    as well as by :func:`emit_mutation_outcome`.
+
+    Raises:
+        ValidationError: If ``--quiet`` or a non-JSON explicit format is set.
+    """
+    if is_quiet():
+        raise ValidationError(
+            "Mutation outcomes are machine-readable JSON and cannot be combined with --quiet.",
+            field="quiet",
+            details={"remedy": "drop --quiet; mutation outcomes always emit JSON on stdout"},
+        )
+    if _default_format_override is not None and _default_format_override != OutputFormat.JSON:
+        raise ValidationError(
+            "Mutation outcomes always emit JSON and cannot use a non-JSON format.",
+            field="format",
+            details={
+                "requested_format": _default_format_override.value,
+                "remedy": "use --json or remove the explicit format selection",
+            },
+        )
+
+
+def emit_mutation_outcome(outcome: dict[str, Any]) -> None:
+    """Emit a mutation outcome or dry-run preview as JSON on stdout.
+
+    Remote mutation outcomes and previews always emit JSON on stdout
+    regardless of TTY state, so shell pipelines and agents always receive
+    the ``mutation-outcome.v1`` envelope even on an interactive terminal.
+    Progress and diagnostics stay on stderr.
+
+    The contract forbids output selections that would swallow or re-render
+    the result: ``--quiet`` and an explicit format other than ``json`` are
+    rejected with a structured input error (``INVALID_INPUT``, exit 2).
+    ``--json`` / ``-f json`` are accepted as already satisfied.
+
+    Args:
+        outcome: The mutation-outcome envelope (or preview) dict to emit.
+
+    Raises:
+        ValidationError: If ``--quiet`` or a non-JSON explicit format is set.
+        typer.Exit: With the status-derived exit code when it is non-zero.
+    """
+    validate_mutation_output()
+    print(json.dumps(outcome, indent=2, default=str))
+    code = outcome_exit_code(outcome["status"])
+    if code:
+        raise typer.Exit(code)
+
+
 def output_error(error: MonarchCLIError) -> None:
     """Output structured error for AI agent consumption.
 
@@ -338,6 +396,8 @@ __all__ = [
     "is_interactive",
     "set_default_format",
     "get_default_format",
+    "validate_mutation_output",
+    "emit_mutation_outcome",
     "should_use_color",
     "output",
     "output_error",

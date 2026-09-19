@@ -26,7 +26,7 @@ from ..core.session import (
     get_storage_info,
     save_session_token,
 )
-from ..output import OutputFormat, console, output
+from ..output import OutputFormat, console, get_default_format, output
 
 app = typer.Typer(
     help="Authentication management",
@@ -240,7 +240,10 @@ def status(
     is_authenticated = storage_info["active_backend"] is not None
     legacy_artifact = storage_info["has_legacy_artifact"]
 
-    if json_output:
+    # Resolve output through the same effective value as every other command:
+    # an explicit local --json, the root --json default, or a piped stdout
+    # yields the structured contract; a TTY keeps the human-readable view.
+    if json_output or get_default_format() == OutputFormat.JSON:
         result = {
             "authenticated": is_authenticated,
             "storage_backend": storage_info["active_backend"],
@@ -443,7 +446,7 @@ def ping(
         accounts = accounts_data.get("accounts", [])
         account_count = len(accounts)
 
-        if json_output:
+        if json_output or get_default_format() == OutputFormat.JSON:
             result = {
                 "status": "ok",
                 "message": f"Connected successfully. {account_count} accounts available.",
