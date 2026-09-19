@@ -120,6 +120,12 @@ class TestParseCurrencyAmount:
         with pytest.raises(ValidationError):
             parse_currency_amount(raw)
 
+    def test_rejects_amount_not_exactly_representable_on_the_wire(self) -> None:
+        from monarch_cli.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            parse_currency_amount("9999999999999999.99")
+
     def test_zero_is_valid_reset_amount(self) -> None:
         assert parse_currency_amount("0.00") == Decimal("0.00")
 

@@ -111,7 +111,17 @@ def parse_currency_amount(raw: str) -> Decimal:
             field="amount",
             details={"precision": CURRENCY_PRECISION},
         )
-    return parsed.quantize(Decimal("0.01"))
+    normalized = parsed.quantize(Decimal("0.01"))
+    # The released client serializes GraphQL Float variables as JSON numbers.
+    # Reject values that the wire format would round silently; the requested
+    # amount must reach the service unchanged (no silent rounding).
+    if Decimal(str(float(normalized))) != normalized:
+        raise ValidationError(
+            "--amount cannot be represented exactly by the numeric wire format.",
+            field="amount",
+            details={"value": raw},
+        )
+    return normalized
 
 
 def validate_month_start(parsed: date) -> None:
@@ -210,7 +220,7 @@ def find_category(client: Any, category_id: str) -> None:
     )
 
 
-def _validate_mutation_response(payload: Any) -> None:
+def validate_budget_write_response(payload: Any) -> None:
     """Validate the budget mutation write response container.
 
     A GraphQL-level ``errors`` payload is a definitive rejection. A missing or
@@ -365,11 +375,6 @@ VERIFICATION_MESSAGE = (
     "retrying; a timed-out write may already have applied the new amount and "
     "retrying could overwrite other changes."
 )
-
-
-def validate_budget_write_response(payload: Any) -> None:
-    """Public wrapper for the write-response validation (used by tests)."""
-    _validate_mutation_response(payload)
 
 
 __all__ = [
