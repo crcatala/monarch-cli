@@ -59,3 +59,23 @@ Do not automatically retry any stage after bytes or a registration request may h
 - [ ] Receipt-inbox upload and follow-up transaction edits remain out of scope; no live financial API call is required by the default suite.
 - [ ] Privacy/safety documentation and repository verification are complete.
 
+
+## Notes
+
+**2026-09-19T17:51:52Z**
+
+Live verification — 2026-09-19, disposable test account.
+
+Passed:
+- Real 3-stage upload (acquire signed params -> media upload -> register): `status: succeeded`, 2/2 items, readback showed exactly one attachment with the expected filename.
+- Real image path: generated 96x96 PNG (19 KB) uploaded successfully; readback showed `mc-cr09-photo.png` (extension png).
+- Offline dry-run shape correct; mutation gate and local input rejection behaved as specified.
+
+Forced registration failure (fault injected on `Common_AddTransactionAttachment` after media success):
+- exit 4, `status: partial`, items = `attachment_media` succeeded + `attachment` failed
+- Cloudinary media request occurred exactly once; registration attempted once; no retry
+- readback confirmed the media was NOT registered (orphaned media only)
+
+Tradeoff accepted by owner: the orphaned Cloudinary asset remains and has no CLI cleanup path.
+
+Note: if the registration stage fails due to a *transport* failure rather than a definitive rejection, it is affected by the ambiguity misclassification tracked in mc-ic7w.

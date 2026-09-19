@@ -53,3 +53,20 @@ Verification checkpoint update (2026-09-18): authenticated read-only checks for 
 Human verification checkpoint (2026-09-19): the owner-authenticated test development account was confirmed to expose exactly two accounts. The household identity gate matched, and no household ID or account/transaction identifiers were recorded.
 
 The corrected disposable-fixture live mutation suite passed (1 selected test, 88 deselected), covering the explicit --transaction-id mutation path, mutation outcome handling, bounded readback, and cleanup. Supplemental verification for the delivered CLI UX work also passed: real-TTY preview and mutation JSON emission, tag add-by-name/add-by-ID/replace/clear, tag and split dry-run no-write behavior, split preview-to-apply fidelity, and real-TTY help review. Test-account tags and splits were restored to their original state. No credentials or raw financial payloads are recorded here.
+
+**2026-09-19T17:51:52Z**
+
+Human/agent verification phase executed — 2026-09-19, on an owner-authenticated disposable test account (2 manual accounts).
+
+Passed:
+- Read-only live suite: `MONARCH_LIVE_TESTS=1 make test-live` -> 20 passed.
+- Per-ticket human steps: live attachment upload (mc-2v9a), live credential-safety capture (mc-sr92), review round trip + no-op (mc-e49c), transaction create/delete lifecycle (mc-yqfi), budget write + extended scope invariants (mc-9u99), live output validated against published schemas (mc-cpzi), capabilities manifest mechanics/accuracy (mc-82kf).
+- Gated live mutation suite: `MONARCH_LIVE_MUTATION_TESTS=1 make test-live-mutation` -> test_transaction_notes_round_trip passed, fixtures self-cleaned.
+- Forced attachment-registration failure -> `partial`/exit 4 with orphaned media acknowledged, no retry.
+
+Open follow-ups:
+- mc-ic7w (high): transport failures on dispatched mutations are misreported as definitive failures instead of ambiguous (gql TransportConnectionFailed not in the ambiguous set). Re-verify after the fix.
+- mc-61tf (low): normalized transaction detail omits review metadata.
+- F2 observation: manual-account balance drift on create/delete (Monarch-side; no CLI restore path).
+
+Remaining human-only items: final UI confirmation, published-PyPI schema install (needs a release), upload-adapter maintenance assumptions, schema publication decision, macOS/Windows manifest run, manifest usefulness sign-off.

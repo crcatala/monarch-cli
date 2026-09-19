@@ -48,3 +48,17 @@ Keep this ticket limited to transport isolation and compatibility. File validati
 - [ ] Dependency metadata and clean-install compatibility require the safe upstream release when that path is selected.
 - [ ] No file-validation policy, attachment registration workflow, mutation outcome, retry behavior, or transaction command is implemented in this ticket.
 - [ ] Security documentation and repository verification are complete.
+
+## Notes
+
+**2026-09-19T17:51:52Z**
+
+Live credential-safety verification — 2026-09-19, disposable test account.
+
+Performed a real `transactions attachments add` upload with outbound HTTP instrumented in-process (request header NAMES only, no values, no repo changes).
+
+Result:
+- Third-party media request: `POST api.cloudinary.com/v1_1/monarch-money/image/upload/` with header names `['User-Agent']`, 0 session cookies, 0 sensitive headers.
+- Control (read-only Monarch call under the same instrumentation): Monarch session default header names `['Accept','Authorization','Client-Platform','Content-Type','User-Agent']` — i.e. the instrumentation detects `Authorization` and it was absent from the media request.
+
+This is a live end-to-end proof of the ticket's primary acceptance criterion (no Monarch credential header reaches the media host), stronger than the request-level unit test.

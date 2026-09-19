@@ -60,3 +60,16 @@ Use centralized mutation authorization, retry-safe remote execution, and `mutati
 **2026-09-19T16:21:32Z**
 
 Payload-shape resolution (option 3): No released monarchmoneycommunity version newer than 1.5.2 exists, and 1.5.2's update_transaction unconditionally serializes category: null and name: null, so ordered option 1 (upstream fix) is unavailable and option 2 cannot satisfy the acceptance criterion that the serialized input contain only transaction identity plus the one intended review-state field. Implemented the last-resort narrow local GraphQL adapter in src/monarch_cli/core/review_mutation.py, which calls the public MonarchMoney.gql_call transport with an explicit minimal document and only {id, reviewed} or {id, needsReview} input variables. Query-shape compatibility tests live in tests/core/test_review_mutation.py; monarch-cli maintainers own the adapter and must update those tests deliberately for any document/variable change. No monkeypatch or interception of gql_call is used.
+
+**2026-09-19T17:51:52Z**
+
+Live verification — 2026-09-19, disposable test account (fixture transaction, deleted afterwards).
+
+Passed:
+- `review mark`/`review return` round trip: return set needs_review=true, mark set it back false; both reported `succeeded` with observed review fields.
+- Deterministic no-op: `review mark` on an already-reviewed transaction returned `no_op: true` with no write.
+- Reads confirmed category/merchant identity unchanged by the review write.
+
+Open issues found in this area:
+- mc-ic7w (high): a transport failure during the review write is reported as a definitive `failed`/exit 1 even though the write applied (gql wraps the error as TransportConnectionFailed).
+- mc-61tf (low): `transactions get --strict` normalized detail does not expose `reviewed_at`/`reviewed_by_user` even though the review commands report them, and `review_status` is always null.

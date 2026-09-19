@@ -53,3 +53,23 @@ Keep this distinct from read-path retry behavior: reads may retry; mutations mus
 - A test proves a definitive service rejection (e.g. GraphQL `errors` payload) still reports `failed`, not `ambiguous`.
 - Existing mutation outcome and exit-code contracts and documentation remain accurate (update `docs/mutation-outcomes.md` if needed).
 
+
+## Notes
+
+**2026-09-19T17:51:52Z**
+
+Live reproduction — 2026-09-19, disposable test account (mc-cr09 verification pass).
+
+Two-layer control on disposable fixtures (write actually applied in every case):
+
+| Fault layer | Write applied remotely | Exit | Status | Details |
+|---|---|---|---|---|
+| Through gql (`transactions review return`) | yes (needs_review=true) | 1 | failed | code=UNKNOWN, exception_class=TransportConnectionFailed, verification=null |
+| Through gql (`budgets set`) | yes (budgeted=value) | 1 | failed | code=UNKNOWN, verification=null |
+| Raw aiohttp error above gql (control) | yes | 4 | ambiguous | reason=transport_failure, verification present |
+
+The control — dispatching the real write and then raising `aiohttp.ServerDisconnectedError` *above* `MonarchMoney.gql_call` — proves the CLI classification logic is correct; the production path never sees that type because gql wraps everything as `TransportConnectionFailed`.
+
+Repro technique: patch `aiohttp.ClientSession._request` (through gql) or `MonarchMoney.gql_call` (above gql) to dispatch the request and then raise. Confirm the remote effect by reading state back after the CLI reports `failed`.
+
+Also observed: the read path retries (4 attempts then NETWORK_ERROR), while the mutation path is single-attempt. Any fix must preserve non-retry semantics for mutations.

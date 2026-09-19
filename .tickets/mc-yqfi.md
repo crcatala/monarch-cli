@@ -52,3 +52,19 @@ This ticket intentionally does not claim idempotency. Upsert/dedupe requires a s
 - [ ] Existing normalized transaction schemas, mutation outcome tests, help-contract tests, and live-test policy remain aligned; no live financial API call is required by the default suite.
 - [ ] User-facing documentation and repository verification are complete.
 
+
+## Notes
+
+**2026-09-19T17:51:52Z**
+
+Live verification — 2026-09-19, disposable test account.
+
+Passed:
+- `transactions create` -> exact-ID readback -> `transactions delete` -> absence (`get` returned NOT_FOUND). Multiple fixtures created and deleted cleanly; final transaction inventory matched the original 3.
+- Destructive confirmation path exercised with `--yes`; dry-run shapes correct.
+
+Observation (F2, not a CLI defect): deleting a manual-account transaction does not restore the account balance. Each create reduced the manual checking balance by the (positive) amount and the delete did not reverse it, so the drift is cumulative and equals the sum of created amounts:
+- fixture +0.01 -> 12599.99
+- fixture +0.02 -> 12599.97
+- fixture +0.05 -> 12599.92 (original 12600.0)
+Today's daily balance-history snapshot is also frozen at the drifted value, and `accounts refresh` does not recompute manual accounts. This appears to be Monarch-side behavior; there is no CLI balance-adjust command.
