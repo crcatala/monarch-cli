@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking Changes
+### Changed
 
 #### Dry-run previews for tag and split mutations
 - `transactions tags replace`/`add`/`clear` and `transactions splits replace`/`clear` accept `--dry-run` (mc-7lm1)
@@ -35,8 +35,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Root global options must precede the command path (`monarch [GLOBAL OPTIONS] GROUP COMMAND [COMMAND OPTIONS]`); README/help examples that placed `--timeout`, `--no-color`, `--verbose`, or `--quiet` after the command path are corrected (mc-hu2c)
 - `auth status` and `auth ping` now resolve output through the shared effective format, so `monarch --json auth status` matches `monarch auth status --json` and a piped `monarch auth status` emits JSON
 - Remote mutation outcomes and dry-run previews always emit JSON on stdout regardless of TTY state; `--quiet` and an explicit non-JSON format are rejected with `INVALID_INPUT` (exit 2) before any mutation is attempted
+- **Default output format** - Changed from `json` to `plain` for interactive terminal use; TTY output is human-friendly while piped/redirected output remains automatic JSON
+- **Concise-format contract** - `compact` uses the same curated field subset as `plain`/`table`; `json`, `csv`, and `ndjson` retain complete normalized records
 
 ### Added
+
+#### Transaction discovery and detail
+- Expanded `transactions list` with repeatable account/category/tag filters, tri-state status filters, visibility controls, and bounded pagination
+- Added read-only `transactions get TXN_ID` with normalized detail; pending IDs redirect by default, while `--strict` disables that redirect
+
+#### Transaction tag workflows
+- Added read-only tag discovery and assignment inspection through `transactions tags list` and `transactions tags show`
+- Added validated `transactions tags create` plus guarded complete-set replacement and clearing; IDs and names are checked before a write and remote results use the shared mutation outcome contract
+
+#### Transaction split workflows
+- Added read-only `transactions splits show` and guarded complete-set `replace`/`clear` operations
+- Split JSON is bounded and validated against the parent transaction total; writes are read back for verification and ambiguous results include safe inspection guidance
+
+#### Account history and refresh visibility
+- Added `accounts history`, `recent-balances`, `snapshots`, and `snapshots-by-type` for normalized balance and net-worth history
+- Added read-only `accounts refresh-status`, including explicit unknown-account results rather than treating them as complete
+
+#### Cashflow and transaction reporting
+- Added `cashflow detail` with normalized category, category-group, merchant, and summary aggregates
+- Added `transactions summary` for all-time aggregates and `transactions recurring` for date-scoped recurring activity
+
+#### Investment holdings
+- Added read-only `investments holdings` with account selection, hidden-account opt-in, bounded concurrent retrieval, and optional security-ID aggregation; missing financial values remain `null`
 
 #### CLI help polish
 - Every remote-mutation command's help documents that the global `--allow-mutations` option is required and must be placed before the command path, and documents `--dry-run` where supported (mc-4z49)
@@ -90,13 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Required verification for ambiguity** - Any ambiguous item forces a `verification` object with `required: true`, an actionable message, and a tokenized safe command when one exists
 - **Sanitized structured errors** - Item error objects carry stable `code`, `message`, and object-valued `details`; raw exception text, request bodies, and credentials never reach the contract
 - **Breaking changes need a new version** - Envelope fields, status values, and exit-code semantics are additive only; removals or semantic changes require `mutation-outcome.v2` or later
-
-### Changed
-
-- **Default output format** - Changed from `json` to `plain` for interactive terminal use
-  - TTY: Human-friendly output with emoji icons
-  - Piped/redirected: Automatic JSON output (backwards compatible)
-- **Concise-format contract decision** - For list commands that offer a concise display selection, `compact` now shows the same curated field subset as `plain`/`table`; `json`, `csv`, and `ndjson` always keep the complete normalized records with every stable field
 
 ### Removed
 
