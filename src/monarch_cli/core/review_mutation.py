@@ -52,21 +52,16 @@ from gql import gql
 #: response selection set are narrowed.
 OPERATION_NAME = "Web_TransactionDrawerUpdateTransaction"
 
-#: The minimal mutation document. It selects only identity plus the observed
-#: review fields for the write response; the authoritative post-write read is
-#: ``get_transaction_details``. It intentionally omits every unrelated mutable
-#: input (category, merchant, amount, date, notes, goal, hideFromReports).
+#: The minimal mutation document. It selects only identity plus the payload
+#: errors for the write response; the authoritative post-write read is
+#: ``get_transaction_details``, so the write response is never trusted for
+#: verification. It intentionally omits every unrelated mutable input
+#: (category, merchant, amount, date, notes, goal, hideFromReports).
 REVIEW_MUTATION_QUERY = """
 mutation Web_TransactionDrawerUpdateTransaction($input: UpdateTransactionMutationInput!) {
   updateTransaction(input: $input) {
     transaction {
       id
-      needsReview
-      reviewedAt
-      reviewedByUser {
-        id
-        name
-      }
     }
     errors {
       fieldErrors {

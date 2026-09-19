@@ -151,13 +151,15 @@ def _read_detail(client: Any, transaction_id: str) -> Mapping[str, Any]:
     return detail
 
 
-def _mutation_container(payload: Any) -> Mapping[str, Any]:
+def _validate_review_response(payload: Any) -> None:
     """Validate the mutation response container.
 
     A definitive payload rejection raises :class:`APIError` (failed item). A
     response whose outcome cannot be established (missing or malformed
     ``errors`` field) raises :class:`MutationAmbiguousError`: the request was
-    already dispatched and its remote effect is unknown.
+    already dispatched and its remote effect is unknown. The response body is
+    not used for verification; the caller performs an authoritative detail
+    post-read.
     """
     response = _as_object(payload, "review mutation")
     if response.get("errors"):
@@ -189,7 +191,6 @@ def _mutation_container(payload: Any) -> Mapping[str, Any]:
             message="The review mutation was rejected by the service.",
             details={"payload_errors": _payload_error_details(errors)},
         )
-    return container
 
 
 def _is_no_op(observed: dict[str, Any], intent: ReviewIntent) -> bool:
@@ -300,7 +301,7 @@ def _run_review(
             entity_ids=(transaction_id,),
             verification=_VERIFICATION_MESSAGE,
         )
-        _mutation_container(payload)
+        _validate_review_response(payload)
         try:
             after = _read_detail(client, transaction_id)
         except Exception:  # noqa: BLE001 - unverified write is ambiguous

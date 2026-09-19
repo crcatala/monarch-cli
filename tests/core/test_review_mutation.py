@@ -46,6 +46,12 @@ def test_document_is_a_single_update_transaction_mutation() -> None:
     assert operations == [OPERATION_NAME]
     assert "$input: UpdateTransactionMutationInput!" in REVIEW_MUTATION_QUERY
     assert "updateTransaction(input: $input)" in REVIEW_MUTATION_QUERY
+    # The write response selects only identity plus payload errors; the command
+    # never trusts the write response for verification (it does a detail read).
+    assert "id" in REVIEW_MUTATION_QUERY
+    assert "errors" in REVIEW_MUTATION_QUERY
+    for unused_selection in ("needsReview", "reviewedAt", "reviewedByUser"):
+        assert unused_selection not in REVIEW_MUTATION_QUERY
     # The document must not declare any unrelated mutable variable.
     for field in UNRELATED_INPUT_FIELDS:
         assert f"${field}" not in REVIEW_MUTATION_QUERY
