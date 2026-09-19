@@ -459,6 +459,46 @@ class TestGlobalValueValidation:
         assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
 
 
+class TestCapabilitiesManifest:
+    """Capabilities manifest generation is framework-sensitive and pinned here.
+
+    Manifest generation walks the registered Typer command tree, so a Typer
+    upgrade that changes command registration or parameter introspection must
+    be caught by this suite (the mc-43s0 compatibility suite) before the
+    dependency bound in ``pyproject.toml`` is widened.
+    """
+
+    def test_manifest_is_deterministic_and_describes_registered_commands(self) -> None:
+        first, first_caught = invoke(["capabilities"])
+        second, second_caught = invoke(["capabilities"])
+
+        assert first.exit_code == 0, first.output
+        assert second.exit_code == 0, second.output
+        assert_parsed_cleanly(first, first_caught)
+        assert_parsed_cleanly(second, second_caught)
+        assert first.output == second.output
+
+        document = json.loads(first.output)
+        assert document["manifest_version"] == "capabilities.v1"
+        names = {command["name"] for command in document["commands"]}
+        assert "accounts list" in names
+        assert "transactions tags add" in names
+        assert "capabilities" in names
+        for group in COMMAND_GROUPS:
+            assert any(name == group or name.startswith(f"{group} ") for name in names)
+
+    def test_manifest_does_not_require_a_client(self) -> None:
+        with patch(
+            "monarch_cli.core.adapter.get_authenticated_client",
+            side_effect=AssertionError("capabilities must not create a client"),
+        ):
+            result, caught = invoke(["capabilities"])
+
+        assert result.exit_code == 0, result.output
+        assert_parsed_cleanly(result, caught)
+        assert json.loads(result.output)["manifest_version"] == "capabilities.v1"
+
+
 class TestDryRunPreviews:
     """Dry-run previews need no --allow-mutations and accept --yes as a no-op."""
 

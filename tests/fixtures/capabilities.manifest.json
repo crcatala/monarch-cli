@@ -1,0 +1,3747 @@
+{
+  "cli": {
+    "command": "monarch",
+    "name": "monarch-cli",
+    "version": "0.1.0"
+  },
+  "commands": [
+    {
+      "arguments": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "account_id"
+          ],
+          "kind": "argument",
+          "name": "account_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts history",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "history"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts list",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--ndjson"
+          ],
+          "kind": "option",
+          "name": "ndjson",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": true,
+        "quiet": true,
+        "raw": true,
+        "schemas": [
+          "urn:monarch-cli:schema:account:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts recent-balances",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "recent-balances"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "accounts refresh",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-a",
+            "--account"
+          ],
+          "kind": "option",
+          "name": "account",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "refresh"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts refresh-status",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-a",
+            "--account"
+          ],
+          "kind": "option",
+          "name": "account",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "refresh-status"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts snapshots",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-t",
+            "--account-type"
+          ],
+          "kind": "option",
+          "name": "account_type",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-e",
+            "--end"
+          ],
+          "kind": "option",
+          "name": "end",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "snapshots"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts snapshots-by-type",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "month",
+            "year"
+          ],
+          "default": null,
+          "flags": [
+            "--timeframe"
+          ],
+          "kind": "option",
+          "name": "timeframe",
+          "repeatable": false,
+          "required": true,
+          "type": "enum"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "snapshots-by-type"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "accounts types",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "accounts",
+        "types"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "auth doctor",
+      "options": [],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": false
+      },
+      "path": [
+        "auth",
+        "doctor"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "local_credential_change",
+        "remote_authentication"
+      ],
+      "name": "auth login",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--storage"
+          ],
+          "kind": "option",
+          "name": "storage",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": false
+      },
+      "path": [
+        "auth",
+        "login"
+      ],
+      "safety": {
+        "interactive": true,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "local_credential_change"
+      ],
+      "name": "auth logout",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--storage"
+          ],
+          "kind": "option",
+          "name": "storage",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": false
+      },
+      "path": [
+        "auth",
+        "logout"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "auth ping",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "auth",
+        "ping"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "auth setup",
+      "options": [],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": false
+      },
+      "path": [
+        "auth",
+        "setup"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "auth status",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "auth",
+        "status"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "budgets list",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "budgets",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "budgets set",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--amount"
+          ],
+          "kind": "option",
+          "name": "amount",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--category-id"
+          ],
+          "kind": "option",
+          "name": "category_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "budgets",
+        "set"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "capabilities",
+      "options": [],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "capabilities"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "cashflow detail",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-e",
+            "--end"
+          ],
+          "kind": "option",
+          "name": "end",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [
+            "today",
+            "yesterday",
+            "this-week",
+            "last-week",
+            "this-month",
+            "last-month",
+            "last-30-days",
+            "last-90-days",
+            "this-year",
+            "last-year",
+            "ytd",
+            "all"
+          ],
+          "default": null,
+          "flags": [
+            "-p",
+            "--preset"
+          ],
+          "kind": "option",
+          "name": "preset",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "cashflow",
+        "detail"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "cashflow summary",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-e",
+            "--end"
+          ],
+          "kind": "option",
+          "name": "end",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [
+            "today",
+            "yesterday",
+            "this-week",
+            "last-week",
+            "this-month",
+            "last-month",
+            "last-30-days",
+            "last-90-days",
+            "this-year",
+            "last-year",
+            "ytd",
+            "all"
+          ],
+          "default": null,
+          "flags": [
+            "-p",
+            "--preset"
+          ],
+          "kind": "option",
+          "name": "preset",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "cashflow",
+        "summary"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "categories list",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "categories",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "institutions list",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--include-deleted"
+          ],
+          "kind": "option",
+          "name": "include_deleted",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "institutions",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "investments holdings",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-a",
+            "--account"
+          ],
+          "kind": "option",
+          "name": "account",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--aggregate"
+          ],
+          "kind": "option",
+          "name": "aggregate",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--include-hidden"
+          ],
+          "kind": "option",
+          "name": "include_hidden",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "investments",
+        "holdings"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "subscription show",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "subscription",
+        "show"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions attachments add",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--file"
+          ],
+          "kind": "option",
+          "name": "file",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--filename"
+          ],
+          "kind": "option",
+          "name": "filename",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "attachments",
+        "add"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions batch-update",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-c",
+            "--category"
+          ],
+          "kind": "option",
+          "name": "category",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": 4,
+          "flags": [
+            "--max-concurrency"
+          ],
+          "kind": "option",
+          "name": "max_concurrency",
+          "repeatable": false,
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-n",
+            "--notes"
+          ],
+          "kind": "option",
+          "name": "notes",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--stdin"
+          ],
+          "kind": "option",
+          "name": "stdin",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "batch-update"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions create",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--account-id"
+          ],
+          "kind": "option",
+          "name": "account_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--amount"
+          ],
+          "kind": "option",
+          "name": "amount",
+          "repeatable": false,
+          "required": true,
+          "type": "number"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--category-id"
+          ],
+          "kind": "option",
+          "name": "category_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--date"
+          ],
+          "kind": "option",
+          "name": "date_value",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--merchant"
+          ],
+          "kind": "option",
+          "name": "merchant",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": "",
+          "flags": [
+            "--notes"
+          ],
+          "kind": "option",
+          "name": "notes",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "create"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions delete",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "delete"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": true,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "transaction_id"
+          ],
+          "kind": "argument",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions get",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--strict"
+          ],
+          "kind": "option",
+          "name": "strict",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [
+          "urn:monarch-cli:schema:transaction-detail:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "get"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions list",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-a",
+            "--account"
+          ],
+          "kind": "option",
+          "name": "account",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-c",
+            "--category"
+          ],
+          "kind": "option",
+          "name": "category",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-e",
+            "--end"
+          ],
+          "kind": "option",
+          "name": "end",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--has-attachments",
+            "--no-has-attachments"
+          ],
+          "kind": "option",
+          "name": "has_attachments",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--has-notes",
+            "--no-has-notes"
+          ],
+          "kind": "option",
+          "name": "has_notes",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--hidden-from-reports",
+            "--no-hidden-from-reports"
+          ],
+          "kind": "option",
+          "name": "hidden_from_reports",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--imported-from-mint",
+            "--no-imported-from-mint"
+          ],
+          "kind": "option",
+          "name": "imported_from_mint",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--pending",
+            "--no-pending"
+          ],
+          "kind": "option",
+          "name": "is_pending",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--recurring",
+            "--no-recurring"
+          ],
+          "kind": "option",
+          "name": "is_recurring",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--split",
+            "--no-split"
+          ],
+          "kind": "option",
+          "name": "is_split",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": 100,
+          "flags": [
+            "-l",
+            "--limit"
+          ],
+          "kind": "option",
+          "name": "limit",
+          "repeatable": false,
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--ndjson"
+          ],
+          "kind": "option",
+          "name": "ndjson",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--needs-review",
+            "--no-needs-review"
+          ],
+          "kind": "option",
+          "name": "needs_review",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": 0,
+          "flags": [
+            "-o",
+            "--offset"
+          ],
+          "kind": "option",
+          "name": "offset",
+          "repeatable": false,
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "choices": [
+            "today",
+            "yesterday",
+            "this-week",
+            "last-week",
+            "this-month",
+            "last-month",
+            "last-30-days",
+            "last-90-days",
+            "this-year",
+            "last-year",
+            "ytd",
+            "all"
+          ],
+          "default": null,
+          "flags": [
+            "-p",
+            "--preset"
+          ],
+          "kind": "option",
+          "name": "preset",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--search"
+          ],
+          "kind": "option",
+          "name": "search",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--synced-from-institution",
+            "--no-synced-from-institution"
+          ],
+          "kind": "option",
+          "name": "synced_from_institution",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-t",
+            "--tag"
+          ],
+          "kind": "option",
+          "name": "tag",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "hidden_transactions_only",
+            "all_transactions"
+          ],
+          "default": null,
+          "flags": [
+            "--visibility"
+          ],
+          "kind": "option",
+          "name": "visibility",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        }
+      ],
+      "output": {
+        "ndjson": true,
+        "quiet": true,
+        "raw": true,
+        "schemas": [
+          "urn:monarch-cli:schema:transaction:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions recurring",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-e",
+            "--end"
+          ],
+          "kind": "option",
+          "name": "end",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [
+            "today",
+            "yesterday",
+            "this-week",
+            "last-week",
+            "this-month",
+            "last-month",
+            "last-30-days",
+            "last-90-days",
+            "this-year",
+            "last-year",
+            "ytd",
+            "all"
+          ],
+          "default": null,
+          "flags": [
+            "-p",
+            "--preset"
+          ],
+          "kind": "option",
+          "name": "preset",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "-s",
+            "--start"
+          ],
+          "kind": "option",
+          "name": "start",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "recurring"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions review mark",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "review",
+        "mark"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions review return",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "review",
+        "return"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions splits clear",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "splits",
+        "clear"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": true,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions splits replace",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--splits-file"
+          ],
+          "kind": "option",
+          "name": "splits_file",
+          "repeatable": false,
+          "required": false,
+          "type": "path"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--splits-json"
+          ],
+          "kind": "option",
+          "name": "splits_json",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "splits",
+        "replace"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": true,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "transaction_id"
+          ],
+          "kind": "argument",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions splits show",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "splits",
+        "show"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions summary",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "summary"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions tags add",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--tag-id"
+          ],
+          "kind": "option",
+          "name": "tag_id",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--tag-name"
+          ],
+          "kind": "option",
+          "name": "tag_name",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "add"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions tags clear",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "clear"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": true,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions tags create",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--color"
+          ],
+          "kind": "option",
+          "name": "color",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--name"
+          ],
+          "kind": "option",
+          "name": "name",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "create"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions tags list",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "list"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions tags replace",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--tag-id"
+          ],
+          "kind": "option",
+          "name": "tag_id",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--tag-name"
+          ],
+          "kind": "option",
+          "name": "tag_name",
+          "repeatable": true,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "replace"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": true,
+        "supports_preview": true
+      }
+    },
+    {
+      "arguments": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "transaction_id"
+          ],
+          "kind": "argument",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "effects": [
+        "read_only"
+      ],
+      "name": "transactions tags show",
+      "options": [
+        {
+          "choices": [
+            "plain",
+            "json",
+            "table",
+            "csv",
+            "compact"
+          ],
+          "default": null,
+          "flags": [
+            "-f",
+            "--format"
+          ],
+          "kind": "option",
+          "name": "format",
+          "repeatable": false,
+          "required": false,
+          "type": "enum"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--json"
+          ],
+          "kind": "option",
+          "name": "json_output",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--raw"
+          ],
+          "kind": "option",
+          "name": "raw",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": true,
+        "raw": true,
+        "schemas": [],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "tags",
+        "show"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "remote_mutation"
+      ],
+      "name": "transactions update",
+      "options": [
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--amount"
+          ],
+          "kind": "option",
+          "name": "amount",
+          "repeatable": false,
+          "required": false,
+          "type": "number"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--category"
+          ],
+          "kind": "option",
+          "name": "category",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--date"
+          ],
+          "kind": "option",
+          "name": "date_value",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--description"
+          ],
+          "kind": "option",
+          "name": "description",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--dry-run"
+          ],
+          "kind": "option",
+          "name": "dry_run",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--notes"
+          ],
+          "kind": "option",
+          "name": "notes",
+          "repeatable": false,
+          "required": false,
+          "type": "string"
+        },
+        {
+          "choices": [],
+          "default": null,
+          "flags": [
+            "--transaction-id"
+          ],
+          "kind": "option",
+          "name": "transaction_id",
+          "repeatable": false,
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [
+          "urn:monarch-cli:schema:mutation-outcome:v1"
+        ],
+        "stable_normalized": true
+      },
+      "path": [
+        "transactions",
+        "update"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": true,
+        "requires_destructive_confirmation": false,
+        "supports_preview": true
+      }
+    }
+  ],
+  "global": {
+    "arguments": [],
+    "options": [
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--allow-mutations"
+        ],
+        "kind": "option",
+        "name": "allow_mutations",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--debug"
+        ],
+        "kind": "option",
+        "name": "debug",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": null,
+        "flags": [
+          "--install-completion"
+        ],
+        "kind": "option",
+        "name": "install_completion",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--json"
+        ],
+        "kind": "option",
+        "name": "json_output",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--no-color"
+        ],
+        "kind": "option",
+        "name": "no_color",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--non-interactive"
+        ],
+        "kind": "option",
+        "name": "non_interactive",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--quiet",
+          "-q"
+        ],
+        "kind": "option",
+        "name": "quiet",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": null,
+        "flags": [
+          "--show-completion"
+        ],
+        "kind": "option",
+        "name": "show_completion",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": null,
+        "flags": [
+          "--timeout"
+        ],
+        "kind": "option",
+        "name": "timeout",
+        "repeatable": false,
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--verbose",
+          "-V"
+        ],
+        "kind": "option",
+        "name": "verbose",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": null,
+        "flags": [
+          "--version",
+          "-v"
+        ],
+        "kind": "option",
+        "name": "version",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "choices": [],
+        "default": false,
+        "flags": [
+          "--yes"
+        ],
+        "kind": "option",
+        "name": "yes",
+        "repeatable": false,
+        "required": false,
+        "type": "boolean"
+      }
+    ]
+  },
+  "manifest_version": "capabilities.v1",
+  "operation_contracts": [
+    {
+      "effect_entities": [
+        "account"
+      ],
+      "operation": "accounts.refresh",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "budget"
+      ],
+      "operation": "budgets.set",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "account"
+      ],
+      "operation": "live-fixture.account.create",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "account"
+      ],
+      "operation": "live-fixture.account.delete",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "live-fixture.transaction.create",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "live-fixture.transaction.delete",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "attachment_media",
+        "attachment"
+      ],
+      "operation": "transactions.attachments.add",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.batch-update",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.create",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.delete",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.review.mark",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.review.return",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.splits.clear",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.splits.replace",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.tags.add",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.tags.clear",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "tag"
+      ],
+      "operation": "transactions.tags.create",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.tags.replace",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    {
+      "effect_entities": [
+        "transaction"
+      ],
+      "operation": "transactions.update",
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    }
+  ],
+  "output": {
+    "error_schema_urn": "urn:monarch-cli:schema:error:v1",
+    "formats": [
+      "json",
+      "table",
+      "csv",
+      "compact",
+      "plain"
+    ],
+    "mutation_outcomes": {
+      "format": "json",
+      "quiet_compatible": false,
+      "schema_urn": "urn:monarch-cli:schema:mutation-outcome:v1"
+    },
+    "quiet": {
+      "aliases": [
+        "-q"
+      ],
+      "behavior": "one ID per line",
+      "flag": "--quiet",
+      "mutation_outcomes_compatible": false
+    },
+    "raw": {
+      "note": "Raw passthrough preserves upstream shapes and is explicitly unschematized and unstable.",
+      "schema_urn": null,
+      "stable": false
+    }
+  },
+  "safety": {
+    "authorization": {
+      "applies_to": [
+        "remote_mutation"
+      ],
+      "config_key": null,
+      "env_var": null,
+      "flag": "--allow-mutations",
+      "grants": "remote mutations for this invocation only",
+      "placement": "before the command path"
+    },
+    "destructive_confirmation": {
+      "authorizes_mutation": false,
+      "config_key": "confirm_destructive",
+      "flag": "--yes"
+    },
+    "non_interactive": {
+      "auto_answers_confirmation": false,
+      "config_key": "non_interactive",
+      "env_var": "MONARCH_NON_INTERACTIVE",
+      "flag": "--non-interactive"
+    },
+    "read_only_by_default": true
+  },
+  "schema_contracts": [
+    {
+      "contract": "account",
+      "urn": "urn:monarch-cli:schema:account:v1",
+      "version": "v1"
+    },
+    {
+      "contract": "error",
+      "urn": "urn:monarch-cli:schema:error:v1",
+      "version": "v1"
+    },
+    {
+      "contract": "mutation-outcome",
+      "urn": "urn:monarch-cli:schema:mutation-outcome:v1",
+      "version": "v1"
+    },
+    {
+      "contract": "transaction",
+      "urn": "urn:monarch-cli:schema:transaction:v1",
+      "version": "v1"
+    },
+    {
+      "contract": "transaction-detail",
+      "urn": "urn:monarch-cli:schema:transaction-detail:v1",
+      "version": "v1"
+    }
+  ],
+  "taxonomy": {
+    "effects": [
+      "local_credential_change",
+      "preview",
+      "read_only",
+      "remote_authentication",
+      "remote_mutation"
+    ],
+    "safety_flags": [
+      "requires_authorization",
+      "requires_destructive_confirmation",
+      "interactive",
+      "supports_preview"
+    ]
+  },
+  "taxonomy_version": "capabilities-taxonomy.v1"
+}

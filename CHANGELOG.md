@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Deterministic CLI capabilities manifest (mc-82kf)
+- Added side-effect-free `monarch capabilities`, which prints one versioned JSON manifest (`capabilities.v1`) describing every command path, argument, option, required input, default, output support, safety requirement, interactivity, and published contract version
+- Command effects, safety policy, interactivity, preview support, and output support are declared as explicit shared metadata; framework introspection discovers syntax only and never determines safety or output behavior
+- Stable schema identifiers and contract versions are consumed from the `mc-cpzi` mapping rather than duplicated; raw passthrough is marked explicitly unstable and unschematized
+- Generation performs no authentication lookup, client construction, network request, prompt, or config/session creation or write
+- A canonical fixture test pins manifest shape, ordering, and byte-for-byte serialization; completeness tests fail when a registered command is missing metadata, metadata disagrees with the shared execution policy, a schema reference is unknown, or the inventory is empty or partial
+- Documented discovery, versioning, stability, and raw-output caveats in `docs/capabilities.md`
+
 #### Published machine-readable output schemas (mc-cpzi)
 - Published checked-in JSON Schema Draft 2020-12 artifacts for normalized account, transaction (list), transaction detail, structured error, and `mutation-outcome.v1`; each carries a stable versioned URN `$id` (for example `urn:monarch-cli:schema:account:v1`) and ships as a package resource in the wheel and sdist
 - Added the `monarch_cli.schemas` module-level mapping resolving contract name/version and URN to the packaged artifact, plus the shared operation/effect-entity mapping (`transactions.attachments.add` uses `attachment_media` and `attachment`)

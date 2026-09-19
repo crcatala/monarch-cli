@@ -22,6 +22,8 @@ net worth.
   institutions, subscriptions, categories, and balance history
 - Guarded transaction, tag, split, and account-refresh mutations with dry-run
   previews and structured mutation outcomes
+- Side-effect-free `monarch capabilities` manifest for agent/integration
+  discovery of commands, options, safety policy, and contract versions
 
 ## Installation
 
@@ -250,6 +252,10 @@ shortcut. `--ndjson` is available on account and transaction list commands.
 field guarantees, and scripting behavior, and
 [Machine-readable output schemas](docs/schema-contracts.md) for the published
 JSON Schema contracts, stable URNs, validation, and compatibility policy.
+
+Run `monarch capabilities` for a versioned JSON manifest of the installed CLI
+(commands, options, safety policy, and contract versions). See
+[Capabilities manifest](docs/capabilities.md).
 
 ## Configuration and authentication
 
