@@ -544,6 +544,10 @@ def refresh(
 ) -> None:
     """Request account refresh from linked institutions.
 
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path (for example:
+    monarch --allow-mutations accounts refresh -a ACC123).
+
     Triggers a sync with your linked banks and financial institutions.
     By default, refreshes all accounts. Use --account to refresh specific ones.
 

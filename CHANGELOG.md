@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### CLI help polish
+- Every remote-mutation command's help documents that the global `--allow-mutations` option is required and must be placed before the command path, and documents `--dry-run` where supported (mc-4z49)
+- Root/group/representative-command help reviewed for concise descriptions and examples; a help-contract test driven by the mutation inventory enforces the guidance for current and future mutations
+
 #### Liability and Debt-Service Account Metadata
 - **Direct asset/liability classification** - `is_asset` mirrors the upstream `isAsset` flag; unavailable classifications stay `null` and liability is never inferred from display labels
 - **Liability metadata in `monarch accounts list`** - Distinct nullable `credit_limit`, `provider_credit_limit`, `apr`, `interest_rate`, `minimum_payment`, `planned_payment`, and `excluded_from_debt_paydown` fields; provider and user-facing values never merge; missing values stay `null`, never fabricated zeroes

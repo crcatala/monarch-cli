@@ -472,7 +472,13 @@ def replace_splits(
         typer.Option("--dry-run", help="Preview the intended split set without writing"),
     ] = False,
 ) -> None:
-    """Replace every split using one bounded JSON source."""
+    """Replace every split using one bounded JSON source.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Exactly one of --splits-json or --splits-file is
+    required; amounts are validated against the current parent amount. Use
+    --dry-run to preview the intended split set without writing.
+    """
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     requested = _validate_splits(_load_source(splits_json, splits_file))
@@ -603,7 +609,11 @@ def clear_splits(
         typer.Option("--dry-run", help="Preview the clear without writing"),
     ] = False,
 ) -> None:
-    """Explicitly clear every split by sending the canonical empty list."""
+    """Explicitly clear every split by sending the canonical empty list.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Use --dry-run to preview the clear without writing.
+    """
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     operation = Operation(command="transactions splits clear", effects=MUTATION_EFFECTS)
