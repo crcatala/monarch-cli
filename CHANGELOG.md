@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A pre-read (no pending redirect) verifies exact identity and returns a deterministic no-op when the requested state is already observed; a post-read confirms the intended review state and that category and merchant identity were unchanged
 - Successful output reports observed `needs_review`, `reviewed_at`, and `reviewed_by_user` and never invents a `reviewed` boolean; uncertain writes use the retry-safe mutation executor and report ambiguity (exit 4) with a tokenized `monarch transactions get TXN_ID` verification command
 
+#### Manual transaction create and delete
+- Added `transactions create` and `transactions delete` (mc-yqfi): a minimal single-transaction lifecycle built on the shared mutation policy, retry-safe executor, and `mutation-outcome.v1` contract
+- `transactions create` requires `--date`, `--account-id`, `--amount`, `--merchant`, and `--category-id` (optional `--notes`); `transactions delete` requires `--transaction-id`; neither accepts positional targets
+- Local validation (empty IDs/merchant, invalid date, non-finite amount, malformed combinations) completes before authentication, authorization, or any API call; both commands are classified `remote_mutation` and require global `--allow-mutations`
+- `--dry-run` for both commands is local-only: no authentication, client, or network call, and it reports the planned target/input without claiming a remote effect
+- Create uses the released public `create_transaction` capability, makes one attempt, extracts the returned ID, and performs a bounded non-redirecting exact-ID readback that verifies date, amount, account, category, merchant, and notes where exposed; a missing/malformed ID, timeout, disconnect, or mismatch is ambiguous (exit 4) with verification guidance and is never retried
+- Delete is single-target only, requires destructive confirmation (`--yes` bypasses the prompt but never authorizes), reads the exact target first, makes one attempt, and verifies absence; a lost or contradictory result is ambiguous rather than a claimed deletion
+- Neither command claims idempotency or recoverability, and the first version deliberately excludes tags, dedupe/upsert, duplicate detection, batch operations, `--update-balance`, attachments, and account/category management
+
 #### Account history and refresh visibility
 - Added `accounts history`, `recent-balances`, `snapshots`, and `snapshots-by-type` for normalized balance and net-worth history
 - Added read-only `accounts refresh-status`, including explicit unknown-account results rather than treating them as complete

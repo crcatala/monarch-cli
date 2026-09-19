@@ -323,6 +323,8 @@ class TestRetryClassifications:
             "accounts refresh",
             "transactions update",
             "transactions batch-update",
+            "transactions create",
+            "transactions delete",
             "transactions tags create",
             "transactions tags replace",
             "transactions tags clear",

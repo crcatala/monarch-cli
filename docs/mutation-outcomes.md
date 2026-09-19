@@ -17,6 +17,8 @@ execution is attempted**:
 - `accounts refresh`
 - `transactions update`
 - `transactions batch-update` (one item per requested transaction)
+- `transactions create`
+- `transactions delete`
 - `transactions tags create`
 - `transactions tags replace`
 - `transactions tags add`
@@ -56,16 +58,18 @@ a preview carries `status: "dry_run"` and is explicitly distinct from
 
 ## Dry-run previews
 
-`transactions update`, `transactions batch-update`, `transactions tags
+`transactions update`, `transactions batch-update`, `transactions
+create`, `transactions delete`, `transactions tags
 replace`/`add`/`clear`, `transactions splits replace`/`clear`,
 `transactions attachments add`, and `transactions review mark`/`return` accept
 `--dry-run`. A preview may authenticate
 and perform read-only validation/discovery (including reading the current
 assignment or a split parent amount) but **never calls a mutation endpoint,
 never requires `--allow-mutations`, and never prompts for confirmation**.
-`--dry-run --yes` is accepted and documented as irrelevant. The attachment
-preview is stricter: it validates local file metadata only and performs no
-authentication lookup or network call at all.
+`--dry-run --yes` is accepted and documented as irrelevant. The attachment,
+transaction create, and transaction delete previews are stricter: they perform
+local validation only and make no authentication lookup or network call at all
+(the attachment preview also reads local file metadata).
 
 A preview result is a JSON object with:
 

@@ -194,6 +194,17 @@ monarch --allow-mutations transactions review mark \
   --transaction-id TXN_ID
 monarch --allow-mutations transactions review return \
   --transaction-id TXN_ID
+
+# Create or delete one manual transaction (create is not idempotent;
+# delete is destructive and prompts unless --yes is given)
+monarch --allow-mutations transactions create \
+  --date 2026-01-15 \
+  --account-id ACC_ID \
+  --amount 12.34 \
+  --merchant "Coffee Shop" \
+  --category-id CAT_ID
+monarch --allow-mutations --yes transactions delete \
+  --transaction-id TXN_ID
 ```
 
 `--yes` skips a destructive confirmation; it never authorizes a write.

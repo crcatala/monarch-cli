@@ -553,6 +553,73 @@ monarch --allow-mutations transactions batch-update \
   --max-concurrency 8
 ```
 
+### `transactions create`
+
+Creates one manual transaction. This is a remote mutation and requires the
+global `--allow-mutations` option before the command path.
+
+Required options:
+
+- `--date YYYY-MM-DD`
+- `--account-id ACCOUNT_ID`
+- `--amount AMOUNT` — finite number
+- `--merchant MERCHANT` — non-empty after trimming
+- `--category-id CATEGORY_ID`
+
+Other options:
+
+- `--notes TEXT`
+- `--dry-run`
+
+Create is not idempotent. After the write, the CLI reads the returned
+transaction ID back without a pending-ID redirect and verifies the requested
+date, amount, account, category, merchant, and notes where the released detail
+response exposes them. A missing ID, lost response, or verification mismatch is
+reported as `ambiguous` (exit `4`) with verification guidance and is never
+retried automatically. This version does not expose tags, dedupe/upsert,
+duplicate detection, batch operations, `--update-balance`, attachments, or
+account/category management.
+
+```bash
+monarch --allow-mutations transactions create \
+  --date 2026-01-15 \
+  --account-id ACC_ID \
+  --amount 12.34 \
+  --merchant "Coffee Shop" \
+  --category-id CAT_ID
+
+monarch transactions create \
+  --date 2026-01-15 \
+  --account-id ACC_ID \
+  --amount 12.34 \
+  --merchant "Coffee Shop" \
+  --category-id CAT_ID \
+  --dry-run
+```
+
+### `transactions delete`
+
+Deletes one manual transaction. This is a remote mutation and requires the
+global `--allow-mutations` option before the command path. The target is a
+required `--transaction-id` option; bulk IDs are never accepted.
+
+Options:
+
+- Required `--transaction-id TXN_ID`
+- `--dry-run`
+
+Delete is destructive and prompts for confirmation unless `--yes` is given
+after `--allow-mutations`; `--yes` never authorizes the write. The CLI reads
+the exact target before deletion and verifies absence afterwards where the
+released read capability supports it. Delete is not recoverable, so a lost or
+contradictory result is reported as `ambiguous` (exit `4`), never as a claimed
+deletion.
+
+```bash
+monarch --allow-mutations --yes transactions delete --transaction-id TXN_ID
+monarch transactions delete --transaction-id TXN_ID --dry-run
+```
+
 ## Transaction splits
 
 ### `transactions splits show TXN_ID`
@@ -825,6 +892,8 @@ Remote mutations are:
 - `accounts refresh`
 - `transactions update`
 - `transactions batch-update`
+- `transactions create`
+- `transactions delete`
 - `transactions tags create`, `replace`, `add`, and `clear`
 - `transactions splits replace` and `clear`
 - `transactions attachments add`

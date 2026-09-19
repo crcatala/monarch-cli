@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import math
 import sys
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -14,12 +15,18 @@ from ..core.adapter import get_authenticated_client
 from ..core.async_utils import run_async
 from ..core.dates import DatePreset, parse_date_range, parse_iso_date, validate_date_ordering
 from ..core.error_handler import handle_errors
-from ..core.exceptions import MutationAmbiguousError, ValidationError
+from ..core.exceptions import (
+    APIError,
+    MutationAmbiguousError,
+    NotFoundError,
+    ValidationError,
+)
 from ..core.mutation_outcomes import (
     ambiguous_item,
     build_mutation_outcome,
     error_from_exception,
     failed_item,
+    outcome_operation,
     succeeded_item,
     verification_object,
 )
@@ -41,6 +48,15 @@ from ..transformers.transaction_aggregates import (
 )
 from ..transformers.transactions import transform_transaction_detail, transform_transactions
 from . import transaction_attachments, transaction_review, transaction_splits, transaction_tags
+from .mutation_helpers import (
+    as_object as _as_object,
+)
+from .mutation_helpers import (
+    confirm_destructive,
+)
+from .mutation_helpers import (
+    payload_error_details as _payload_error_details,
+)
 
 app = typer.Typer(
     help="Transaction management",
@@ -1104,5 +1120,560 @@ def batch_update(
                 BATCH_VERIFICATION_MESSAGE,
                 command=UPDATE_VERIFICATION_COMMAND,
             ),
+        )
+    )
+
+
+# --- Manual transaction create/delete (mc-yqfi) -----------------------------
+#
+# A minimal, explicit lifecycle for one manual transaction. Create uses the
+# released public ``create_transaction`` capability and performs a bounded
+# exact-ID readback; delete is single-target only and verifies absence when
+# the released read capability supports it. Neither command claims
+# idempotency or recoverability: an uncertain create/delete is reported as
+# ambiguous with safe verification guidance, never retried blindly.
+
+CREATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
+DELETE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
+
+#: Tokenized safe verification commands for the create/delete lifecycle.
+CREATE_VERIFICATION_COMMAND: list[str] = ["monarch", "transactions", "list"]
+DELETE_VERIFICATION_COMMAND: list[str] = ["monarch", "transactions", "get"]
+CREATE_VERIFICATION_MESSAGE = (
+    "A create can succeed even when its response is lost. Do not retry "
+    "blindly: verify whether the transaction now exists (for example "
+    "'monarch transactions list --search MERCHANT' or the Monarch web UI) "
+    "before creating it again."
+)
+DELETE_VERIFICATION_MESSAGE = (
+    "Verify whether the transaction still exists with 'monarch transactions "
+    "get TRANSACTION_ID' (a not-found result confirms deletion) before "
+    "retrying."
+)
+
+
+def _validate_required_id(value: str, option: str) -> None:
+    """Reject an empty (or whitespace-only) required opaque ID."""
+    if not value.strip():
+        raise ValidationError(f"--{option} must be a non-empty ID.", field=option.replace("-", "_"))
+
+
+def _fetch_exact_detail(client: Any, transaction_id: str, command: str) -> Mapping[str, Any] | None:
+    """Read one transaction detail without a pending-ID redirect.
+
+    Returns the exact detail object, or ``None`` when the service reports no
+    such transaction. The read is observational: it happens through the read
+    executor, never the mutation executor.
+    """
+    payload = run_read_call(
+        lambda: client.get_transaction_details(
+            transaction_id=transaction_id, redirect_posted=False
+        ),
+        Operation(command=command, effects=GET_EFFECTS),
+    )
+    response = _as_object(payload, "transaction detail")
+    detail = response.get("getTransaction")
+    if detail is None:
+        return None
+    return _as_object(detail, "transaction detail")
+
+
+def _created_transaction_id(payload: Any) -> str:
+    """Extract the created transaction ID from a create response.
+
+    A definite payload rejection raises :class:`APIError` (a definitive
+    failure). A response whose outcome cannot be resolved to an identity
+    raises :class:`MutationAmbiguousError`: the request was already
+    dispatched and may have created the transaction, so a missing ID or a
+    malformed response is never reported as an ordinary failure.
+    """
+    if not isinstance(payload, Mapping):
+        raise MutationAmbiguousError(
+            "The create returned a malformed response; remote state is unknown.",
+            details={"reason": "malformed_response", "field": "createTransaction"},
+        )
+    if payload.get("errors"):
+        raise APIError(
+            message="The transaction create was rejected by the service.",
+            details={"payload_errors": _payload_error_details(payload["errors"])},
+        )
+    container = payload.get("createTransaction")
+    if not isinstance(container, Mapping):
+        raise MutationAmbiguousError(
+            "The create returned an incomplete response; remote state is unknown.",
+            details={"reason": "malformed_response", "field": "createTransaction"},
+        )
+    errors = container.get("errors")
+    if errors:
+        raise APIError(
+            message="The transaction create was rejected by the service.",
+            details={"payload_errors": _payload_error_details(errors)},
+        )
+    transaction = container.get("transaction")
+    transaction_id = transaction.get("id") if isinstance(transaction, Mapping) else None
+    if not isinstance(transaction_id, str) or not transaction_id.strip():
+        raise MutationAmbiguousError(
+            "The create response did not include a transaction ID; the "
+            "transaction may still have been created.",
+            details={
+                "reason": "missing_identity",
+                "field": "createTransaction.transaction.id",
+            },
+        )
+    return transaction_id
+
+
+def _mapping_id(value: Any) -> str | None:
+    return value.get("id") if isinstance(value, Mapping) else None
+
+
+def _merchant_name(value: Any) -> str | None:
+    return value.get("name") if isinstance(value, Mapping) else None
+
+
+def _created_result(transaction_id: str, detail: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalized observed identity/fields for a verified create."""
+    return {
+        "transaction_id": transaction_id,
+        "date": detail.get("date"),
+        "amount": detail.get("amount"),
+        "account_id": _mapping_id(detail.get("account")),
+        "category_id": _mapping_id(detail.get("category")),
+        "merchant": _merchant_name(detail.get("merchant")),
+        "notes": detail.get("notes"),
+    }
+
+
+def _create_mismatch(
+    detail: Mapping[str, Any], normalized: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Compare a readback detail against the requested create input.
+
+    Only fields the released detail response exposes are compared. A
+    requested empty note is satisfied by an absent or empty observed note.
+    """
+    mismatched: list[str] = []
+    if detail.get("date") != normalized["date"]:
+        mismatched.append("date")
+    observed_amount = detail.get("amount")
+    amount_matches = False
+    if isinstance(observed_amount, (int, float)) and not isinstance(observed_amount, bool):
+        amount_matches = round(float(observed_amount), 2) == round(float(normalized["amount"]), 2)
+    if not amount_matches:
+        mismatched.append("amount")
+    if _mapping_id(detail.get("account")) != normalized["account_id"]:
+        mismatched.append("account_id")
+    if _mapping_id(detail.get("category")) != normalized["category_id"]:
+        mismatched.append("category_id")
+    if _merchant_name(detail.get("merchant")) != normalized["merchant"]:
+        mismatched.append("merchant")
+    observed_notes = detail.get("notes")
+    if normalized["notes"]:
+        if observed_notes != normalized["notes"]:
+            mismatched.append("notes")
+    elif observed_notes not in (None, ""):
+        mismatched.append("notes")
+    if not mismatched:
+        return None
+    return {
+        "mismatched_fields": mismatched,
+        "observed": _created_result(normalized["transaction_id"], detail),
+    }
+
+
+@app.command("create", context_settings={"allow_extra_args": True})
+@handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
+def create_transaction(
+    ctx: typer.Context,
+    date_value: Annotated[str, typer.Option("--date", help="Transaction date (YYYY-MM-DD)")],
+    account_id: Annotated[str, typer.Option("--account-id", help="Account ID")],
+    amount: Annotated[float, typer.Option("--amount", help="Transaction amount")],
+    merchant: Annotated[str, typer.Option("--merchant", help="Merchant/description name")],
+    category_id: Annotated[str, typer.Option("--category-id", help="Category ID")],
+    notes: Annotated[str, typer.Option("--notes", help="Optional transaction notes")] = "",
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Validate the input without creating anything"),
+    ] = False,
+) -> None:
+    """Create one manual transaction.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Required: --date, --account-id, --amount,
+    --merchant, and --category-id; --notes is optional. This version does not
+    expose tags, dedupe/upsert, duplicate detection, batch operations,
+    --update-balance, attachments, or account/category management. Create is
+    not idempotent: if the response is lost, verify before retrying. Use
+    --dry-run to validate the input without authenticating or writing.
+
+    Examples:
+        monarch --allow-mutations transactions create \\
+            --date 2026-01-15 --account-id ACC1 --amount 12.34 \\
+            --merchant "Coffee Shop" --category-id CAT1
+        monarch transactions create --date 2026-01-15 --account-id ACC1 \\
+            --amount 12.34 --merchant "Coffee Shop" --category-id CAT1 --dry-run
+    """
+    _reject_positional_targets(ctx.args)
+    parsed_date = parse_iso_date(date_value, field="date")
+    assert parsed_date is not None
+    _validate_required_id(account_id, "account-id")
+    _validate_required_id(category_id, "category-id")
+    if not math.isfinite(amount):
+        raise ValidationError(
+            "Amount must be a finite number.",
+            field="amount",
+            details={"received": str(amount)},
+        )
+    merchant_name = merchant.strip()
+    if not merchant_name:
+        raise ValidationError("Merchant must be non-empty after trimming.", field="merchant")
+
+    normalized: dict[str, Any] = {
+        "date": parsed_date.isoformat(),
+        "account_id": account_id,
+        "amount": amount,
+        "merchant": merchant_name,
+        "category_id": category_id,
+        "notes": notes,
+    }
+
+    operation = resolve_invocation("transactions create", CREATE_EFFECTS, dry_run=dry_run)
+    if dry_run:
+        emit_mutation_outcome(
+            {
+                "status": "dry_run",
+                "operation": outcome_operation("transactions create"),
+                "target": {"account_id": account_id, "date": normalized["date"]},
+                "detail": {
+                    "amount": amount,
+                    "merchant": merchant_name,
+                    "category_id": category_id,
+                    "notes": notes,
+                },
+            }
+        )
+        return
+
+    validate_mutation_output()
+    require_mutation_authorization(operation)
+    client = get_authenticated_client()
+
+    with spinner("Creating transaction..."):
+        try:
+            payload = run_mutation_call(
+                lambda: client.create_transaction(
+                    date=normalized["date"],
+                    account_id=account_id,
+                    amount=amount,
+                    merchant_name=merchant_name,
+                    category_id=category_id,
+                    notes=notes,
+                ),
+                operation,
+                verification=CREATE_VERIFICATION_MESSAGE,
+            )
+            transaction_id = _created_transaction_id(payload)
+        except typer.Exit:
+            raise
+        except MutationAmbiguousError as exc:
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        ambiguous_item(
+                            "transaction",
+                            "unknown",
+                            exc.message,
+                            {
+                                "remote_state": "unknown",
+                                "reason": exc.details.get("reason"),
+                            },
+                        )
+                    ],
+                    verification=verification_object(
+                        CREATE_VERIFICATION_MESSAGE, command=CREATE_VERIFICATION_COMMAND
+                    ),
+                )
+            )
+            return
+        except Exception as exc:
+            error = error_from_exception(exc)
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        failed_item(
+                            "transaction",
+                            "unknown",
+                            error["code"],
+                            error["message"],
+                            error["details"],
+                        )
+                    ],
+                )
+            )
+            return
+
+    # Bounded exact-ID readback. A missing ID, malformed response, timeout,
+    # disconnect, or verification mismatch is never reported as success.
+    try:
+        detail = _fetch_exact_detail(client, transaction_id, "transactions create verify")
+    except typer.Exit:
+        raise
+    except Exception:  # noqa: BLE001 - a dispatched create with no readback is ambiguous
+        _emit_create_ambiguous(
+            operation.command,
+            transaction_id,
+            "The transaction was created remotely but could not be verified; "
+            "remote state is unknown.",
+            {"reason": "verification_unavailable", "remote_state": "unknown"},
+        )
+        return
+
+    if detail is None or detail.get("id") != transaction_id:
+        _emit_create_ambiguous(
+            operation.command,
+            transaction_id,
+            "The created transaction could not be read back by its exact ID; "
+            "remote state is unknown.",
+            {
+                "reason": "verification_mismatch",
+                "observed_transaction_id": detail.get("id") if detail is not None else None,
+                "remote_state": "unknown",
+            },
+        )
+        return
+
+    normalized["transaction_id"] = transaction_id
+    mismatch = _create_mismatch(detail, normalized)
+    if mismatch is not None:
+        _emit_create_ambiguous(
+            operation.command,
+            transaction_id,
+            "The created transaction could not be verified as requested; remote state is unknown.",
+            {"reason": "verification_mismatch", "remote_state": "unknown", **mismatch},
+        )
+        return
+
+    result = _created_result(transaction_id, detail)
+    _finish_mutation(
+        build_mutation_outcome(
+            operation.command,
+            [succeeded_item("transaction", transaction_id, result)],
+        )
+    )
+
+
+def _emit_create_ambiguous(
+    command: str,
+    transaction_id: str,
+    message: str,
+    details: dict[str, Any],
+) -> None:
+    _finish_mutation(
+        build_mutation_outcome(
+            command,
+            [ambiguous_item("transaction", transaction_id, message, details)],
+            verification=verification_object(
+                CREATE_VERIFICATION_MESSAGE,
+                command=[*CREATE_VERIFICATION_COMMAND, transaction_id],
+            ),
+        )
+    )
+
+
+@app.command("delete", context_settings={"allow_extra_args": True})
+@handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
+def delete_transaction(
+    ctx: typer.Context,
+    transaction_id: Annotated[
+        str,
+        typer.Option("--transaction-id", help="Transaction ID to delete"),
+    ],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Validate the target without deleting anything"),
+    ] = False,
+) -> None:
+    """Delete one manual transaction.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. The target is a required --transaction-id option
+    and is single-target only; bulk IDs are never accepted. Destructive:
+    prompts unless --yes is given after --allow-mutations; --yes never
+    authorizes the write. Delete is not recoverable, and an uncertain result
+    is reported as ambiguous rather than a claimed deletion. Use --dry-run to
+    validate the target without authenticating or writing.
+
+    Examples:
+        monarch --allow-mutations --yes transactions delete --transaction-id TXN123
+        monarch transactions delete --transaction-id TXN123 --dry-run
+    """
+    _reject_positional_targets(ctx.args)
+    _validate_transaction_id(transaction_id)
+
+    operation = resolve_invocation("transactions delete", DELETE_EFFECTS, dry_run=dry_run)
+    if dry_run:
+        emit_mutation_outcome(
+            {
+                "status": "dry_run",
+                "operation": outcome_operation("transactions delete"),
+                "target": {"transaction_id": transaction_id},
+                "detail": {"action": "delete", "destructive": True},
+            }
+        )
+        return
+
+    validate_mutation_output()
+    require_mutation_authorization(operation)
+    client = get_authenticated_client()
+
+    # Read the exact target before deletion so a missing or mismatched target
+    # is a deterministic pre-mutation error, never a claimed deletion. A read
+    # failure here happens before any mutation was dispatched, so it stays on
+    # the structured error path rather than the mutation-outcome contract.
+    before = _fetch_exact_detail(client, transaction_id, "transactions delete verify")
+    if before is None:
+        raise NotFoundError(
+            message="Transaction not found.",
+            resource_type="transaction",
+            resource_id=transaction_id,
+        )
+    if before.get("id") != transaction_id:
+        raise APIError(
+            message=(
+                "The requested transaction ID did not match the returned "
+                "transaction; refusing to delete without exact target identity."
+            ),
+            details={"reason": "target_identity_mismatch", "requested_id": transaction_id},
+        )
+
+    confirm_destructive(
+        f"Permanently delete transaction {transaction_id}?", operation=operation.command
+    )
+
+    with spinner("Deleting transaction..."):
+        try:
+            deleted = run_mutation_call(
+                lambda: client.delete_transaction(transaction_id),
+                operation,
+                entity_ids=(transaction_id,),
+                verification=DELETE_VERIFICATION_MESSAGE,
+            )
+        except typer.Exit:
+            raise
+        except MutationAmbiguousError as exc:
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        ambiguous_item(
+                            "transaction",
+                            transaction_id,
+                            exc.message,
+                            {
+                                "remote_state": "unknown",
+                                "reason": exc.details.get("reason"),
+                            },
+                        )
+                    ],
+                    verification=verification_object(
+                        DELETE_VERIFICATION_MESSAGE,
+                        command=[*DELETE_VERIFICATION_COMMAND, transaction_id],
+                    ),
+                )
+            )
+            return
+        except Exception as exc:
+            error = error_from_exception(exc)
+            _finish_mutation(
+                build_mutation_outcome(
+                    operation.command,
+                    [
+                        failed_item(
+                            "transaction",
+                            transaction_id,
+                            error["code"],
+                            error["message"],
+                            error["details"],
+                        )
+                    ],
+                )
+            )
+            return
+
+    if not deleted:
+        # Defensive: the released client reports a rejected delete by raising,
+        # but a falsy result is a definitive non-success, never a deletion.
+        _finish_mutation(
+            build_mutation_outcome(
+                operation.command,
+                [
+                    failed_item(
+                        "transaction",
+                        transaction_id,
+                        code="API_ERROR",
+                        message="The delete request was not accepted by the service.",
+                        details={},
+                    )
+                ],
+            )
+        )
+        return
+
+    # Verify absence where the released read capability supports it. A read
+    # that fails, or that still returns the transaction, leaves the outcome
+    # unconfirmed and is reported as ambiguous, never as a claimed deletion.
+    try:
+        after = _fetch_exact_detail(client, transaction_id, "transactions delete verify")
+    except typer.Exit:
+        raise
+    except Exception:  # noqa: BLE001 - an unverified delete is ambiguous
+        _finish_mutation(
+            build_mutation_outcome(
+                operation.command,
+                [
+                    ambiguous_item(
+                        "transaction",
+                        transaction_id,
+                        "The delete was dispatched but could not be verified; "
+                        "remote state is unknown.",
+                        {"reason": "verification_unavailable", "remote_state": "unknown"},
+                    )
+                ],
+                verification=verification_object(
+                    DELETE_VERIFICATION_MESSAGE,
+                    command=[*DELETE_VERIFICATION_COMMAND, transaction_id],
+                ),
+            )
+        )
+        return
+    if after is not None:
+        _finish_mutation(
+            build_mutation_outcome(
+                operation.command,
+                [
+                    ambiguous_item(
+                        "transaction",
+                        transaction_id,
+                        "The transaction is still present after the delete request; "
+                        "remote state is unknown.",
+                        {"reason": "verification_mismatch", "remote_state": "unknown"},
+                    )
+                ],
+                verification=verification_object(
+                    DELETE_VERIFICATION_MESSAGE,
+                    command=[*DELETE_VERIFICATION_COMMAND, transaction_id],
+                ),
+            )
+        )
+        return
+
+    _finish_mutation(
+        build_mutation_outcome(
+            operation.command,
+            [succeeded_item("transaction", transaction_id, {"deleted": True})],
         )
     )
