@@ -97,7 +97,20 @@ def test_replace_deduplicates_validates_before_mutation_and_verifies() -> None:
             "transaction": {"id": "txn-1", "tags": [{"id": "tag-1"}, {"id": "tag-2"}]},
         }
     }
-    result = invoke(mock, ["replace", "txn-1", "tag-1", "tag-1", "tag-2"])
+    result = invoke(
+        mock,
+        [
+            "replace",
+            "--transaction-id",
+            "txn-1",
+            "--tag-id",
+            "tag-1",
+            "--tag-id",
+            "tag-1",
+            "--tag-id",
+            "tag-2",
+        ],
+    )
     assert result.exit_code == 0
     assert json.loads(result.stdout)["items"][0]["result"] == {
         "tag_ids": ["tag-1", "tag-2"],
@@ -111,7 +124,7 @@ def test_replace_deduplicates_validates_before_mutation_and_verifies() -> None:
 def test_unknown_id_fails_before_set() -> None:
     mock = client()
     mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
-    result = invoke(mock, ["replace", "txn-1", "missing"])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "missing"])
     assert result.exit_code == 2
     assert "unknown_ids" in result.stderr
     mock.set_transaction_tags.assert_not_called()
@@ -123,7 +136,7 @@ def test_malformed_current_assignment_fails_closed_before_set() -> None:
     mock.get_transaction_details.return_value = {
         "getTransaction": {"id": "txn-1", "tags": [{"name": "Work"}]}
     }
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 1
     assert json.loads(result.stderr)["code"] == "API_ERROR"
     mock.set_transaction_tags.assert_not_called()
@@ -146,7 +159,7 @@ def test_noninteractive_confirmation_blocks_before_set() -> None:
     set_config(Config(confirm_destructive=True))
     mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
     mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
-    result = invoke(mock, ["replace", "txn-1", "tag-1"])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
     assert result.exit_code == 5
     assert json.loads(result.stderr)["code"] == "PROMPT_BLOCKED"
     mock.set_transaction_tags.assert_not_called()
@@ -157,7 +170,7 @@ def test_transport_ambiguity_is_structured_and_not_retried() -> None:
     mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
     mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
     mock.set_transaction_tags.side_effect = TimeoutError()
-    result = invoke(mock, ["replace", "txn-1", "tag-1"])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
     assert result.exit_code == 4
     payload = json.loads(result.stdout)
     assert payload["status"] == "ambiguous"
@@ -169,7 +182,7 @@ def test_clear_is_explicit_and_noop_is_deterministic() -> None:
     mock = client()
     mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
     mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 0
     assert json.loads(result.stdout)["items"][0]["result"]["no_op"] is True
     mock.set_transaction_tags.assert_not_called()
@@ -187,7 +200,7 @@ def test_clear_payload_error_is_failed_outcome() -> None:
             "transaction": None,
         }
     }
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload["status"] == "failed"
@@ -204,8 +217,166 @@ def test_replace_verification_mismatch_is_ambiguous() -> None:
             "transaction": {"id": "txn-1", "tags": []},
         }
     }
-    result = invoke(mock, ["replace", "txn-1", "tag-1"])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
     assert result.exit_code == 4
     payload = json.loads(result.stdout)
     assert payload["status"] == "ambiguous"
     assert payload["verification"]["command"][-1] == "txn-1"
+
+
+def test_replace_accepts_tag_names_and_mixed_refs() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {
+        "householdTransactionTags": [
+            tag("tag-1"),
+            {"id": "tag-2", "name": "Travel", "color": "#000000"},
+        ]
+    }
+    mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
+    mock.set_transaction_tags.return_value = {
+        "setTransactionTags": {
+            "errors": [],
+            "transaction": {"id": "txn-1", "tags": [{"id": "tag-1"}, {"id": "tag-2"}]},
+        }
+    }
+    result = invoke(
+        mock,
+        ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-1", "--tag-name", "Travel"],
+    )
+    assert result.exit_code == 0
+    mock.set_transaction_tags.assert_called_once_with(
+        transaction_id="txn-1", tag_ids=["tag-1", "tag-2"]
+    )
+
+
+def test_replace_unknown_name_fails_before_mutation() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-name", "Missing"])
+    assert result.exit_code == 2
+    assert "unknown_names" in result.stderr
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_replace_ambiguous_name_reports_candidates() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {
+        "householdTransactionTags": [
+            {"id": "tag-1", "name": "Work", "color": "#111111"},
+            {"id": "tag-2", "name": "Work", "color": "#222222"},
+        ]
+    }
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-name", "Work"])
+    assert result.exit_code == 2
+    err = json.loads(result.stderr)
+    assert err["details"]["ambiguous_names"]["Work"] == ["tag-1", "tag-2"]
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_replace_name_matching_is_case_sensitive_and_trimmed() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--tag-name", "  work  "])
+    assert result.exit_code == 2  # exact case-sensitive match required
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_replace_requires_at_least_one_ref() -> None:
+    mock = client()
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1"])
+    assert result.exit_code == 2
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_add_preserves_existing_and_reports_added() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {
+        "householdTransactionTags": [
+            tag("tag-1"),
+            {"id": "tag-2", "name": "Travel", "color": "#000000"},
+        ]
+    }
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    mock.set_transaction_tags.return_value = {
+        "setTransactionTags": {
+            "errors": [],
+            "transaction": {"id": "txn-1", "tags": [{"id": "tag-1"}, {"id": "tag-2"}]},
+        }
+    }
+    result = invoke(mock, ["add", "--transaction-id", "txn-1", "--tag-id", "tag-2"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)["items"][0]["result"]
+    assert data == {
+        "tag_ids": ["tag-1", "tag-2"],
+        "added_tag_ids": ["tag-2"],
+        "skipped_tag_ids": [],
+        "no_op": False,
+    }
+    mock.set_transaction_tags.assert_called_once_with(
+        transaction_id="txn-1", tag_ids=["tag-1", "tag-2"]
+    )
+
+
+def test_add_is_noop_when_already_present() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    result = invoke(mock, ["add", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)["items"][0]["result"]
+    assert data["no_op"] is True
+    assert data["added_tag_ids"] == []
+    assert data["skipped_tag_ids"] == ["tag-1"]
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_add_preserves_stale_current_ids_verbatim() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag("tag-1")]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "stale-9"}]}
+    }
+    mock.set_transaction_tags.return_value = {
+        "setTransactionTags": {
+            "errors": [],
+            "transaction": {"id": "txn-1", "tags": [{"id": "stale-9"}, {"id": "tag-1"}]},
+        }
+    }
+    result = invoke(mock, ["add", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
+    assert result.exit_code == 0
+    mock.set_transaction_tags.assert_called_once_with(
+        transaction_id="txn-1", tag_ids=["stale-9", "tag-1"]
+    )
+
+
+def test_add_reports_ambiguous_when_stale_id_dropped() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag("tag-1")]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "stale-9"}]}
+    }
+    mock.set_transaction_tags.return_value = {
+        "setTransactionTags": {
+            "errors": [],
+            "transaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]},
+        }
+    }
+    result = invoke(mock, ["add", "--transaction-id", "txn-1", "--tag-id", "tag-1"])
+    assert result.exit_code == 4
+    assert json.loads(result.stdout)["status"] == "ambiguous"
+
+
+def test_tags_reject_removed_positional_targets() -> None:
+    mock = client()
+    for args in (
+        ["replace", "txn-1", "--tag-id", "tag-1"],
+        ["add", "txn-1", "--tag-id", "tag-1"],
+        ["clear", "txn-1"],
+    ):
+        result = invoke(mock, args)
+        assert result.exit_code != 0
+    mock.set_transaction_tags.assert_not_called()

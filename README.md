@@ -149,15 +149,26 @@ Tag discovery is read-only:
 `monarch transactions tags list` lists available tags and
 `monarch transactions tags show TRANSACTION_ID` inspects one assignment.
 Authorized tag creation uses `--name` and a six-digit `#RRGGBB` `--color`.
-Tag replacement and clearing are explicit full-set operations:
-`monarch --allow-mutations --yes transactions tags replace TRANSACTION_ID TAG_ID...`
-and `monarch --allow-mutations --yes transactions tags clear TRANSACTION_ID`.
-The CLI validates IDs from a read-only discovery request, removes duplicate IDs
-in first-seen order, and never exposes incremental add/remove or batch tagging.
-An already-equal set is a deterministic no-op. The released client provides no
-conditional-write or idempotency guarantee, so concurrent assignments can still
-change between discovery and replacement; verify an ambiguous or mismatched
-write with `transactions tags show` before retrying.
+
+Transaction-targeted tag mutations use explicit options. `--tag-id` and
+`--tag-name` are repeatable and may be mixed; names match exactly and
+case-sensitively (CLI input is whitespace-trimmed only):
+
+```bash
+monarch --allow-mutations transactions tags replace --transaction-id TXN123 --tag-id TAG1 --tag-name "Travel"
+monarch --allow-mutations transactions tags add     --transaction-id TXN123 --tag-name "Travel"
+monarch --allow-mutations --yes transactions tags clear --transaction-id TXN123
+```
+
+`replace` sends exactly the resolved set; `clear` sends the empty set (both are
+destructive and prompt unless `--yes`). `add` is a read-modify-write over the
+same full-set endpoint: it preserves existing tags (including IDs no longer in
+household discovery), skips already-present tags, and is a deterministic no-op
+when nothing is new. The upstream API has no additive endpoint, so `add` is not
+atomic against concurrent tag changes. IDs/names are validated from a single
+read-only discovery request; unknown names/IDs and duplicate-name ambiguities
+are pre-mutation errors, and duplicates are removed in first-seen order. Verify
+an ambiguous or mismatched write with `transactions tags show` before retrying.
 
 ### Transaction splits
 

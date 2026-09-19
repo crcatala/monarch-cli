@@ -89,6 +89,7 @@ OUTCOME_OPERATIONS: dict[str, str] = {
     "transactions batch-update": "transactions.batch-update",
     "transactions tags create": "transactions.tags.create",
     "transactions tags replace": "transactions.tags.replace",
+    "transactions tags add": "transactions.tags.add",
     "transactions tags clear": "transactions.tags.clear",
     "transactions splits replace": "transactions.splits.replace",
     "transactions splits clear": "transactions.splits.clear",
