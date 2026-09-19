@@ -1,6 +1,6 @@
 ---
 id: mc-ic7w
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-09-19T17:37:24Z
@@ -84,3 +84,24 @@ Classification changes:
 - Definitive rejections stay definitive: TransportQueryError (GraphQL errors), TransportAlreadyConnected/Closed, and 4xx TransportServerError; 5xx is ambiguous.
 
 Tests: real gql transport wrapping exercised by patching aiohttp.ClientSession.post (gql raises TransportConnectionFailed), plus raw wrapper, GraphQL errors, 4xx/5xx, read retry, and a command-level budgets set envelope test (exit 4, remote_state unknown, verification present). Docs + changelog updated.
+
+**2026-09-19T18:25:15Z**
+
+Re-verification after fix (PR #89, commit 0955d55) — 2026-09-19, disposable test account.
+
+Re-ran the live through-gql fault injection on disposable fixtures. Every case now matches the contract.
+
+| Case | Injection | Before fix | After fix |
+|---|---|---|---|
+| A | `transactions review return` + disconnect through gql | exit 1, failed, UNKNOWN | exit 4, ambiguous, reason=transport_failure, remote_state=unknown, verification present |
+| B | `budgets set` + disconnect through gql | exit 1, failed, UNKNOWN | exit 4, ambiguous, MUTATION_AMBIGUOUS, verification present |
+| C | definitive GraphQL rejection (`TransportQueryError`) | — | exit 1, failed (correctly NOT ambiguous) |
+| D | `TransportServerError` code 500 | — | exit 4, ambiguous |
+| E | `TransportServerError` code 400 | — | exit 1, failed (definitive) |
+
+Additional confirmations:
+- Single-attempt mutations preserved: exactly one write dispatch in A and B, no automatic retry.
+- Writes actually applied in A and B (needs_review=true / budgeted=value), so `ambiguous` is the correct verdict.
+- Read path still retries: injecting `TransportConnectionFailed` on `accounts list` produced 4 transport attempts then a structured `NETWORK_ERROR`, confirming the new retryable entry does not break read behavior or leak into mutation retry.
+
+All fixtures deleted; final state restored (original 3 transactions, budgets at budgeted=0). Verification complete — closing.
