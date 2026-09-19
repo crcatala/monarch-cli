@@ -264,14 +264,31 @@ def output(
 
     # Handle quiet mode - output only IDs
     if quiet_mode:
+        # Quiet output must never silently discard records: a record without an
+        # extractable ID is an error rather than empty output. Mutation/preview
+        # output is exempt because it never uses this path.
         if isinstance(data, list):
             for item in data:
-                if isinstance(item, dict) and id_field in item:
-                    print(item[id_field])
+                if isinstance(item, dict):
+                    if id_field in item:
+                        print(item[id_field])
+                    else:
+                        raise ValidationError(
+                            f"Quiet output requires an extractable '{id_field}' field; "
+                            "a returned record does not contain one.",
+                            field=id_field,
+                        )
                 else:
                     print(item)
-        elif isinstance(data, dict) and id_field in data:
-            print(data[id_field])
+        elif isinstance(data, dict):
+            if id_field in data:
+                print(data[id_field])
+            else:
+                raise ValidationError(
+                    f"Quiet output requires an extractable '{id_field}' field; "
+                    "the returned record does not contain one.",
+                    field=id_field,
+                )
         return
 
     # Raw pass-through

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import sys
-from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -93,27 +93,8 @@ class TransactionVisibility(StrEnum):
 UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 BATCH_UPDATE_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 
-
-def _parse_date(date_str: str | None) -> date | None:
-    """Parse a date string in YYYY-MM-DD format.
-
-    Args:
-        date_str: Date string in YYYY-MM-DD format, or None.
-
-    Returns:
-        Parsed date object, or None if input was None.
-
-    Raises:
-        typer.BadParameter: If date string is not valid YYYY-MM-DD format.
-    """
-    if date_str is None:
-        return None
-    try:
-        return date.fromisoformat(date_str)
-    except ValueError as e:
-        raise typer.BadParameter(
-            f"Invalid date format: '{date_str}'. Use YYYY-MM-DD format."
-        ) from e
+MAX_BATCH_CONCURRENCY = 16
+MIN_BATCH_CONCURRENCY = 1
 
 
 @app.command("list")
@@ -325,9 +306,10 @@ def list_cmd(
     if ndjson:
         output_format = OutputFormat.COMPACT  # Will handle NDJSON below
 
-    # Parse date range (preset + explicit dates)
-    start_date = _parse_date(start)
-    end_date = _parse_date(end)
+    # Parse date range (preset + explicit dates) with the shared strict
+    # YYYY-MM-DD validator; invalid dates are structured usage errors.
+    start_date = parse_iso_date(start, field="start")
+    end_date = parse_iso_date(end, field="end")
     start_str, end_str = parse_date_range(preset, start_date, end_date)
 
     # Validate everything that can be validated locally BEFORE client
@@ -753,6 +735,14 @@ def update(
     changes: dict[str, Any] = {}
 
     if amount is not None:
+        # Finite numbers only: NaN/infinity would corrupt state and could emit
+        # invalid JSON in a dry-run preview.
+        if not math.isfinite(amount):
+            raise ValidationError(
+                "Amount must be a finite number.",
+                field="amount",
+                details={"received": str(amount)},
+            )
         changes["amount"] = amount
     if description is not None:
         changes["merchant_name"] = description
@@ -761,7 +751,9 @@ def update(
     if notes is not None:
         changes["notes"] = notes
     if date_value is not None:
-        changes["date"] = date_value
+        parsed_date = parse_iso_date(date_value, field="date")
+        assert parsed_date is not None
+        changes["date"] = parsed_date.isoformat()
 
     # Require at least one change. This is a pre-execution input-validation
     # failure: it uses the structured error contract, never a mutation
@@ -900,7 +892,7 @@ def batch_update(
         int,
         typer.Option(
             "--max-concurrency",
-            help="Maximum number of parallel API calls",
+            help="Maximum parallel API calls (1-16; local safety cap)",
         ),
     ] = 4,
     dry_run: Annotated[
@@ -935,8 +927,13 @@ def batch_update(
         monarch transactions batch-update --stdin --notes "Q1 Expenses" < ids.txt
     """
     _reject_positional_targets(ctx.args)
-
-    # Classify this parsed invocation before any prompt or client creation.
+    if max_concurrency < MIN_BATCH_CONCURRENCY or max_concurrency > MAX_BATCH_CONCURRENCY:
+        raise ValidationError(
+            f"--max-concurrency must be an integer between {MIN_BATCH_CONCURRENCY} "
+            f"and {MAX_BATCH_CONCURRENCY} (a local safety cap).",
+            field="max_concurrency",
+            details={"min": MIN_BATCH_CONCURRENCY, "max": MAX_BATCH_CONCURRENCY},
+        )
     operation = resolve_invocation(
         "transactions batch-update", BATCH_UPDATE_EFFECTS, dry_run=dry_run
     )

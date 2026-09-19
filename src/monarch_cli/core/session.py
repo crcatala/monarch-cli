@@ -46,7 +46,7 @@ class KeyringUnavailableError(MonarchCLIError):
 
     def __init__(
         self,
-        message: str = "Keyring unavailable. Use --backend=file or set MONARCH_TOKEN env var.",
+        message: str = "Keyring unavailable. Use --storage=file or set MONARCH_TOKEN env var.",
         details: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(
@@ -105,7 +105,7 @@ def _save_to_keyring(token: str) -> None:
         raise KeyringUnavailableError(details={"original_error": str(e)}) from e
     except keyring.errors.KeyringError as e:
         raise KeyringUnavailableError(
-            message=f"Keyring error: {e}. Use --backend=file or set MONARCH_TOKEN env var.",
+            message=f"Keyring error: {e}. Use --storage=file or set MONARCH_TOKEN env var.",
             details={"original_error": str(e)},
         ) from e
 

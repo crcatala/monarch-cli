@@ -15,6 +15,8 @@ from monarch_cli.commands import (
     transactions,
 )
 from monarch_cli.core.config import get_config, set_config
+from monarch_cli.core.error_handler import handle_errors
+from monarch_cli.core.exceptions import ValidationError
 from monarch_cli.core.operations import set_mutation_authorized
 from monarch_cli.core.prompting import resolve_non_interactive, set_non_interactive
 from monarch_cli.output import apply_config
@@ -41,6 +43,7 @@ def version_callback(value: bool) -> None:
 
 
 @app.callback()
+@handle_errors
 def main(
     version: bool | None = typer.Option(  # noqa: ARG001
         None,
@@ -94,7 +97,10 @@ def main(
     yes: bool = typer.Option(
         False,
         "--yes",
-        help="Skip shared destructive confirmation for this invocation.",
+        help=(
+            "Skip destructive confirmation for this invocation only. This never "
+            "authorizes a remote write; --allow-mutations is still required."
+        ),
     ),
     non_interactive: bool = typer.Option(
         False,
@@ -109,6 +115,15 @@ def main(
     ),
 ) -> None:
     """CLI for Monarch Money - AI-agent friendly financial data access."""
+    # Validate global options before touching mutation authorization so no
+    # client/network work happens for an invalid value.
+    if timeout is not None and timeout < 1:
+        raise ValidationError(
+            "--timeout must be an integer >= 1 second.",
+            field="timeout",
+            details={"min": 1},
+        )
+
     # Per-invocation mutation authorization (mc-k48z). Read-only by default;
     # no config-file or environment-variable authorization is supported.
     set_mutation_authorized(allow_mutations)

@@ -7,6 +7,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.error_handler import handle_errors
+from ..core.exceptions import ValidationError
 from ..core.operations import Effect, operation_effects
 from ..output import OutputFormat, output
 from ..output.progress import spinner
@@ -76,6 +77,13 @@ def holdings_cmd(
         monarch investments holdings --raw --json
     """
     output_format = OutputFormat.JSON if json_output else format
+    if raw and aggregate:
+        raise ValidationError(
+            "--aggregate only shapes normalized output and is incompatible with "
+            "--raw; the raw response bypasses normalization and aggregation.",
+            field="aggregate",
+            details={"incompatible_with": "raw"},
+        )
     with spinner("Fetching investment holdings..."):
         data: Any = get_investment_holdings(
             list(account) if account else None,

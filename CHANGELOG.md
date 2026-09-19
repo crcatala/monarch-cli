@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+#### Validation and flag interaction semantics
+- `--timeout` must be >= 1; `transactions batch-update --max-concurrency` must be 1-16 (rejects 0/negative/out-of-range before any API call) — mc-s6s6
+- Date options use one strict `YYYY-MM-DD` parser; compact/loose forms (`20240115`, `2024-1-5`) fail with `INVALID_INPUT`
+- Transaction update amounts reject NaN/infinity; `--raw` rejects normalized-only options (`institutions list --include-deleted`, `investments holdings --aggregate`); `--quiet` errors when a returned record has no extractable ID
+- Keyring guidance recommends `--storage=file`; `--yes` is documented as confirmation bypass only and never authorizes a write
+
 #### Transaction tag assignment redesign and additive `add`
 - `transactions tags replace`/`clear` require `--transaction-id` and use repeatable `--tag-id`/`--tag-name` options instead of positional arguments; `transactions tags add` is new (mc-46gq)
 - Tag names resolve through household discovery with exact, case-sensitive matching; unknown names/IDs and duplicate-name ambiguities are pre-mutation errors

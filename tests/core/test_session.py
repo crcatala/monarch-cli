@@ -466,3 +466,12 @@ class TestGetStorageInfo:
             info = get_storage_info()
         assert info["has_legacy_artifact"] is True
         assert info["active_backend"] is None
+
+
+def test_keyring_unavailable_message_recommends_storage_file() -> None:
+    """Keyring guidance must name the real --storage=file option (mc-s6s6)."""
+    from monarch_cli.core.session import KeyringUnavailableError
+
+    error = KeyringUnavailableError()
+    assert "--storage=file" in error.message
+    assert "--backend=file" not in error.message

@@ -112,6 +112,24 @@ without either, rendering stays TTY-aware (plain on a TTY, JSON when piped).
 | `--non-interactive` | | Fail before prompting; useful for CI and agents |
 | `--help` | | Show help and exit |
 
+### Input validation
+
+Input is validated before mutation authorization, authentication, or any API
+call; failures use the structured `INVALID_INPUT` contract (exit 2):
+
+- `--timeout` must be an integer `>= 1`.
+- `transactions batch-update --max-concurrency` accepts `1`-`16` (a local
+  safety cap); `0`, negatives, and larger values are rejected.
+- Date options accept only `YYYY-MM-DD` (`20240115` and `2024-1-5` are rejected).
+- Transaction update amounts must be finite (no NaN/infinity).
+- `--raw` rejects options that only shape normalized output
+  (`institutions list --raw --include-deleted`,
+  `investments holdings --raw --aggregate`).
+- `--quiet` errors when a returned record has no extractable `id` instead of
+  printing nothing; mutation and preview output never use the quiet path.
+- `--yes` skips destructive confirmation only; it never authorizes a remote
+  write. Keyring-unavailable errors recommend `--storage=file` or `MONARCH_TOKEN`.
+
 ### Mutation safety
 
 The CLI is **read-only by default**. Every command has explicit operation

@@ -7,6 +7,7 @@ from typing import Annotated, Any
 import typer
 
 from ..core.error_handler import handle_errors
+from ..core.exceptions import ValidationError
 from ..core.operations import Effect, operation_effects
 from ..output import OutputFormat, output
 from ..output.progress import spinner
@@ -57,6 +58,13 @@ def list_cmd(
     historical records. Missing connection fields remain null and never imply
     a healthy connection. This command is read-only.
     """
+    if raw and include_deleted:
+        raise ValidationError(
+            "--include-deleted only shapes normalized output and is incompatible "
+            "with --raw; the raw response is passed through unchanged.",
+            field="include_deleted",
+            details={"incompatible_with": "raw"},
+        )
     with spinner("Fetching institutions..."):
         data: Any = (
             get_institutions_raw(INSTITUTIONS_OPERATION)

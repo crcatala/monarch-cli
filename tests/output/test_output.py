@@ -308,15 +308,29 @@ class TestQuietModeOutput:
 
         assert captured.out == ""
 
-    def test_quiet_dict_missing_id_field_no_output(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Quiet mode with dict missing id field produces no output."""
-        data = {"name": "Test", "value": 123}
-        output(data, quiet=True)
-        captured = capsys.readouterr()
+    def test_quiet_dict_missing_id_field_errors(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Quiet mode with a record missing the id field errors, never silent."""
+        from monarch_cli.core.exceptions import ValidationError
 
-        assert captured.out == ""
+        data = {"name": "Test", "value": 123}
+        with pytest.raises(ValidationError) as exc_info:
+            output(data, quiet=True)
+        assert exc_info.value.code.value == "INVALID_INPUT"
+        assert capsys.readouterr().out == ""
+
+    def test_quiet_list_record_missing_id_errors(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A list record without an ID errors instead of printing the dict."""
+        from monarch_cli.core.exceptions import ValidationError
+
+        data = [{"id": "ACC1"}, {"name": "no-id"}]
+        with pytest.raises(ValidationError):
+            output(data, quiet=True)
+        assert capsys.readouterr().out == "ACC1\n"
+
+    def test_quiet_empty_dict_no_output(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """An empty collection produces no output and no error."""
+        output([], quiet=True)
+        assert capsys.readouterr().out == ""
 
     def test_quiet_list_of_scalars(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Quiet mode with list of scalars outputs each item."""
