@@ -16,7 +16,7 @@ Allow a user or automated workflow to deliberately mark a transaction reviewed o
 
 ## Design
 
-Expose two explicit operations for one transaction:
+Expose two explicit operations for one transaction, each selecting its target with a required `--transaction-id` option following the `mc-qv0q` mutation convention (no positional transaction ID):
 
 - mark reviewed: send `reviewed=True` and omit `needs_review`;
 - return to review queue: send `needs_review=True` and omit `reviewed`.
@@ -37,6 +37,7 @@ Use centralized mutation authorization, retry-safe remote execution, and `mutati
 
 ## Acceptance Criteria
 
+- [ ] Both operations take the target as a required `--transaction-id` option, not a positional argument.
 - [ ] Users can explicitly mark one transaction reviewed and explicitly return one transaction to the review queue through distinct intent-oriented command paths/options.
 - [ ] Mark-reviewed maps to `reviewed=True` while omitting `needsReview`; return-to-queue maps to `needsReview=True` while omitting `reviewed`.
 - [ ] `reviewed=False`, `needsReview=False`, and contradictory review-state combinations are not accepted by this surface.

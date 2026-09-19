@@ -20,7 +20,7 @@ Add a side-effect-free command that emits a versioned JSON manifest. Explicit co
 
 Framework introspection may enumerate registered command paths, arguments, and options, but the public manifest shape is owned by CLI code and protected by one canonical fixture test rather than exposing Typer internals. Completeness checks compare the registered command tree with explicit metadata and reject an empty or partial inventory.
 
-Model output behavior accurately: global formats and quiet behavior are distinct from command-specific support such as NDJSON and raw passthrough. Raw output is explicitly unstable. Stable schema identifiers and contract versions come from the lightweight mapping published by `mc-cpzi` rather than duplicated constants. Compatibility testing is limited to the supported Typer range established by `mc-43s0`; this ticket does not widen that range.
+Model output behavior accurately: global formats and quiet behavior are distinct from command-specific support such as NDJSON and raw passthrough. Raw output is explicitly unstable. Preview behavior and mutation output modes follow the decisions recorded in `mc-qv0q`: dry-run previews are distinct from `mutation-outcome.v1`, and mutation outcomes are always JSON. Stable schema identifiers and contract versions come from the lightweight mapping published by `mc-cpzi` rather than duplicated constants. Compatibility testing is limited to the supported Typer range established by `mc-43s0`; this ticket does not widen that range.
 
 ## Key Decisions
 

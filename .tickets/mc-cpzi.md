@@ -16,7 +16,7 @@ Make normalized CLI output contracts directly consumable by users, agents, and i
 
 ## Design
 
-Publish JSON Schema Draft 2020-12 artifacts for established normalized account and transaction outputs, the structured error contract, and `mutation-outcome.v1`. Arbitrary raw passthrough payloads are explicitly unschematized and unstable.
+Publish JSON Schema Draft 2020-12 artifacts for established normalized account and transaction outputs, the structured error contract, and `mutation-outcome.v1`. `mutation-outcome.v1` covers the registered operation set, including `transactions.tags.add` once it lands; dry-run previews are explicitly outside this schema family. Arbitrary raw passthrough payloads are explicitly unschematized and unstable.
 
 Checked-in schema files are the normative contract for this initial implementation and are included as package resources in the wheel. Each has a stable URN identifier such as `urn:monarch-cli:schema:account:v1`, independent of repository paths. An ordinary module-level mapping resolves public contract names and versions to packaged artifacts; it is not a separately serialized subsystem. `mc-82kf` consumes the same mapping for capability discovery.
 
