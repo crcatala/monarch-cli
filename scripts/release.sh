@@ -23,6 +23,22 @@ TAG="v${VERSION}"
 echo "📦 Preparing release for monarch-cli ${VERSION}"
 echo ""
 
+# The git tag is derived from the package source version, but the built
+# wheel/sdist version comes from pyproject.toml. If they drift, the tag and the
+# published artifact would disagree. Fail early with an actionable message.
+PYPROJECT_VERSION=$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
+if [[ "$VERSION" != "$PYPROJECT_VERSION" ]]; then
+    echo "❌ Version mismatch:"
+    echo "   src/monarch_cli/__init__.py: ${VERSION}"
+    echo "   pyproject.toml:             ${PYPROJECT_VERSION}"
+    echo ""
+    echo "   The git tag is derived from src/monarch_cli/__init__.py, while the"
+    echo "   built wheel/sdist version comes from pyproject.toml. Make them match"
+    echo "   (and refresh uv.lock with 'uv lock') before releasing."
+    echo "   See docs/RELEASING.md, Step 1."
+    exit 1
+fi
+
 # Check if tag already exists
 if git rev-parse "$TAG" >/dev/null 2>&1; then
     echo "❌ Tag $TAG already exists!"
@@ -65,8 +81,20 @@ echo ""
 echo "🔨 Building package and smoke-installing wheel..."
 if [[ "$DRY_RUN" == false ]]; then
     rm -rf build/ *.egg-info
+    # smoke-install wipes and rebuilds dist/, so artifacts always match the
+    # current metadata; there is no stale-dist risk on this path.
     make smoke-install
     uv run twine check dist/*
+
+    # Belt and braces: the artifact we are about to attach must be the version
+    # we are about to tag.
+    if ! ls dist/monarch_cli-"${VERSION}"-*.whl >/dev/null 2>&1; then
+        echo "❌ Built wheel does not match version ${VERSION}."
+        echo "   dist/ contains:"
+        ls -1 dist/
+        echo "   Fix the version metadata and re-run (see docs/RELEASING.md Step 1)."
+        exit 1
+    fi
 else
     echo "   [dry-run] Would run: make smoke-install && twine check dist/*"
 fi
