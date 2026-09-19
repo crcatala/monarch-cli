@@ -16,7 +16,9 @@ Make normalized CLI output contracts directly consumable by users, agents, and i
 
 ## Design
 
-Publish JSON Schema Draft 2020-12 artifacts for established normalized account and transaction outputs, the structured error contract, and `mutation-outcome.v1`. `mutation-outcome.v1` covers the registered operation set, including `transactions.tags.add` once it lands; dry-run previews are explicitly outside this schema family. Arbitrary raw passthrough payloads are explicitly unschematized and unstable.
+Publish JSON Schema Draft 2020-12 artifacts for established normalized account and transaction outputs, the structured error contract, and `mutation-outcome.v1`. `mutation-outcome.v1` covers the registered operation set, including `transactions.tags.add` once it lands and the planned multi-stage `transactions.attachments.add` workflow; dry-run previews are explicitly outside this schema family. Arbitrary raw passthrough payloads are explicitly unschematized and unstable.
+
+The attachment workflow must use the existing generic multi-stage envelope rather than adding attachment-specific top-level fields. Its schema fixtures should cover ordered effect items for media upload and Monarch registration, including definitive failure, ambiguous registration, and partial completion where a media asset may exist without a registered attachment. Attachment-specific stable operation/entity names are defined by `mc-2v9a` and consumed here through the shared operation/schema mapping.
 
 Checked-in schema files are the normative contract for this initial implementation and are included as package resources in the wheel. Each has a stable URN identifier such as `urn:monarch-cli:schema:account:v1`, independent of repository paths. An ordinary module-level mapping resolves public contract names and versions to packaged artifacts; it is not a separately serialized subsystem. `mc-82kf` consumes the same mapping for capability discovery.
 
@@ -36,10 +38,12 @@ Schemas encode the post-`mc-h3cl` normalization semantics and the exact mutation
 ## Acceptance Criteria
 
 - [ ] Valid JSON Schema Draft 2020-12 artifacts are published for normalized account output, normalized transaction list/detail output, structured errors, and `mutation-outcome.v1`.
+- [ ] The mutation-outcome fixtures include the planned `transactions.attachments.add` operation with successful multi-stage results, definitive stage failure, ambiguous registration, and partial/orphaned-media completion while preserving the generic envelope shape and ordered item semantics.
 - [ ] Every schema defines required fields, types, nullability, nested objects/arrays, and closed enums where the CLI actually guarantees them.
 - [ ] Raw passthrough output is explicitly excluded and documented as unstable.
 - [ ] Every artifact has a stable versioned URN `$id` and is included in source distributions and wheels as a package resource.
 - [ ] A module-level mapping resolves public contract name/version and URN to the packaged artifact; capabilities use that mapping rather than duplicate constants.
+- [ ] The shared operation/schema mapping includes the stable attachment operation and effect-entity identifiers selected by `mc-2v9a`; no command-specific envelope extension or duplicated attachment schema constants are introduced.
 - [ ] Existing `tests/test_schemas.py` contracts validate representative runtime output against the published artifacts instead of maintaining a second independent field list.
 - [ ] CI proves representative account, transaction, error, and mutation outputs conform and fails on undocumented stable fields or removals without maintaining a second field-list contract.
 - [ ] Negative fixtures fail for missing required fields, wrong types, invalid nullability, impossible mutation summary counts, and invalid closed-enum values so validation cannot pass vacuously.
