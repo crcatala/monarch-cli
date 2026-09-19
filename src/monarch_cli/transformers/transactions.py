@@ -16,6 +16,14 @@ Normalization rules (v1 contract):
 - ``needs_review`` and opaque ``review_status`` are exposed independently when
   supplied by the selected upstream endpoint. ``review_status`` is nullable;
   detail responses from the released public client may omit it.
+- ``owner_id`` and ``owner_name`` mirror the optional upstream
+  ``ownedByUser`` relationship (``id`` and ``name``). ``ownership_overridden_at``
+  mirrors the upstream ``ownershipOverriddenAt`` timestamp literally. All three
+  are nullable: a missing, ``null``, or non-object owner relationship yields
+  ``null`` owner fields, and the override timestamp proves only that an override
+  occurred, not who changed ownership or what it changed from. Null ownership
+  does not distinguish shared, unassigned, unavailable, or unsupported upstream
+  states.
 - A present-but-null nested relationship (for example ``merchant: null``)
   yields ``null`` rather than raising.
 - Unknown additive upstream fields are ignored.
@@ -86,6 +94,9 @@ def transform_transaction(raw: Any) -> dict[str, Any]:
         "is_pending": _is_pending(transaction),
         "needs_review": bool_or_default(nested_get(transaction, "needsReview"), False),
         "review_status": _opaque_str(nested_get(transaction, "reviewStatus")),
+        "owner_id": nested_get(transaction, "ownedByUser", "id"),
+        "owner_name": nested_get(transaction, "ownedByUser", "name"),
+        "ownership_overridden_at": nested_get(transaction, "ownershipOverriddenAt"),
         "notes": nested_get(transaction, "notes"),
     }
 
@@ -232,6 +243,9 @@ def transform_transaction_detail(raw: Any, requested_id: str | None = None) -> d
         "is_pending": _is_pending(detail),
         "needs_review": bool_or_default(nested_get(detail, "needsReview"), False),
         "review_status": _opaque_str(nested_get(detail, "reviewStatus")),
+        "owner_id": nested_get(detail, "ownedByUser", "id"),
+        "owner_name": nested_get(detail, "ownedByUser", "name"),
+        "ownership_overridden_at": nested_get(detail, "ownershipOverriddenAt"),
         "notes": nested_get(detail, "notes"),
         "is_recurring": bool_or_default(nested_get(detail, "isRecurring"), False),
         "hidden_from_reports": bool_or_default(nested_get(detail, "hideFromReports"), False),

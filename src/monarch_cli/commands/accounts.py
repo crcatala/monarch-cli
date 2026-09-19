@@ -36,6 +36,25 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+#: Concise ordered field selection for ``accounts list`` human formats
+#: (plain/table). Machine-readable formats (JSON, CSV, compact/NDJSON) always
+#: emit the complete normalized account fields, and ``--raw`` is untouched.
+#: ``owner_id`` is omitted here because only a legible owner name is useful in
+#: a table; the stable identifier remains available in the machine-readable
+#: formats.
+ACCOUNT_LIST_DISPLAY_FIELDS: tuple[str, ...] = (
+    "id",
+    "name",
+    "type",
+    "subtype",
+    "balance",
+    "institution",
+    "owner_name",
+    "is_active",
+    "is_manual",
+    "last_updated",
+)
+
 
 class SnapshotTimeframe(StrEnum):
     """Timeframes supported by type-scoped account snapshots."""
@@ -123,7 +142,12 @@ def list_cmd(
             print(json.dumps(data, default=str))
         return
 
-    output(data, output_format, raw=False)
+    output(
+        data,
+        output_format,
+        raw=False,
+        display_fields=ACCOUNT_LIST_DISPLAY_FIELDS if not raw else None,
+    )
 
 
 @app.command("types")

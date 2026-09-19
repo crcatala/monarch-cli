@@ -365,3 +365,61 @@ class TestQuietModeOutput:
         # Should output JSON, not just ID
         result = json.loads(captured.out)
         assert result == data
+
+
+class TestDisplayFieldProjection:
+    """Concise human-format field selection (owner attribution display).
+
+    ``display_fields`` restricts plain and table output to the ordered field
+    selection. Machine-readable formats (JSON, CSV, compact) always keep the
+    complete normalized record, and ``--raw`` is never projected.
+    """
+
+    DATA = [
+        {"id": "a1", "name": "Checking", "owner_id": "u1", "owner_name": "Alex", "balance": 5},
+        {"id": "a2", "name": "Savings", "owner_id": None, "owner_name": None, "balance": 7},
+    ]
+
+    FIELDS = ("id", "name", "owner_name")
+
+    def test_plain_projects_to_display_fields(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.PLAIN, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        assert "Owner Name: Alex" in captured.out
+        assert "owner_id" not in captured.out
+        assert "Balance" not in captured.out
+
+    def test_table_projects_to_display_fields(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.TABLE, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        assert "owner_name" in captured.out
+        assert "balance" not in captured.out
+
+    def test_json_keeps_complete_record(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.JSON, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result[0] == self.DATA[0]
+        assert result[1] == self.DATA[1]
+
+    def test_compact_keeps_complete_record(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.COMPACT, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result == self.DATA
+
+    def test_csv_keeps_complete_record(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.CSV, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        assert "owner_id" in captured.out
+        assert "balance" in captured.out
+
+    def test_none_selection_is_identity(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(self.DATA, OutputFormat.PLAIN, display_fields=None)
+        captured = capsys.readouterr()
+        assert "Balance: 5" in captured.out
+
+    def test_non_dict_entries_pass_through(self, capsys: pytest.CaptureFixture[str]) -> None:
+        output(["scalar"], OutputFormat.PLAIN, display_fields=self.FIELDS)
+        captured = capsys.readouterr()
+        assert "scalar" in captured.out

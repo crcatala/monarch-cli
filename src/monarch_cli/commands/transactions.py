@@ -53,6 +53,28 @@ app.add_typer(transaction_tags.app, name="tags")
 #: Declared effect sets for this group's commands.
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 GET_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
+
+#: Concise ordered field selection for ``transactions list`` human formats
+#: (plain/table). Machine-readable formats (JSON, CSV, compact/NDJSON) always
+#: emit the complete normalized transaction fields, and ``--raw`` is
+#: untouched. The owner identifier and override timestamp are omitted here
+#: because only a legible owner name is useful in a table; both remain
+#: available in the machine-readable formats.
+TRANSACTION_LIST_DISPLAY_FIELDS: tuple[str, ...] = (
+    "id",
+    "date",
+    "amount",
+    "description",
+    "category",
+    "category_id",
+    "account",
+    "account_id",
+    "is_pending",
+    "needs_review",
+    "review_status",
+    "owner_name",
+    "notes",
+)
 SUMMARY_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 RECURRING_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 
@@ -381,7 +403,12 @@ def list_cmd(
             print(json.dumps(data, default=str))
         return
 
-    output(data, output_format, raw=False)
+    output(
+        data,
+        output_format,
+        raw=False,
+        display_fields=TRANSACTION_LIST_DISPLAY_FIELDS if not raw else None,
+    )
 
 
 def _validate_list_query(

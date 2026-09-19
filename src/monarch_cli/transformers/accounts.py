@@ -11,6 +11,11 @@ Normalization rules (v1 contract):
 - ``is_active`` and ``is_manual`` are always booleans. Absent or ``null``
   source values default to ``is_active=True`` (not hidden) and
   ``is_manual=False``.
+- ``owner_id`` and ``owner_name`` mirror the optional upstream
+  ``ownedByUser`` relationship (``id`` and ``displayName``). A missing,
+  ``null``, or non-object owner relationship yields ``null`` for both fields;
+  null ownership means only that owner identity was not provided and does not
+  distinguish shared, unassigned, unavailable, or unsupported upstream states.
 - A present-but-null nested relationship (for example ``institution: null``)
   yields ``null`` rather than raising.
 - Unknown additive upstream fields are ignored.
@@ -54,6 +59,8 @@ def transform_account(raw: Any) -> dict[str, Any]:
         "institution": nested_get(account, "institution", "name"),
         "is_active": not is_hidden,
         "is_manual": bool_or_default(nested_get(account, "isManual"), False),
+        "owner_id": nested_get(account, "ownedByUser", "id"),
+        "owner_name": nested_get(account, "ownedByUser", "displayName"),
         "last_updated": nested_get(account, "updatedAt"),
     }
 

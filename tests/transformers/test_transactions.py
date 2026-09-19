@@ -308,6 +308,9 @@ class TestSchemaContract:
         "is_pending",
         "needs_review",
         "review_status",
+        "owner_id",
+        "owner_name",
+        "ownership_overridden_at",
         "notes",
     }
 
@@ -321,3 +324,91 @@ class TestSchemaContract:
         result = transform_transaction(SAMPLE_TRANSACTION_FULL)
         extra = set(result.keys()) - self.REQUIRED_FIELDS
         assert extra == set(), f"Unexpected fields: {extra}"
+
+
+class TestOwnershipNormalization:
+    """Owner attribution mirrors the optional upstream ownedByUser relationship.
+
+    A missing, null, or malformed owner relationship yields null normalized
+    owner fields. Null ownership must never be relabeled as a shared or
+    unassigned state. ``ownership_overridden_at`` is a literal passthrough:
+    it never implies an actor, a previous owner, or a boolean shared state.
+    """
+
+    def test_complete_owner_relationship(self):
+        raw = {**SAMPLE_TRANSACTION_FULL, "ownedByUser": {"id": "user-1", "name": "Alex"}}
+        result = transform_transaction(raw)
+        assert result["owner_id"] == "user-1"
+        assert result["owner_name"] == "Alex"
+
+    def test_missing_owner_relationship(self):
+        result = transform_transaction(SAMPLE_TRANSACTION_FULL)
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+        assert result["ownership_overridden_at"] is None
+
+    def test_null_owner_relationship(self):
+        result = transform_transaction({**SAMPLE_TRANSACTION_FULL, "ownedByUser": None})
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    @pytest.mark.parametrize(
+        "malformed",
+        ["not-an-object", 42, ["user-1"], True],
+        ids=["string", "number", "list", "boolean"],
+    )
+    def test_non_object_owner_relationship_yields_nulls(self, malformed):
+        result = transform_transaction({**SAMPLE_TRANSACTION_FULL, "ownedByUser": malformed})
+        assert result["owner_id"] is None
+        assert result["owner_name"] is None
+
+    def test_partially_populated_owner_relationship(self):
+        id_only = transform_transaction(
+            {**SAMPLE_TRANSACTION_FULL, "ownedByUser": {"id": "user-1"}}
+        )
+        assert id_only["owner_id"] == "user-1"
+        assert id_only["owner_name"] is None
+
+        name_only = transform_transaction(
+            {**SAMPLE_TRANSACTION_FULL, "ownedByUser": {"name": "Alex"}}
+        )
+        assert name_only["owner_id"] is None
+        assert name_only["owner_name"] == "Alex"
+
+    def test_override_timestamp_passthrough_without_derived_fields(self):
+        """The override timestamp is passed through literally; nothing is derived."""
+        result = transform_transaction(
+            {
+                **SAMPLE_TRANSACTION_FULL,
+                "ownedByUser": {"id": "user-1", "name": "Alex"},
+                "ownershipOverriddenAt": "2026-01-02T03:04:05Z",
+            }
+        )
+        assert result["ownership_overridden_at"] == "2026-01-02T03:04:05Z"
+        assert result["owner_id"] == "user-1"
+        # No actor, previous-owner, direction, or boolean shared state exists.
+        assert "overridden_by" not in result
+        assert "previous_owner" not in result
+        assert "is_shared" not in result
+
+    def test_detail_owner_fields_mirror_list_contract(self):
+        """Detail normalization uses the same owner fields as list normalization."""
+        detail = {
+            "getTransaction": {
+                "id": "txn-123",
+                "ownedByUser": {"id": "user-1", "name": "Alex"},
+                "ownershipOverriddenAt": "2026-01-02T03:04:05Z",
+            }
+        }
+        result = transform_transaction_detail(detail, requested_id="txn-123")
+        assert result["owner_id"] == "user-1"
+        assert result["owner_name"] == "Alex"
+        assert result["ownership_overridden_at"] == "2026-01-02T03:04:05Z"
+
+    def test_detail_malformed_owner_relationship_yields_nulls(self):
+        for owned_by in (None, "not-an-object", ["user-1"], {}):
+            detail = {"getTransaction": {"id": "txn-123", "ownedByUser": owned_by}}
+            result = transform_transaction_detail(detail, requested_id="txn-123")
+            assert result["owner_id"] is None
+            assert result["owner_name"] is None
+            assert result["ownership_overridden_at"] is None

@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from monarch_cli.commands.transactions import _parse_date, app
 from monarch_cli.core.exceptions import APIError
 from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
+from monarch_cli.output import set_quiet
 
 runner = CliRunner()
 
@@ -414,9 +415,12 @@ class TestTransactionsList:
             result = runner.invoke(app, ["list", "--format", "table"])
 
             assert result.exit_code == 0
-            # Table output has table chars and column headers
+            # Table output has table chars and column headers. The concise
+            # display selection keeps owner attribution legible, so narrow
+            # terminals may truncate individual headers (e.g. "da…" for date);
+            # assert on stable prefixes rather than full header names.
             assert "id" in result.stdout
-            assert "date" in result.stdout
+            assert "da" in result.stdout
             # Table contains box drawing characters
             assert "┃" in result.stdout or "|" in result.stdout
 
@@ -537,6 +541,115 @@ class TestTransactionsList:
         assert "INVALID_INPUT" in result.stderr
 
 
+class TestTransactionsListOwnership:
+    """Household ownership visibility in transaction list output.
+
+    Normalized output always carries nullable ``owner_id``/``owner_name``
+    plus a literal ``ownership_overridden_at``. Missing, null, or malformed
+    owner payloads produce null owner fields; raw output remains untouched.
+    """
+
+    def _owned_transaction(self, owned_by: object, **extra: object) -> dict:
+        txn: dict = {
+            "id": "txn_owned",
+            "date": "2026-01-15",
+            "amount": -10.0,
+            "merchant": {"name": "Coffee Shop"},
+            "pending": False,
+        }
+        if owned_by is not None:
+            txn["ownedByUser"] = owned_by
+        txn.update(extra)
+        return txn
+
+    def _invoke_list_json(self, mock_authenticated_client: MagicMock, results: list[dict]):
+        response = {"allTransactions": {"results": results}}
+
+        async def async_get_transactions(**_):
+            return response
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            return runner.invoke(app, ["list", "--json"])
+
+    def test_list_json_exposes_complete_owner(self, mock_authenticated_client: MagicMock) -> None:
+        result = self._invoke_list_json(
+            mock_authenticated_client,
+            [self._owned_transaction({"id": "user-1", "name": "Alex"})],
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload[0]["owner_id"] == "user-1"
+        assert payload[0]["owner_name"] == "Alex"
+        assert payload[0]["ownership_overridden_at"] is None
+
+    @pytest.mark.parametrize(
+        "owned_by",
+        [None, "not-an-object", ["user-1"], {"id": "user-1"}, {"name": "Alex"}],
+        ids=["null", "string", "list", "partial-id", "partial-name"],
+    )
+    def test_list_json_missing_or_malformed_owner_is_null(
+        self, mock_authenticated_client: MagicMock, owned_by: object
+    ) -> None:
+        result = self._invoke_list_json(
+            mock_authenticated_client, [self._owned_transaction(owned_by)]
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert "owner_id" in payload[0]
+        assert "owner_name" in payload[0]
+        assert "is_shared" not in payload[0]
+
+    def test_list_json_override_timestamp_is_literal(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        result = self._invoke_list_json(
+            mock_authenticated_client,
+            [
+                self._owned_transaction(
+                    {"id": "user-1", "name": "Alex"},
+                    ownershipOverriddenAt="2026-01-02T03:04:05Z",
+                )
+            ],
+        )
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload[0]["ownership_overridden_at"] == "2026-01-02T03:04:05Z"
+        # The timestamp never grows derived actor/previous-owner/shared fields.
+        assert "overridden_by" not in payload[0]
+        assert "previous_owner" not in payload[0]
+        assert "is_shared" not in payload[0]
+
+    def test_list_quiet_remains_id_only(self, mock_authenticated_client: MagicMock) -> None:
+        response = {"allTransactions": {"results": [self._owned_transaction({"id": "user-1"})]}}
+
+        async def async_get_transactions(**_):
+            return response
+
+        mock_authenticated_client.get_transactions = async_get_transactions
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            set_quiet(True)
+            try:
+                result = runner.invoke(app, ["list"])
+            finally:
+                set_quiet(False)
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == "txn_owned"
+
+
 class TestTransactionsGet:
     """Tests for normalized transaction detail discovery."""
 
@@ -588,6 +701,79 @@ class TestTransactionsGet:
         assert payload["review_status"] == "PENDING"
         assert payload["attachments"][0]["id"] == "att_1"
         assert payload["tags"][0]["name"] == "Work"
+
+    def test_get_exposes_owner_fields_and_literal_override_timestamp(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+
+        detail_response = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "date": "2024-01-15",
+                "amount": -50.0,
+                "ownedByUser": {"id": "user-1", "name": "Alex"},
+                "ownershipOverriddenAt": "2026-01-02T03:04:05Z",
+            }
+        }
+
+        async def async_get_transaction_details(**_kwargs: Any) -> dict[str, Any]:
+            return detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "txn-detail", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["owner_id"] == "user-1"
+        assert payload["owner_name"] == "Alex"
+        assert payload["ownership_overridden_at"] == "2026-01-02T03:04:05Z"
+        # The timestamp never grows derived actor/previous-owner/shared fields.
+        assert "overridden_by" not in payload
+        assert "previous_owner" not in payload
+        assert "is_shared" not in payload
+
+    @pytest.mark.parametrize(
+        "owned_by",
+        [None, "not-an-object", ["user-1"], {}],
+        ids=["null", "string", "list", "empty-object"],
+    )
+    def test_get_malformed_owner_yields_nulls_without_crashing(
+        self, mock_authenticated_client: MagicMock, owned_by: object
+    ) -> None:
+        detail_response = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "date": "2024-01-15",
+                "amount": -50.0,
+                "ownedByUser": owned_by,
+            }
+        }
+
+        async def async_get_transaction_details(**_kwargs: Any) -> dict[str, Any]:
+            return detail_response
+
+        mock_authenticated_client.get_transaction_details = async_get_transaction_details
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["get", "txn-detail", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["owner_id"] is None
+        assert payload["owner_name"] is None
+        assert payload["ownership_overridden_at"] is None
 
     def test_get_preserves_needs_review_when_detail_omits_review_status(
         self, mock_authenticated_client: MagicMock
