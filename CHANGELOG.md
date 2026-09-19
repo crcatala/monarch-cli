@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Liability and Debt-Service Account Metadata
+- **Direct asset/liability classification** - `is_asset` mirrors the upstream `isAsset` flag; unavailable classifications stay `null` and liability is never inferred from display labels
+- **Liability metadata in `monarch accounts list`** - Distinct nullable `credit_limit`, `provider_credit_limit`, `apr`, `interest_rate`, `minimum_payment`, `planned_payment`, and `excluded_from_debt_paydown` fields; provider and user-facing values never merge; missing values stay `null`, never fabricated zeroes
+- **Stable type/subtype identifiers** - `type_name` and `subtype_name` mirror the upstream `name` identifiers used by `monarch accounts types`; `type`/`subtype` remain display labels
+- **Literal passthrough** - Rate values keep upstream numeric units (no scaling); upstream does not document snapshot-vs-setting semantics for planned/provider/minimum values, and no claim is made
+
 #### Household Ownership Visibility
 - **`owner_id` / `owner_name` in account output** - Normalized account records mirror the optional upstream `ownedByUser` relationship (`id` and `displayName`), so shared-household activity can be separated by person
 - **`owner_id` / `owner_name` / `ownership_overridden_at` in transaction output** - List and detail records expose the upstream ownership relationship (`id` and `name`) and pass the override timestamp through literally; no actor, previous owner, or boolean shared state is ever derived
@@ -57,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Default output format** - Changed from `json` to `plain` for interactive terminal use
   - TTY: Human-friendly output with emoji icons
   - Piped/redirected: Automatic JSON output (backwards compatible)
+- **Concise-format contract decision** - For list commands that offer a concise display selection, `compact` now shows the same curated field subset as `plain`/`table`; `json`, `csv`, and `ndjson` always keep the complete normalized records with every stable field
 
 ### Removed
 

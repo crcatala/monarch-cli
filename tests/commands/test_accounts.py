@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from monarch_cli.commands.accounts import app
+from monarch_cli.commands.accounts import ACCOUNT_LIST_DISPLAY_FIELDS, app
 from monarch_cli.core.operations import (
     Effect,
     Operation,
@@ -219,9 +219,13 @@ class TestAccountsList:
             result = runner.invoke(app, ["list", "--format", "table"])
 
             assert result.exit_code == 0
-            # Table output has table chars and column headers
+            # Table output has table chars and column headers. The concise
+            # display selection keeps liability classification (is_asset) and
+            # owner attribution legible, so narrow terminals may truncate
+            # individual headers; assert on stable prefixes rather than full
+            # header names.
             assert "id" in result.stdout
-            assert "name" in result.stdout
+            assert "apr" in result.stdout
             # Table contains box drawing characters
             assert "┃" in result.stdout or "|" in result.stdout
 
@@ -486,6 +490,202 @@ class TestAccountsListOwnership:
         assert result.exit_code == 0
         payload = json.loads(result.stdout)
         assert payload["accounts"][0]["ownedByUser"] == owned
+
+
+class TestAccountsListLiability:
+    """Liability and debt-service metadata in account list output.
+
+    Normalized output carries the direct ``is_asset`` classification, stable
+    ``type_name``/``subtype_name`` identifiers, and the distinct nullable
+    liability fields. Concise formats (plain/table/compact) stay small;
+    JSON/CSV keep everything; raw is untouched; quiet stays ID-only.
+    """
+
+    CREDIT_RAW = {
+        "id": "acc_credit",
+        "displayName": "Shared Visa",
+        "type": {"name": "liability", "display": "Credit Card"},
+        "subtype": {"name": "credit_card", "display": "Credit Card"},
+        "currentBalance": -1250.5,
+        "isHidden": False,
+        "isManual": False,
+        "isAsset": False,
+        "limit": 5000.0,
+        "dataProviderCreditLimit": 5100.0,
+        "apr": 0.2499,
+        "interestRate": 24.99,
+        "minimumPayment": 25.0,
+        "plannedPayment": 50.0,
+        "excludeFromDebtPaydown": False,
+    }
+
+    def _invoke_list(
+        self, mock_authenticated_client: MagicMock, accounts: list[dict], args: list[str]
+    ):
+        response = {"accounts": accounts}
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            return runner.invoke(app, args)
+
+    def test_list_json_credit_card_liability_metadata(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        result = self._invoke_list(mock_authenticated_client, [self.CREDIT_RAW], ["list", "--json"])
+        assert result.exit_code == 0
+        record = json.loads(result.stdout)[0]
+        assert record["is_asset"] is False
+        assert record["type_name"] == "liability"
+        assert record["subtype_name"] == "credit_card"
+        assert record["credit_limit"] == 5000.0
+        assert record["provider_credit_limit"] == 5100.0
+        assert record["apr"] == 0.2499
+        assert record["interest_rate"] == 24.99
+        assert record["minimum_payment"] == 25.0
+        assert record["planned_payment"] == 50.0
+        assert record["excluded_from_debt_paydown"] is False
+        assert record["credit_limit"] != record["provider_credit_limit"]
+
+    def test_list_json_null_partial_zero_negative_stay_distinguishable(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        result = self._invoke_list(
+            mock_authenticated_client,
+            [
+                {"id": "acc_partial", "isAsset": None, "limit": 0, "minimumPayment": -1.5},
+                {"id": "acc_bare"},
+            ],
+            ["list", "--json"],
+        )
+        assert result.exit_code == 0
+        records = json.loads(result.stdout)
+        assert records[0]["is_asset"] is None
+        assert records[0]["credit_limit"] == 0
+        assert records[0]["minimum_payment"] == -1.5
+        assert records[0]["apr"] is None
+        for record in records:
+            for field in (
+                "provider_credit_limit",
+                "planned_payment",
+                "excluded_from_debt_paydown",
+                "type_name",
+                "subtype_name",
+            ):
+                assert record[field] is None
+
+    def test_list_plain_shows_asset_liability_classification(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        result = self._invoke_list(
+            mock_authenticated_client, [self.CREDIT_RAW], ["list", "--format", "plain"]
+        )
+        assert result.exit_code == 0
+        # Plain human formatting renders the classification and the small
+        # liability subset (Yes/No booleans, locale-formatted numbers).
+        assert "Is Asset: No" in result.stdout
+        assert "Credit Limit: 5,000.00" in result.stdout
+        assert "Apr: 0.25" in result.stdout
+
+    def test_list_compact_is_concise_and_json_complete(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        compact = self._invoke_list(
+            mock_authenticated_client, [self.CREDIT_RAW], ["list", "--format", "compact"]
+        )
+        assert compact.exit_code == 0
+        compact_record = json.loads(compact.stdout)[0]
+        assert set(compact_record) == set(ACCOUNT_LIST_DISPLAY_FIELDS)
+
+        full = self._invoke_list(mock_authenticated_client, [self.CREDIT_RAW], ["list", "--json"])
+        full_record = json.loads(full.stdout)[0]
+        for field in (
+            "provider_credit_limit",
+            "interest_rate",
+            "minimum_payment",
+            "planned_payment",
+            "excluded_from_debt_paydown",
+        ):
+            assert field in full_record
+
+    def test_list_csv_keeps_all_liability_fields(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        result = self._invoke_list(
+            mock_authenticated_client, [self.CREDIT_RAW], ["list", "--format", "csv"]
+        )
+        assert result.exit_code == 0
+        header = result.stdout.splitlines()[0]
+        for field in (
+            "credit_limit",
+            "provider_credit_limit",
+            "apr",
+            "interest_rate",
+            "minimum_payment",
+            "planned_payment",
+            "excluded_from_debt_paydown",
+            "type_name",
+            "subtype_name",
+            "is_asset",
+        ):
+            assert field in header
+
+    def test_list_quiet_remains_id_only_with_liability_payload(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        response = {"accounts": [self.CREDIT_RAW]}
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.services.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            set_quiet(True)
+            try:
+                result = runner.invoke(app, ["list"])
+            finally:
+                set_quiet(False)
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == "acc_credit"
+
+    def test_list_raw_preserves_liability_fields_verbatim(
+        self, mock_authenticated_client: MagicMock
+    ) -> None:
+        response = {"accounts": [self.CREDIT_RAW]}
+
+        async def async_accounts() -> dict:
+            return response
+
+        mock_authenticated_client.get_accounts = async_accounts
+        with (
+            patch(
+                "monarch_cli.commands.accounts.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(app, ["list", "--raw", "--json"])
+        assert result.exit_code == 0
+        record = json.loads(result.stdout)["accounts"][0]
+        assert record["isAsset"] is False
+        assert record["dataProviderCreditLimit"] == 5100.0
+        assert record["excludeFromDebtPaydown"] is False
+        assert "is_asset" not in record
 
 
 class TestAccountsTypes:

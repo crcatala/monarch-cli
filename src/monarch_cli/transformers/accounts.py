@@ -16,6 +16,25 @@ Normalization rules (v1 contract):
   ``null``, or non-object owner relationship yields ``null`` for both fields;
   null ownership means only that owner identity was not provided and does not
   distinguish shared, unassigned, unavailable, or unsupported upstream states.
+- ``is_asset`` is the direct upstream asset/liability classification from
+  ``isAsset``. It is nullable: absent, ``null``, or drifted non-boolean values
+  yield ``null`` (unknown classification) rather than a misleading default.
+  Liability is never inferred from localized display labels.
+- ``type_name`` and ``subtype_name`` mirror the upstream ``type.name``/
+  ``subtype.name`` identifiers — the same stable identifiers used by
+  ``monarch accounts types`` — while ``type``/``subtype`` remain the human
+  display labels.
+- Liability and debt-service metadata pass through literally from the released
+  ``get_accounts`` response: ``credit_limit`` (upstream ``limit``),
+  ``provider_credit_limit`` (``dataProviderCreditLimit``), ``apr``,
+  ``interest_rate`` (``interestRate``), ``minimum_payment``
+  (``minimumPayment``), ``planned_payment`` (``plannedPayment``), and
+  ``excluded_from_debt_paydown`` (``excludeFromDebtPaydown``). All are
+  nullable and stay distinguishable from zero, negative, or inapplicable
+  values: missing, ``null``, or non-numeric/non-boolean values yield ``null``,
+  never a fabricated zero. No precedence or merging occurs between the two
+  limit fields or between APR and interest rate, and rate values keep their
+  upstream numeric units without scaling.
 - A present-but-null nested relationship (for example ``institution: null``)
   yields ``null`` rather than raising.
 - Unknown additive upstream fields are ignored.
@@ -28,7 +47,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from .nesting import bool_or_default, list_or_empty, nested_get, require_list, require_object
+from .nesting import (
+    bool_or_default,
+    list_or_empty,
+    nested_get,
+    nullable_bool,
+    nullable_number,
+    require_list,
+    require_object,
+)
 
 
 def transform_account(raw: Any) -> dict[str, Any]:
@@ -61,6 +88,16 @@ def transform_account(raw: Any) -> dict[str, Any]:
         "is_manual": bool_or_default(nested_get(account, "isManual"), False),
         "owner_id": nested_get(account, "ownedByUser", "id"),
         "owner_name": nested_get(account, "ownedByUser", "displayName"),
+        "type_name": nested_get(account, "type", "name"),
+        "subtype_name": nested_get(account, "subtype", "name"),
+        "is_asset": nullable_bool(nested_get(account, "isAsset")),
+        "credit_limit": nullable_number(nested_get(account, "limit")),
+        "provider_credit_limit": nullable_number(nested_get(account, "dataProviderCreditLimit")),
+        "apr": nullable_number(nested_get(account, "apr")),
+        "interest_rate": nullable_number(nested_get(account, "interestRate")),
+        "minimum_payment": nullable_number(nested_get(account, "minimumPayment")),
+        "planned_payment": nullable_number(nested_get(account, "plannedPayment")),
+        "excluded_from_debt_paydown": nullable_bool(nested_get(account, "excludeFromDebtPaydown")),
         "last_updated": nested_get(account, "updatedAt"),
     }
 

@@ -247,9 +247,9 @@ def output(
         raw: If True, print data as-is (pass-through).
         quiet: If True, output only IDs (one per line). If None, uses module flag.
         id_field: Field name to extract when in quiet mode (default: "id").
-        display_fields: Optional ordered field selection for the concise human
-            formats (plain, table). Machine-readable formats (JSON, CSV,
-            compact/NDJSON) always keep the complete normalized fields;
+        display_fields: Optional ordered field selection for the concise
+            formats (plain, table, compact). Machine-readable formats (JSON,
+            CSV, and NDJSON) always keep the complete normalized fields;
             --raw is untouched. When ``None``, no projection is applied.
 
     Note:
@@ -287,9 +287,11 @@ def output(
         print(format_plain(_project_display(data, display_fields)))
 
     elif format == OutputFormat.COMPACT:
-        # Machine-readable: always the complete normalized record, so stable
-        # owner fields survive for automation.
-        print(json.dumps(data, default=str))
+        # Explicit contract decision: compact is a concise single-line summary
+        # view, projected like the other human formats. NDJSON (--ndjson) is
+        # the machine-readable streaming format and always carries the
+        # complete normalized records, as do JSON and CSV.
+        print(json.dumps(_project_display(data, display_fields), default=str))
 
     elif format == OutputFormat.TABLE:
         # TABLE only works for list of dicts

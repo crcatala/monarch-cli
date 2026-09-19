@@ -19,6 +19,8 @@ from monarch_cli.transformers.nesting import (
     list_or_empty,
     mapping_or_empty,
     nested_get,
+    nullable_bool,
+    nullable_number,
     number_or_zero,
     require_object,
 )
@@ -143,3 +145,42 @@ class TestNumberOrZero:
     def test_nan_and_infinity_are_left_to_the_caller(self) -> None:
         # The helper does not silently sanitize real numeric payloads.
         assert math.isnan(number_or_zero(float("nan")))
+
+
+class TestNullableBool:
+    """``nullable_bool`` keeps unavailable flags distinguishable from False."""
+
+    def test_booleans_pass_through(self) -> None:
+        assert nullable_bool(True) is True
+        assert nullable_bool(False) is False
+
+    def test_unavailable_yields_none(self) -> None:
+        assert nullable_bool(None) is None
+
+    @pytest.mark.parametrize("drifted", ["true", 1, [], {}])
+    def test_malformed_yields_none(self, drifted: object) -> None:
+        assert nullable_bool(drifted) is None
+
+
+class TestNullableNumber:
+    """``nullable_number`` backs literal liability/rate passthrough."""
+
+    @pytest.mark.parametrize("value", [0, 0.0, 12, -3.5, 1e9])
+    def test_numeric_values_pass_through_unchanged(self, value: int | float) -> None:
+        assert nullable_number(value) == value
+
+    def test_unavailable_yields_none_not_zero(self) -> None:
+        assert nullable_number(None) is None
+        assert nullable_number("12") is None
+        assert nullable_number("oops") is None
+        assert nullable_number([]) is None
+
+    def test_booleans_are_rejected(self) -> None:
+        # A boolean must never leak in as a numeric value.
+        assert nullable_number(True) is None
+        assert nullable_number(False) is None
+
+    def test_nan_and_infinity_are_left_to_the_caller(self) -> None:
+        # The helper does not silently sanitize real numeric payloads.
+        assert math.isnan(nullable_number(float("nan")))
+        assert math.isinf(nullable_number(float("inf")))

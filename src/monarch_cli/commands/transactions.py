@@ -54,9 +54,9 @@ app.add_typer(transaction_tags.app, name="tags")
 LIST_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 GET_EFFECTS: frozenset[Effect] = frozenset({Effect.READ_ONLY})
 
-#: Concise ordered field selection for ``transactions list`` human formats
-#: (plain/table). Machine-readable formats (JSON, CSV, compact/NDJSON) always
-#: emit the complete normalized transaction fields, and ``--raw`` is
+#: Concise ordered field selection for ``transactions list`` concise formats
+#: (plain/table/compact). Machine-readable formats (JSON, CSV, and NDJSON)
+#: always emit the complete normalized transaction fields, and ``--raw`` is
 #: untouched. The owner identifier and override timestamp are omitted here
 #: because only a legible owner name is useful in a table; both remain
 #: available in the machine-readable formats.
