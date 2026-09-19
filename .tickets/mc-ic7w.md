@@ -1,6 +1,6 @@
 ---
 id: mc-ic7w
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-09-19T17:37:24Z
@@ -73,3 +73,14 @@ The control — dispatching the real write and then raising `aiohttp.ServerDisco
 Repro technique: patch `aiohttp.ClientSession._request` (through gql) or `MonarchMoney.gql_call` (above gql) to dispatch the request and then raise. Confirm the remote effect by reading state back after the CLI reports `failed`.
 
 Also observed: the read path retries (4 attempts then NETWORK_ERROR), while the mutation path is single-attempt. Any fix must preserve non-retry semantics for mutations.
+
+**2026-09-19T18:00:50Z**
+
+Fix implemented on branch fix/mc-ic7w-gql-transport-ambiguity and opened as PR https://github.com/crcatala/monarch-cli/pull/89.
+
+Classification changes:
+- gql.transport.exceptions.TransportConnectionFailed added to RETRYABLE_EXCEPTIONS (src/monarch_cli/core/retry.py), which also makes it ambiguous on the mutation path since AMBIGUOUS_TRANSPORT_EXCEPTIONS is derived from that set.
+- Defensive catch-all for the gql TransportError base class in run_mutation_api_call_async treats any in-flight transport failure as ambiguous, so a future gql exception cannot silently downgrade a dispatched write.
+- Definitive rejections stay definitive: TransportQueryError (GraphQL errors), TransportAlreadyConnected/Closed, and 4xx TransportServerError; 5xx is ambiguous.
+
+Tests: real gql transport wrapping exercised by patching aiohttp.ClientSession.post (gql raises TransportConnectionFailed), plus raw wrapper, GraphQL errors, 4xx/5xx, read retry, and a command-level budgets set envelope test (exit 4, remote_state unknown, verification present). Docs + changelog updated.
