@@ -1,6 +1,6 @@
 ---
 id: mc-hu2c
-status: in_progress
+status: closed
 deps: []
 links: [mc-s6s6]
 created: 2026-09-19T01:19:38Z
