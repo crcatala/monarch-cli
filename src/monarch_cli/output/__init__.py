@@ -384,6 +384,10 @@ def emit_mutation_outcome(outcome: dict[str, Any]) -> None:
     """
     validate_mutation_output()
     print(json.dumps(outcome, indent=2, default=str))
+    # Dry-run previews share this emission path but are not mutation outcomes:
+    # they carry status "dry_run" and always exit 0.
+    if outcome.get("status") == "dry_run":
+        return
     code = outcome_exit_code(outcome["status"])
     if code:
         raise typer.Exit(code)

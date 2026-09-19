@@ -457,3 +457,43 @@ class TestGlobalValueValidation:
         assert result.exit_code == 2, result.output
         assert_parsed_cleanly(result, caught)
         assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+
+
+class TestDryRunPreviews:
+    """Dry-run previews need no --allow-mutations and accept --yes as a no-op."""
+
+    def test_dry_run_yes_is_accepted_as_noop(self) -> None:
+        mock = MagicMock()
+
+        async def get_tags():  # noqa: ANN202
+            return {
+                "householdTransactionTags": [{"id": "tag-1", "name": "Work", "color": "#112233"}]
+            }
+
+        async def get_detail(**_: object):  # noqa: ANN202
+            return {"getTransaction": {"id": "txn-1", "tags": []}}
+
+        mock.get_transaction_tags = get_tags
+        mock.get_transaction_details = get_detail
+
+        with patch(
+            "monarch_cli.commands.transaction_tags.get_authenticated_client",
+            return_value=mock,
+        ):
+            result, caught = invoke(
+                [
+                    "--yes",
+                    "transactions",
+                    "tags",
+                    "replace",
+                    "--transaction-id",
+                    "txn-1",
+                    "--tag-id",
+                    "tag-1",
+                    "--dry-run",
+                ]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert_parsed_cleanly(result, caught)
+        assert json.loads(result.stdout)["status"] == "dry_run"

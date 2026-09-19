@@ -188,6 +188,13 @@ read-only discovery request; unknown names/IDs and duplicate-name ambiguities
 are pre-mutation errors, and duplicates are removed in first-seen order. Verify
 an ambiguous or mismatched write with `transactions tags show` before retrying.
 
+`replace`, `add`, and `clear` accept `--dry-run`: a preview performs only
+read/validation work (including reading the current assignment), requires no
+`--allow-mutations`, never prompts, and emits a JSON result with
+`status: "dry_run"`, the operation, the target, and the resolved detail. A
+preview is distinct from `mutation-outcome.v1`; `--dry-run --yes` is accepted
+(`--yes` is irrelevant to a preview).
+
 ### Transaction splits
 
 `monarch transactions splits show TRANSACTION_ID` is read-only and displays the
@@ -200,6 +207,11 @@ monarch --allow-mutations --yes transactions splits replace --transaction-id TXN
   --splits-file ./splits.json
 monarch --allow-mutations --yes transactions splits clear --transaction-id TXN123
 ```
+
+`replace` and `clear` accept `--dry-run`. A preview validates the parent amount
+and input constraints, shows the intended split set (or the rows that would be
+cleared), never calls the mutation endpoint, requires no `--allow-mutations`,
+and emits `status: "dry_run"` distinct from `mutation-outcome.v1`.
 
 Exactly one source is required. Inline and file JSON are bounded to 64 KiB;
 replacement arrays contain 1–100 records, each with exactly non-empty

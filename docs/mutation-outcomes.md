@@ -51,6 +51,30 @@ re-rendered by `--quiet`/`--format`) but are **not** part of this envelope:
 a preview carries `status: "dry_run"` and is explicitly distinct from
 `mutation-outcome.v1`.
 
+## Dry-run previews
+
+`transactions update`, `transactions batch-update`, `transactions tags
+replace`/`add`/`clear`, and `transactions splits replace`/`clear` accept
+`--dry-run`. A preview may authenticate and perform read-only
+validation/discovery (including reading the current assignment or a split
+parent amount) but **never calls a mutation endpoint, never requires
+`--allow-mutations`, and never prompts for confirmation**. `--dry-run --yes`
+is accepted and documented as irrelevant.
+
+A preview result is a JSON object with:
+
+- `status`: always `"dry_run"`, so a preview can never be confused with an
+  applied write or with `mutation-outcome.v1`.
+- `operation`: the stable operation identifier (for example
+  `transactions.tags.replace`).
+- `target`: the resolved target (for example `{"transaction_id": "txn_123"}`).
+- `detail`: a command-specific, informational object describing what would
+  happen. It is **not** a second stable schema family; `mc-cpzi` may decide
+  later whether previews are schematized.
+
+Previews are never registered as a mutation outcome operation and never use the
+`mutation-outcome.v1` envelope.
+
 ## The envelope
 
 ```json

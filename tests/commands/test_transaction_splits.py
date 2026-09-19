@@ -375,3 +375,56 @@ def test_replace_rejects_removed_source_aliases() -> None:
         result = invoke(mock, ["replace", "--transaction-id", "txn-1", alias, "splits.json"])
         assert result.exit_code != 0, result.output
     mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_replace_dry_run_validates_parent_without_write() -> None:
+    mock = client()
+    mock.get_transaction_splits.return_value = payload()  # amount -10.0
+    result = invoke(
+        mock,
+        [
+            "replace",
+            "--transaction-id",
+            "txn-1",
+            "--splits-json",
+            '[{"merchantName":"Store","amount":-10.00,"categoryId":"cat-1"}]',
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload_out = json.loads(result.stdout)
+    assert payload_out["status"] == "dry_run"
+    assert payload_out["operation"] == "transactions.splits.replace"
+    assert payload_out["detail"]["parent_amount"] == "-10.0"
+    assert payload_out["detail"]["splits"][0]["amount"] == -10.0
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_clear_dry_run_reads_current_without_write() -> None:
+    mock = client()
+    mock.get_transaction_splits.return_value = payload(rows=[row()])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    detail = json.loads(result.stdout)["detail"]
+    assert detail["current_split_count"] == 1
+    assert detail["final_splits"] == []
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_split_dry_run_does_not_require_mutation_authorization() -> None:
+    set_mutation_authorized(False)
+    mock = client()
+    mock.get_transaction_splits.return_value = payload()
+    result = invoke(
+        mock,
+        [
+            "replace",
+            "--transaction-id",
+            "txn-1",
+            "--splits-json",
+            '[{"merchantName":"Store","amount":-10.00,"categoryId":"cat-1"}]',
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    mock.update_transaction_splits.assert_not_awaited()

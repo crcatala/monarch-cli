@@ -18,6 +18,7 @@ from ..core.mutation_outcomes import (
     build_mutation_outcome,
     error_from_exception,
     failed_item,
+    outcome_operation,
     succeeded_item,
     verification_object,
 )
@@ -34,6 +35,7 @@ from .mutation_helpers import (
     as_object as _as_object,
 )
 from .mutation_helpers import (
+    build_preview,
     confirm_destructive,
 )
 from .mutation_helpers import (
@@ -465,6 +467,10 @@ def replace_splits(
         Path | None,
         typer.Option("--splits-file", help="Readable JSON file containing a split array"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview the intended split set without writing"),
+    ] = False,
 ) -> None:
     """Replace every split using one bounded JSON source."""
     _reject_positional_targets(ctx.args)
@@ -472,12 +478,22 @@ def replace_splits(
     requested = _validate_splits(_load_source(splits_json, splits_file))
     operation = Operation(command="transactions splits replace", effects=MUTATION_EFFECTS)
     validate_mutation_output()
-    require_mutation_authorization(operation)
+    if not dry_run:
+        require_mutation_authorization(operation)
     client = get_authenticated_client()
     # This read is intentionally before confirmation and the mutation: parent
     # amount validation must use the current server value, not caller input.
     parent, _current = _read_splits(client, transaction_id)
     _validate_signed_total(requested, parent.get("amount"))
+    if dry_run:
+        emit_mutation_outcome(
+            build_preview(
+                outcome_operation(operation.command),
+                transaction_id,
+                {"parent_amount": str(parent.get("amount")), "splits": requested},
+            )
+        )
+        return
     _confirm(operation.command, transaction_id, requested)
     try:
         payload = run_mutation_call(
@@ -582,14 +598,29 @@ def replace_splits(
 def clear_splits(
     ctx: typer.Context,
     transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview the clear without writing"),
+    ] = False,
 ) -> None:
     """Explicitly clear every split by sending the canonical empty list."""
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     operation = Operation(command="transactions splits clear", effects=MUTATION_EFFECTS)
     validate_mutation_output()
-    require_mutation_authorization(operation)
+    if not dry_run:
+        require_mutation_authorization(operation)
     client = get_authenticated_client()
+    if dry_run:
+        _parent, current = _read_splits(client, transaction_id)
+        emit_mutation_outcome(
+            build_preview(
+                outcome_operation(operation.command),
+                transaction_id,
+                {"current_split_count": len(current), "final_splits": []},
+            )
+        )
+        return
     _confirm(operation.command, transaction_id, [])
     try:
         payload = run_mutation_call(
