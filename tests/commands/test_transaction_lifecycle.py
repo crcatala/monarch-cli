@@ -170,9 +170,9 @@ def test_delete_requires_transaction_id_option() -> None:
 
 def test_delete_rejects_positional_target() -> None:
     mock = client()
-    result = invoke(mock, ["delete", "txn-1"])
+    result = invoke(mock, ["delete", "txn-1", "--transaction-id", "txn-1"])
     assert result.exit_code != 0
-    assert "transaction-id" in _plain(result.output).lower()
+    assert "positional" in _plain(result.output + (result.stderr or "")).lower()
     mock.delete_transaction.assert_not_awaited()
 
 
