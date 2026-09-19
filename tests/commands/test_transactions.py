@@ -660,6 +660,8 @@ class TestTransactionsGet:
                 "pending": False,
                 "needsReview": True,
                 "reviewStatus": "PENDING",
+                "reviewedAt": "2024-01-16T10:00:00Z",
+                "reviewedByUser": {"id": "user_1", "name": "Alex"},
                 "attachments": [{"id": "att_1", "filename": "receipt.pdf"}],
                 "tags": [{"id": "tag_1", "name": "Work", "color": "blue"}],
                 "isSplitTransaction": True,
@@ -695,6 +697,8 @@ class TestTransactionsGet:
         assert payload["is_pending"] is False
         assert payload["needs_review"] is True
         assert payload["review_status"] == "PENDING"
+        assert payload["reviewed_at"] == "2024-01-16T10:00:00Z"
+        assert payload["reviewed_by_user"] == {"id": "user_1", "name": "Alex"}
         assert payload["attachments"][0]["id"] == "att_1"
         assert payload["tags"][0]["name"] == "Work"
 
