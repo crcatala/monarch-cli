@@ -206,7 +206,6 @@ class TestGlobalOptionParsing:
         ):
             result, caught = invoke(
                 [
-                    "--quiet",
                     "--no-color",
                     "--verbose",
                     "--timeout",
@@ -447,3 +446,14 @@ class TestMutationOutputSelection:
         assert_parsed_cleanly(result, caught)
         data = json.loads(result.stdout)
         assert data["operation"] == "accounts.refresh"
+
+
+class TestGlobalValueValidation:
+    """Global option values are validated before any API call (mc-s6s6)."""
+
+    def test_timeout_below_one_is_a_structured_error(self) -> None:
+        result, caught = invoke(["--timeout", "0", "auth", "status"])
+
+        assert result.exit_code == 2, result.output
+        assert_parsed_cleanly(result, caught)
+        assert json.loads(result.stderr)["code"] == "INVALID_INPUT"

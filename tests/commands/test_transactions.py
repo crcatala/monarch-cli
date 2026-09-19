@@ -10,8 +10,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from monarch_cli.commands.transactions import _parse_date, app
-from monarch_cli.core.exceptions import APIError
+from monarch_cli.commands.transactions import app
+from monarch_cli.core.dates import parse_iso_date
+from monarch_cli.core.exceptions import APIError, ValidationError
 from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
 from monarch_cli.output import set_quiet
 
@@ -26,29 +27,23 @@ def authorize_subcommand_tests():
     reset_mutation_authorization()
 
 
-class TestParseDateHelper:
-    """Tests for the date parsing helper."""
+class TestStrictDateParser:
+    """The single shared strict YYYY-MM-DD validator used by the commands."""
 
     def test_parse_valid_date(self) -> None:
-        """Parse valid date string."""
         from datetime import date
 
-        result = _parse_date("2024-06-15")
+        result = parse_iso_date("2024-06-15", field="date")
         assert result == date(2024, 6, 15)
 
     def test_parse_none_returns_none(self) -> None:
-        """Parse None returns None."""
-        result = _parse_date(None)
-        assert result is None
+        assert parse_iso_date(None, field="date") is None
 
-    def test_parse_invalid_date_raises(self) -> None:
-        """Parse invalid date raises typer.BadParameter."""
-        import typer
-
-        with pytest.raises(typer.BadParameter) as exc_info:
-            _parse_date("not-a-date")
-        assert "Invalid date format" in str(exc_info.value)
-        assert "YYYY-MM-DD" in str(exc_info.value)
+    def test_parse_invalid_date_raises_structured_error(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            parse_iso_date("not-a-date", field="date")
+        assert exc_info.value.code.value == "INVALID_INPUT"
+        assert exc_info.value.exit_code == 2
 
 
 @pytest.fixture
@@ -1699,3 +1694,61 @@ class TestExplicitMutationTargets:
 
         assert result.exit_code == 0, result.output
         assert update_calls == ["txn_1", "txn_2", "txn_3"]
+
+
+class TestValidationSemantics:
+    """mc-s6s6: early, structured validation of flags and values."""
+
+    def test_batch_max_concurrency_rejects_zero(self) -> None:
+        result = runner.invoke(
+            app,
+            ["batch-update", "--transaction-id", "txn_1", "--max-concurrency", "0", "--notes", "x"],
+        )
+        assert result.exit_code == 2
+        assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+
+    @pytest.mark.parametrize("value", ["-3", "17", "100"])
+    def test_batch_max_concurrency_rejects_out_of_range(self, value: str) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "batch-update",
+                "--transaction-id",
+                "txn_1",
+                "--max-concurrency",
+                value,
+                "--notes",
+                "x",
+            ],
+        )
+        assert result.exit_code == 2
+        assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+
+    def test_update_rejects_non_finite_amounts(self) -> None:
+        for value in ("nan", "inf", "-inf"):
+            result = runner.invoke(
+                app, ["update", "--transaction-id", "txn_1", "--amount", value, "--dry-run"]
+            )
+            assert result.exit_code == 2, (value, result.output)
+            assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+
+    def test_update_allows_zero_amount(self) -> None:
+        result = runner.invoke(
+            app, ["update", "--transaction-id", "txn_1", "--amount", "0", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.stdout)["changes"]["amount"] == 0.0
+
+    @pytest.mark.parametrize("value", ["20240115", "2024-1-5", "01-15-2024"])
+    def test_update_date_uses_strict_parser(self, value: str) -> None:
+        result = runner.invoke(
+            app, ["update", "--transaction-id", "txn_1", "--date", value, "--dry-run"]
+        )
+        assert result.exit_code == 2, (value, result.output)
+        assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+
+    @pytest.mark.parametrize("value", ["20240115", "2024-1-5"])
+    def test_list_date_uses_strict_parser(self, value: str) -> None:
+        result = runner.invoke(app, ["list", "--start", value])
+        assert result.exit_code == 2
+        assert json.loads(result.stderr)["code"] == "INVALID_INPUT"

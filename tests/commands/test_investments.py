@@ -36,3 +36,12 @@ def test_help_documents_bounded_reads_and_raw() -> None:
     assert result.exit_code == 0
     assert "four" in result.stdout
     assert "raw" in result.stdout.lower()
+
+
+def test_raw_and_aggregate_are_incompatible() -> None:
+    """--raw bypasses normalization, so --aggregate is rejected up front (mc-s6s6)."""
+    with patch("monarch_cli.commands.investments.get_investment_holdings") as get:
+        result = runner.invoke(app, ["--raw", "--aggregate", "--json"])
+    assert result.exit_code == 2
+    assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+    get.assert_not_called()

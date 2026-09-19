@@ -80,3 +80,14 @@ def test_subscription_raw_preserves_sensitive_upstream_fields_explicitly() -> No
         result = runner.invoke(app, ["subscription", "show", "--raw", "--json"])
     assert result.exit_code == 0
     assert json.loads(result.stdout) == raw
+
+
+def test_raw_and_include_deleted_are_incompatible() -> None:
+    """--raw passes the upstream response through, so --include-deleted is rejected."""
+    with patch("monarch_cli.commands.institutions.get_institutions_raw") as raw:
+        result = runner.invoke(
+            app, ["institutions", "list", "--raw", "--include-deleted", "--json"]
+        )
+    assert result.exit_code == 2
+    assert json.loads(result.stderr)["code"] == "INVALID_INPUT"
+    raw.assert_not_called()
