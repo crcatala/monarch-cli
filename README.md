@@ -222,7 +222,6 @@ order:
 
 See [Configuration](docs/configuration.md) for supported settings,
 environment variables, retry behavior, and non-interactive automation.
-For credential-storage security guidance, see [SECURITY.md](SECURITY.md).
 
 ## Command reference
 
@@ -283,8 +282,10 @@ instructions are in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-before opening a pull request.
+This is a personally maintained project and is not currently accepting code
+contributions, pull requests, or feature requests. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for bug-reporting, security, and fork
+information.
 
 ## License
 
