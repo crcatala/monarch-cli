@@ -1,6 +1,6 @@
 ---
 id: mc-r75q
-status: in_progress
+status: closed
 deps: [mc-h3cl, mc-7xfl]
 links: []
 created: 2026-09-11T01:36:40Z
