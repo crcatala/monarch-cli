@@ -92,14 +92,22 @@ monarch budgets list --json
 
 ### Global Options
 
+The documented grammar is `monarch [GLOBAL OPTIONS] GROUP COMMAND [COMMAND OPTIONS]`:
+global options must appear **before** the command path. An explicit leaf output
+selection (`-f/--format`, a command-local `--json`, or `--ndjson`) overrides the
+root default; the root `--json` supplies the default for structured commands;
+without either, rendering stays TTY-aware (plain on a TTY, JSON when piped).
+
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--version` | `-v` | Show version and exit |
 | `--verbose` | `-V` | Show operational progress messages |
 | `--debug` | | Show stack traces on errors |
-| `--json` | | Output in JSON format |
+| `--json` | | Output in JSON format (default for structured commands) |
 | `--quiet` | `-q` | Output only IDs, one per line |
 | `--no-color` | | Disable colored output |
+| `--timeout` | | API request timeout in seconds |
+| `--yes` | | Skip destructive confirmation only; never authorizes a mutation |
 | `--allow-mutations` | | Authorize remote mutations for this invocation only; place before the command path |
 | `--non-interactive` | | Fail before prompting; useful for CI and agents |
 | `--help` | | Show help and exit |
@@ -548,17 +556,17 @@ semantics.
 CLI flags override both config file and environment variables:
 
 ```bash
-# Override format for this command
+# Override format for this command (leaf-local --json)
 monarch accounts list --json
 
-# Override timeout for slow connections  
-monarch transactions list --timeout 60
+# Override timeout for slow connections
+monarch --timeout 60 transactions list
 
 # Disable color for this command
-monarch accounts list --no-color
+monarch --no-color accounts list
 
 # Enable verbose output
-monarch accounts list --verbose
+monarch --verbose accounts list
 ```
 
 ### Authentication Priority
@@ -585,7 +593,7 @@ ACCOUNTS=$(monarch accounts list | jq '.')
 monarch transactions list --json --preset this-month
 
 # Quiet mode for IDs only
-monarch accounts list --quiet
+monarch --quiet accounts list
 # Output:
 # ACC123456
 # ACC789012

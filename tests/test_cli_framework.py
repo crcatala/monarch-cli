@@ -14,6 +14,7 @@ paths or point at mocked clients.
 
 from __future__ import annotations
 
+import json
 import re
 import warnings
 from typing import TYPE_CHECKING
@@ -219,22 +220,60 @@ class TestGlobalOptionParsing:
         assert_parsed_cleanly(result, caught)
 
     def test_global_options_after_subcommand(self) -> None:
-        """Typer must keep accepting global flags placed after the subcommand."""
+        """Global-only options placed after the command path are rejected.
+
+        The documented grammar is ``monarch [GLOBAL OPTIONS] GROUP COMMAND
+        [COMMAND OPTIONS]``. A root-only global option such as
+        ``--allow-mutations`` is not a command option, so placing it after the
+        command path must be a usage error rather than silently accepted.
+        """
+        result, caught = invoke(["auth", "status", "--allow-mutations"])
+
+        assert result.exit_code != 0
+        assert_parsed_cleanly(result, caught)
+        assert "--allow-mutations" in result.output
+
+    def test_global_options_placement_before_subcommand_is_effective(self) -> None:
+        """A root global option before the command path still takes effect."""
         storage_info = {
             "has_env_token": False,
             "has_keyring_token": False,
             "has_file_token": False,
             "has_legacy_artifact": False,
-            "active_backend": "none",
+            "active_backend": None,
         }
         with patch(
             "monarch_cli.commands.auth.get_storage_info",
             return_value=storage_info,
         ):
-            result, caught = invoke(["auth", "status", "--json"])
+            result, caught = invoke(["--json", "auth", "status"])
 
         assert result.exit_code == 0, result.output
         assert_parsed_cleanly(result, caught)
+        data = json.loads(result.output)
+        assert data["authenticated"] is False
+
+    def test_root_json_matches_local_json_for_auth_status(self) -> None:
+        """`monarch --json auth status` and `monarch auth status --json` agree."""
+        storage_info = {
+            "has_env_token": False,
+            "has_keyring_token": True,
+            "has_file_token": False,
+            "has_legacy_artifact": False,
+            "active_backend": "keyring",
+        }
+        with patch(
+            "monarch_cli.commands.auth.get_storage_info",
+            return_value=storage_info,
+        ):
+            root_result, root_caught = invoke(["--json", "auth", "status"])
+            local_result, local_caught = invoke(["auth", "status", "--json"])
+
+        assert_parsed_cleanly(root_result, root_caught)
+        assert_parsed_cleanly(local_result, local_caught)
+        assert root_result.exit_code == 0, root_result.output
+        assert local_result.exit_code == 0, local_result.output
+        assert json.loads(root_result.output) == json.loads(local_result.output)
 
     def test_invalid_timeout_value_is_a_parse_error(self) -> None:
         result, caught = invoke(["--timeout", "not-a-number", "auth", "status"])
@@ -365,3 +404,43 @@ class TestErrorPaths:
         assert result.exit_code != 0
         assert_parsed_cleanly(result, caught)
         assert "Traceback" not in result.output
+
+
+class TestMutationOutputSelection:
+    """Mutation output selections are validated before any remote mutation."""
+
+    def test_quiet_is_rejected_on_mutation_before_mutation(self) -> None:
+        with patch("monarch_cli.commands.accounts.refresh_accounts") as mock_refresh:
+            result, caught = invoke(["--quiet", "--allow-mutations", "accounts", "refresh"])
+
+        assert result.exit_code == 2, result.output
+        assert_parsed_cleanly(result, caught)
+        combined = result.output + (result.stderr or "")
+        assert "INVALID_INPUT" in combined
+        assert "--quiet" in combined
+        mock_refresh.assert_not_called()
+
+    def test_json_is_accepted_on_mutation(self) -> None:
+        outcome = {
+            "schema_version": "mutation-outcome.v1",
+            "operation": "accounts.refresh",
+            "status": "succeeded",
+            "summary": {"total": 1, "succeeded": 1, "failed": 0, "ambiguous": 0},
+            "items": [
+                {
+                    "entity": "account",
+                    "id": "acc_1",
+                    "status": "succeeded",
+                    "result": {},
+                    "error": None,
+                }
+            ],
+            "verification": None,
+        }
+        with patch("monarch_cli.commands.accounts.refresh_accounts", return_value=outcome):
+            result, caught = invoke(["--json", "--allow-mutations", "accounts", "refresh"])
+
+        assert result.exit_code == 0, result.output
+        assert_parsed_cleanly(result, caught)
+        data = json.loads(result.stdout)
+        assert data["operation"] == "accounts.refresh"

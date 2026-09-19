@@ -20,7 +20,6 @@ from ..core.mutation_outcomes import (
     build_mutation_outcome,
     error_from_exception,
     failed_item,
-    outcome_exit_code,
     succeeded_item,
     verification_object,
 )
@@ -34,7 +33,7 @@ from ..core.operations import (
     run_mutation_call,
     run_read_call,
 )
-from ..output import OutputFormat, output
+from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
 from ..output.progress import spinner
 from ..transformers.transaction_aggregates import (
     transform_recurring_transactions,
@@ -650,10 +649,7 @@ BATCH_VERIFICATION_MESSAGE = (
 
 def _finish_mutation(outcome: dict[str, Any]) -> None:
     """Emit a mutation outcome envelope and exit with its status code."""
-    output(outcome)
-    code = outcome_exit_code(outcome["status"])
-    if code:
-        raise typer.Exit(code)
+    emit_mutation_outcome(outcome)
 
 
 @app.command()
@@ -762,6 +758,7 @@ def update(
 
     # Authorize before authentication lookup, client creation, or any prompt.
     require_mutation_authorization(operation)
+    validate_mutation_output()
 
     # Client creation happens before the mutation attempt: a pre-execution
     # authentication failure must stay on the structured error path, never be
@@ -908,6 +905,7 @@ def batch_update(
     # this gate below.
     if not dry_run:
         require_mutation_authorization(operation)
+    validate_mutation_output()
 
     # Collect transaction IDs
     ids: list[str] = []

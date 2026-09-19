@@ -19,6 +19,7 @@ execution is attempted**:
 - `transactions batch-update` (one item per requested transaction)
 - `transactions tags create`
 - `transactions tags replace`
+- `transactions tags add`
 - `transactions tags clear`
 - `transactions splits replace`
 - `transactions splits clear`
@@ -28,6 +29,27 @@ envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
 failures (for example `transactions update` with no change flags) keep the
 structured error contract: one JSON error object on stderr with stable `code`,
 `message`, and `details` fields.
+
+## Emission
+
+Every remote mutation emits the `mutation-outcome.v1` envelope as JSON on
+**stdout regardless of TTY state**. An interactive terminal never re-renders
+the envelope as plain text, so `monarch ... | jq` and an interactive shell see
+the same machine-readable result. Progress and diagnostics remain on stderr.
+
+Output selections that would swallow or re-render the envelope are rejected
+with a structured input error (`INVALID_INPUT`, exit 2) **before** any remote
+write is attempted:
+
+- `--quiet` cannot be combined with a mutation or preview.
+- An explicit non-JSON format (`plain`, `table`, `csv`, `compact`) cannot be
+  combined with a mutation or preview.
+- `--json` / `-f json` are accepted as already satisfied.
+
+Dry-run previews use this same JSON emission path (never silenced or
+re-rendered by `--quiet`/`--format`) but are **not** part of this envelope:
+a preview carries `status: "dry_run"` and is explicitly distinct from
+`mutation-outcome.v1`.
 
 ## The envelope
 
@@ -73,8 +95,9 @@ Per-item statuses are `succeeded`, `failed`, or `ambiguous`.
 - `operation` is a stable namespaced identifier (`accounts.refresh`,
   `transactions.update`, `transactions.batch-update`,
   `transactions.tags.create`, `transactions.tags.replace`,
-  `transactions.tags.clear`) supplied by the shared operation descriptor
-  registry — never inferred from an upstream method or GraphQL operation name.
+  `transactions.tags.add`, `transactions.tags.clear`) supplied by the shared
+  operation descriptor registry — never inferred from an upstream method or
+  GraphQL operation name.
 - Atomic single-effect operations use an `items` array containing exactly one
   item. Batch items preserve normalized input order.
 - A multi-stage workflow uses one ordered item per remote effect that was

@@ -19,7 +19,6 @@ from ..core.mutation_outcomes import (
     build_mutation_outcome,
     error_from_exception,
     failed_item,
-    outcome_exit_code,
     succeeded_item,
     verification_object,
 )
@@ -32,7 +31,7 @@ from ..core.operations import (
     run_read_call,
 )
 from ..core.prompting import confirm_action
-from ..output import OutputFormat, output
+from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
 
 app = typer.Typer(help="Inspect and safely replace transaction splits", no_args_is_help=True)
 
@@ -387,10 +386,7 @@ def _validate_transaction_id(transaction_id: str) -> None:
 
 
 def _emit(outcome: dict[str, Any]) -> None:
-    output(outcome)
-    code = outcome_exit_code(outcome["status"])
-    if code:
-        raise typer.Exit(code)
+    emit_mutation_outcome(outcome)
 
 
 def _confirm(operation: str, transaction_id: str, requested: list[dict[str, Any]]) -> None:
@@ -508,6 +504,7 @@ def replace_splits(
     requested = _validate_splits(_load_source(splits_json, splits_file))
     operation = Operation(command="transactions splits replace", effects=MUTATION_EFFECTS)
     require_mutation_authorization(operation)
+    validate_mutation_output()
     client = get_authenticated_client()
     # This read is intentionally before confirmation and the mutation: parent
     # amount validation must use the current server value, not caller input.
@@ -621,6 +618,7 @@ def clear_splits(
     _validate_transaction_id(transaction_id)
     operation = Operation(command="transactions splits clear", effects=MUTATION_EFFECTS)
     require_mutation_authorization(operation)
+    validate_mutation_output()
     client = get_authenticated_client()
     _confirm(operation.command, transaction_id, [])
     try:
