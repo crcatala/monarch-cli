@@ -16,8 +16,10 @@ only.
 
 After a write attempt the exact category/month is read back through the
 released ``get_budgets`` read capability and the observed planned amount is
-compared against the requested amount using the documented currency
-comparison below. The write result is never trusted for verification.
+compared against the requested amount by exact equality after normalizing
+both values to whole cents (the requested amount is never rounded: an amount
+that is not exactly representable in cents is rejected during local
+validation). The write result is never trusted for verification.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from ..core.exceptions import APIError, NotFoundError, ValidationError
+from ..core.exceptions import APIError, MutationAmbiguousError, NotFoundError, ValidationError
 from ..core.operations import Effect, Operation, run_mutation_call, run_read_call
 
 #: Currency amount wire scale: budget amounts are compared and reported in
@@ -42,13 +44,6 @@ CURRENCY_PRECISION = 18
 
 #: Largest accepted absolute amount, mirroring the split-amount bound.
 MAX_AMOUNT = Decimal("9999999999999999.99")
-
-#: Documented currency comparison for readback verification: the requested and
-#: observed amounts are both normalized to whole cents (``quantize`` to two
-#: decimal places) and compared for exact equality. There is no tolerance
-#: beyond cent normalization and no rounding of the requested value: an amount
-#: that cannot be represented in cents is rejected during local validation.
-CURRENCY_COMPARISON = "exact equality after normalizing both amounts to whole cents"
 
 #: Descriptor for the read-only category-discovery call used to validate the
 #: target category before a write. It never carries the remote_mutation effect.
@@ -122,6 +117,16 @@ def parse_currency_amount(raw: str) -> Decimal:
             details={"value": raw},
         )
     return normalized
+
+
+#: Safe verification guidance for an ambiguous budget write. ``budgets list``
+#: only reports the current month, so no tokenized command is offered for an
+#: arbitrary requested month; the web UI is the honest verification surface.
+VERIFICATION_MESSAGE = (
+    "Confirm the category's monthly budget in the Monarch web UI before "
+    "retrying; a timed-out write may already have applied the new amount and "
+    "retrying could overwrite other changes."
+)
 
 
 def validate_month_start(parsed: date) -> None:
@@ -229,8 +234,6 @@ def validate_budget_write_response(payload: Any) -> None:
     effect cannot be established from the response. The write response is
     never used for verification; the authoritative readback follows separately.
     """
-    from ..core.exceptions import MutationAmbiguousError
-
     response = _as_object(payload, "budget mutation")
     if response.get("errors"):
         raise APIError(
@@ -367,21 +370,10 @@ def set_monthly_category_budget(
     )
 
 
-#: Safe verification guidance for an ambiguous budget write. ``budgets list``
-#: only reports the current month, so no tokenized command is offered for an
-#: arbitrary requested month; the web UI is the honest verification surface.
-VERIFICATION_MESSAGE = (
-    "Confirm the category's monthly budget in the Monarch web UI before "
-    "retrying; a timed-out write may already have applied the new amount and "
-    "retrying could overwrite other changes."
-)
-
-
 __all__ = [
     "CURRENCY_SCALE",
     "CURRENCY_PRECISION",
     "MAX_AMOUNT",
-    "CURRENCY_COMPARISON",
     "VERIFICATION_MESSAGE",
     "parse_currency_amount",
     "validate_month_start",
