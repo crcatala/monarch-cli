@@ -86,37 +86,37 @@ class TestMonarchMoneyOwnershipSurface:
     if a future resolution drops the fields this CLI normalizes.
     """
 
-    @pytest.fixture(scope="class")
-    def client_source(self) -> str:
+    @staticmethod
+    def _client_source() -> str:
         import inspect
 
         return inspect.getsource(MonarchMoney)
 
     def test_accounts_query_selects_owned_by_user_with_display_name(
-        self, client_source: str
+        self,
     ) -> None:
         """The accounts read selects ``ownedByUser { id displayName ... }``."""
         import re
 
-        match = re.search(r"ownedByUser\s*\{[^}]*\}", client_source)
+        match = re.search(r"ownedByUser\s*\{[^}]*\}", self._client_source())
         assert match, "No ownedByUser selection found in the installed client"
         assert "id" in match.group(0)
         assert "displayName" in match.group(0)
 
-    def test_transaction_queries_select_owned_by_user_with_name(self, client_source: str) -> None:
+    def test_transaction_queries_select_owned_by_user_with_name(self) -> None:
         """Transaction reads select ``ownedByUser { id name ... }``."""
         import re
 
-        selections = re.findall(r"ownedByUser\s*\{[^}]*\}", client_source)
+        selections = re.findall(r"ownedByUser\s*\{[^}]*\}", self._client_source())
         assert selections, "No ownedByUser selection found in the installed client"
         assert any("name" in selection for selection in selections), (
             "No ownedByUser selection with `name` found; transaction owner_name "
             "normalization requires the declared client floor"
         )
 
-    def test_client_selects_ownership_overridden_at(self, client_source: str) -> None:
+    def test_client_selects_ownership_overridden_at(self) -> None:
         """Transaction reads select the literal ``ownershipOverriddenAt`` timestamp."""
-        assert "ownershipOverriddenAt" in client_source, (
+        assert "ownershipOverriddenAt" in self._client_source(), (
             "ownershipOverriddenAt missing from the installed client; "
             "the declared monarchmoneycommunity>=1.5.2 floor must be preserved"
         )

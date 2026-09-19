@@ -616,7 +616,7 @@ print(f"Found {len(transactions)} transactions")
 
 These output fields are guaranteed stable across versions:
 
-**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `owner_id`, `owner_name`, `last_synced`
+**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `owner_id`, `owner_name`, `last_updated`
 
 **Account types:** `group`, `type`, `type_display`, `subtype`, `subtype_display`
 
