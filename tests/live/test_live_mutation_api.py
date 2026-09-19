@@ -288,6 +288,7 @@ def test_transaction_notes_round_trip(
                 "--json",
                 "transactions",
                 "update",
+                "--transaction-id",
                 transaction_id,
                 "--notes",
                 notes,
