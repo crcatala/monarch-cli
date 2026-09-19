@@ -16,6 +16,7 @@ from ..core.mutation_outcomes import (
     build_mutation_outcome,
     error_from_exception,
     failed_item,
+    outcome_operation,
     succeeded_item,
     verification_object,
 )
@@ -32,6 +33,7 @@ from .mutation_helpers import (
     as_object as _as_object,
 )
 from .mutation_helpers import (
+    build_preview,
     confirm_destructive,
 )
 from .mutation_helpers import (
@@ -437,12 +439,27 @@ def _write_tag_set(
         )
 
 
-def _start_tag_mutation(command: str) -> tuple[Operation, Any]:
-    """Validate output, authorize, and return the operation plus a client."""
+def _start_tag_mutation(command: str, *, dry_run: bool = False) -> tuple[Operation, Any]:
+    """Validate output, optionally authorize, and return operation + client.
+
+    A dry-run preview performs read-only work only: it never requires
+    ``--allow-mutations`` and never prompts for confirmation.
+    """
     operation = Operation(command=command, effects=MUTATION_EFFECTS)
     validate_mutation_output()
-    require_mutation_authorization(operation)
+    if not dry_run:
+        require_mutation_authorization(operation)
     return operation, get_authenticated_client()
+
+
+def _emit_tag_preview(
+    operation: Operation,
+    transaction_id: str,
+    detail: dict[str, Any],
+) -> None:
+    emit_mutation_outcome(
+        build_preview(outcome_operation(operation.command), transaction_id, detail)
+    )
 
 
 @app.command("replace", context_settings={"allow_extra_args": True})
@@ -459,20 +476,39 @@ def replace_tags(
         list[str] | None,
         typer.Option("--tag-name", help="Exact tag name (repeatable)"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview the resolved tag set without writing"),
+    ] = False,
 ) -> None:
     """Replace the complete tag set for one transaction.
 
     Examples:
         monarch --allow-mutations transactions tags replace \\
             --transaction-id TXN123 --tag-id TAG1 --tag-name "Travel"
+        monarch transactions tags replace --transaction-id TXN123 --tag-id TAG1 --dry-run
     """
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     _require_tag_refs(tag_id, tag_name)
-    operation, client = _start_tag_mutation("transactions tags replace")
+    operation, client = _start_tag_mutation("transactions tags replace", dry_run=dry_run)
     known = _fetch_known_tags(client)
     requested = _resolve_tag_refs(known, tag_id or [], tag_name or [])
     current = _read_current_tags(client, transaction_id)
+    if dry_run:
+        _emit_tag_preview(
+            operation,
+            transaction_id,
+            {
+                "requested_tag_ids": requested,
+                "current_tag_ids": current,
+                "final_tag_ids": requested,
+                "added_tag_ids": [t for t in requested if t not in set(current)],
+                "removed_tag_ids": [t for t in current if t not in set(requested)],
+                "no_op": set(current) == set(requested),
+            },
+        )
+        return
     if set(current) == set(requested):
         _emit(
             build_mutation_outcome(
@@ -511,6 +547,10 @@ def add_tags(
         list[str] | None,
         typer.Option("--tag-name", help="Exact tag name (repeatable)"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview the additive result without writing"),
+    ] = False,
 ) -> None:
     """Add tags to a transaction, preserving its existing tags.
 
@@ -522,11 +562,12 @@ def add_tags(
     Examples:
         monarch --allow-mutations transactions tags add \\
             --transaction-id TXN123 --tag-name "Travel"
+        monarch transactions tags add --transaction-id TXN123 --tag-name "Travel" --dry-run
     """
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     _require_tag_refs(tag_id, tag_name)
-    operation, client = _start_tag_mutation("transactions tags add")
+    operation, client = _start_tag_mutation("transactions tags add", dry_run=dry_run)
     known = _fetch_known_tags(client)
     requested = _resolve_tag_refs(known, tag_id or [], tag_name or [])
     current = _read_current_tags(client, transaction_id)
@@ -534,6 +575,20 @@ def add_tags(
     added = [tag for tag in requested if tag not in current_set]
     skipped = [tag for tag in requested if tag in current_set]
     final = _dedupe([*current, *added])
+    if dry_run:
+        _emit_tag_preview(
+            operation,
+            transaction_id,
+            {
+                "requested_tag_ids": requested,
+                "current_tag_ids": current,
+                "final_tag_ids": final,
+                "added_tag_ids": added,
+                "already_present_tag_ids": skipped,
+                "no_op": not added,
+            },
+        )
+        return
     if not added:
         _emit(
             build_mutation_outcome(
@@ -574,12 +629,28 @@ def add_tags(
 def clear_tags(
     ctx: typer.Context,
     transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview the clear without writing"),
+    ] = False,
 ) -> None:
     """Explicitly clear every tag from one transaction."""
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
-    operation, client = _start_tag_mutation("transactions tags clear")
+    operation, client = _start_tag_mutation("transactions tags clear", dry_run=dry_run)
     current = _read_current_tags(client, transaction_id)
+    if dry_run:
+        _emit_tag_preview(
+            operation,
+            transaction_id,
+            {
+                "current_tag_ids": current,
+                "final_tag_ids": [],
+                "removed_tag_ids": current,
+                "no_op": not current,
+            },
+        )
+        return
     if not current:
         _emit(
             build_mutation_outcome(

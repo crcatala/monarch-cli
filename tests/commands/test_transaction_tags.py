@@ -380,3 +380,77 @@ def test_tags_reject_removed_positional_targets() -> None:
         result = invoke(mock, args)
         assert result.exit_code != 0
     mock.set_transaction_tags.assert_not_called()
+
+
+def test_replace_dry_run_previews_without_writing() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {
+        "householdTransactionTags": [
+            tag("tag-1"),
+            {"id": "tag-2", "name": "Travel", "color": "#000000"},
+        ]
+    }
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    result = invoke(
+        mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-2", "--dry-run"]
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "dry_run"
+    assert payload["operation"] == "transactions.tags.replace"
+    assert payload["target"] == {"transaction_id": "txn-1"}
+    assert "schema_version" not in payload
+    detail = payload["detail"]
+    assert detail["current_tag_ids"] == ["tag-1"]
+    assert detail["final_tag_ids"] == ["tag-2"]
+    assert detail["removed_tag_ids"] == ["tag-1"]
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_add_dry_run_reports_additive_without_writing() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {
+        "householdTransactionTags": [
+            tag("tag-1"),
+            {"id": "tag-2", "name": "Travel", "color": "#000000"},
+        ]
+    }
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    result = invoke(mock, ["add", "--transaction-id", "txn-1", "--tag-id", "tag-2", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    detail = json.loads(result.stdout)["detail"]
+    assert detail["final_tag_ids"] == ["tag-1", "tag-2"]
+    assert detail["added_tag_ids"] == ["tag-2"]
+    assert detail["no_op"] is False
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_clear_dry_run_previews_without_writing() -> None:
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {
+        "getTransaction": {"id": "txn-1", "tags": [{"id": "tag-1"}]}
+    }
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    detail = json.loads(result.stdout)["detail"]
+    assert detail["current_tag_ids"] == ["tag-1"]
+    assert detail["final_tag_ids"] == []
+    mock.set_transaction_tags.assert_not_called()
+
+
+def test_tag_dry_run_does_not_require_mutation_authorization() -> None:
+    set_mutation_authorized(False)
+    mock = client()
+    mock.get_transaction_tags.return_value = {"householdTransactionTags": [tag()]}
+    mock.get_transaction_details.return_value = {"getTransaction": {"id": "txn-1", "tags": []}}
+    result = invoke(
+        mock, ["replace", "--transaction-id", "txn-1", "--tag-id", "tag-1", "--dry-run"]
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["status"] == "dry_run"
+    mock.set_transaction_tags.assert_not_called()

@@ -80,6 +80,25 @@ def reject_positional_targets(legacy: list[str] | None) -> None:
         )
 
 
+def build_preview(
+    operation_id: str,
+    transaction_id: str,
+    detail: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a dry-run preview result (mc-7lm1).
+
+    Previews always carry ``status: "dry_run"`` so they can never be confused
+    with an applied write or with ``mutation-outcome.v1``. The detail object is
+    informational and is deliberately not a second stable schema family.
+    """
+    return {
+        "status": "dry_run",
+        "operation": operation_id,
+        "target": {"transaction_id": transaction_id},
+        "detail": detail,
+    }
+
+
 def confirm_destructive(message: str, *, operation: str) -> None:
     """Apply the shared destructive-confirmation policy for one mutation.
 
@@ -102,5 +121,6 @@ __all__ = [
     "payload_error_details",
     "validate_transaction_id",
     "reject_positional_targets",
+    "build_preview",
     "confirm_destructive",
 ]

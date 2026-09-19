@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+#### Dry-run previews for tag and split mutations
+- `transactions tags replace`/`add`/`clear` and `transactions splits replace`/`clear` accept `--dry-run` (mc-7lm1)
+- A preview performs only read/validation work: it never calls a mutation endpoint, never requires `--allow-mutations`, and never prompts; `--dry-run --yes` is accepted as irrelevant
+- Preview results carry `status: "dry_run"` with the operation, target, and an informational detail object; they use the shared JSON emission path and are distinct from `mutation-outcome.v1`
+
 #### Validation and flag interaction semantics
 - `--timeout` must be >= 1; `transactions batch-update --max-concurrency` must be 1-16 (rejects 0/negative/out-of-range before any API call) — mc-s6s6
 - Date options use one strict `YYYY-MM-DD` parser; compact/loose forms (`20240115`, `2024-1-5`) fail with `INVALID_INPUT`
