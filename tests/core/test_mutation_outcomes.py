@@ -289,6 +289,8 @@ class TestOperationRegistry:
             "accounts refresh": "accounts.refresh",
             "transactions update": "transactions.update",
             "transactions batch-update": "transactions.batch-update",
+            "transactions create": "transactions.create",
+            "transactions delete": "transactions.delete",
             "transactions tags create": "transactions.tags.create",
             "transactions tags replace": "transactions.tags.replace",
             "transactions tags add": "transactions.tags.add",

@@ -106,6 +106,17 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "executor per item and never retries an item whose outcome is "
         "unknown."
     ),
+    "transactions create": (
+        "no_retry: upstream documents no idempotency key for transaction "
+        "creation; a timed-out create may already have created a transaction, "
+        "and a blind retry could duplicate it, so an uncertain create must be "
+        "verified before repeating."
+    ),
+    "transactions delete": (
+        "no_retry: upstream documents no idempotency key for transaction "
+        "deletion; a timed-out delete may already have removed the transaction, "
+        "so it must be verified before repeating."
+    ),
     "transactions tags create": (
         "no_retry: upstream documents no idempotency key or read-after-write "
         "verification for tag creation; a timed-out request may already have "

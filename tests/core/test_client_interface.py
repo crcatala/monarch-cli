@@ -26,6 +26,8 @@ class TestMonarchMoneyInterface:
         "get_cashflow",
         "get_transaction_categories",
         "update_transaction",
+        "create_transaction",
+        "delete_transaction",
         "request_accounts_refresh",
         "get_transaction_tags",
         "create_transaction_tag",
