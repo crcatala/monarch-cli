@@ -560,8 +560,8 @@ def refresh(
 
     # Authorize before authentication lookup, client creation, or any prompt.
     operation = Operation(command="accounts refresh", effects=frozenset({Effect.REMOTE_MUTATION}))
-    require_mutation_authorization(operation)
     validate_mutation_output()
+    require_mutation_authorization(operation)
 
     with spinner("Requesting account refresh..."):
         result = refresh_accounts(account_ids, operation=operation)

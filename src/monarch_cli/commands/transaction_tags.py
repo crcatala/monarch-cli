@@ -244,8 +244,8 @@ def create_tag(
     if color is None or not _COLOR_RE.fullmatch(color):
         raise ValidationError("Color must match #[0-9A-Fa-f]{6}.", field="color")
     operation = Operation(command="transactions tags create", effects=MUTATION_EFFECTS)
-    require_mutation_authorization(operation)
     validate_mutation_output()
+    require_mutation_authorization(operation)
     client = get_authenticated_client()
     try:
         payload = run_mutation_call(
@@ -292,8 +292,8 @@ def create_tag(
 
 def _set_tags(transaction_id: str, requested: list[str], operation_name: str) -> None:
     operation = Operation(command=operation_name, effects=MUTATION_EFFECTS)
-    require_mutation_authorization(operation)
     validate_mutation_output()
+    require_mutation_authorization(operation)
     client = get_authenticated_client()
     # Discovery is read-only and deliberately precedes confirmation/mutation.
     known = _tag_list(

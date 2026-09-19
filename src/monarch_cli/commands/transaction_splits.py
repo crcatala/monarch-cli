@@ -503,8 +503,8 @@ def replace_splits(
     _validate_transaction_id(transaction_id)
     requested = _validate_splits(_load_source(splits_json, splits_file))
     operation = Operation(command="transactions splits replace", effects=MUTATION_EFFECTS)
-    require_mutation_authorization(operation)
     validate_mutation_output()
+    require_mutation_authorization(operation)
     client = get_authenticated_client()
     # This read is intentionally before confirmation and the mutation: parent
     # amount validation must use the current server value, not caller input.
@@ -617,8 +617,8 @@ def clear_splits(
     """Explicitly clear every split by sending the canonical empty list."""
     _validate_transaction_id(transaction_id)
     operation = Operation(command="transactions splits clear", effects=MUTATION_EFFECTS)
-    require_mutation_authorization(operation)
     validate_mutation_output()
+    require_mutation_authorization(operation)
     client = get_authenticated_client()
     _confirm(operation.command, transaction_id, [])
     try:

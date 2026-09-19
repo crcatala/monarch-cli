@@ -756,9 +756,10 @@ def update(
         )
         return
 
-    # Authorize before authentication lookup, client creation, or any prompt.
-    require_mutation_authorization(operation)
+    # Validate output selection before authorization, which itself precedes
+    # authentication lookup, client creation, or any prompt.
     validate_mutation_output()
+    require_mutation_authorization(operation)
 
     # Client creation happens before the mutation attempt: a pre-execution
     # authentication failure must stay on the structured error path, never be
@@ -903,9 +904,9 @@ def batch_update(
     # Authorize before reading stdin, authentication lookup, client creation,
     # or any prompt. Dry-run invocations are classified as previews and skip
     # this gate below.
+    validate_mutation_output()
     if not dry_run:
         require_mutation_authorization(operation)
-    validate_mutation_output()
 
     # Collect transaction IDs
     ids: list[str] = []
