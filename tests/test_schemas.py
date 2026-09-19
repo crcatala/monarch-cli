@@ -146,6 +146,8 @@ FULL_TRANSACTION_DETAIL_RAW = {
         "pending": False,
         "needsReview": True,
         "reviewStatus": "REVIEWED",
+        "reviewedAt": "2024-01-16T10:00:00Z",
+        "reviewedByUser": {"id": "user-1", "name": "Alex"},
         "notes": "Team lunch",
         "isRecurring": False,
         "hideFromReports": False,

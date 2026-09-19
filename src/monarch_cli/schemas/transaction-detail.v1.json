@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:monarch-cli:schema:transaction-detail:v1",
   "title": "Monarch CLI normalized transaction detail (v1)",
-  "description": "Normative contract for single-transaction detail output (`monarch transactions get`). Extends the list record shape with requested/returned identity, redirect state, the original transaction, and nested attachment/tag/split collections. Fields are always present; unavailable values are null. Additive-only: removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
+  "description": "Normative contract for single-transaction detail output (`monarch transactions get`). Extends the list record shape with requested/returned identity, redirect state, the original transaction, nested attachment/tag/split collections, and review attribution. Fields are always present; unavailable values are null. Optional additive properties such as `reviewed_at` and `reviewed_by_user` are also always emitted by the CLI and remain optional here only to preserve the additive compatibility classification. Additive-only: removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -89,7 +89,18 @@
     },
     "review_status": {
       "type": ["string", "null"],
-      "description": "Opaque upstream review status; null when omitted by the selected endpoint."
+      "description": "Opaque upstream review status; null when omitted by the selected endpoint. The public detail endpoint has not been observed to populate it, so treat it as a placeholder; use reviewed_at/reviewed_by_user for review attribution."
+    },
+    "reviewed_at": {
+      "type": ["string", "null"],
+      "description": "Literal upstream reviewedAt timestamp, or null when unreviewed or omitted. Detail-only optional additive property always emitted by the CLI."
+    },
+    "reviewed_by_user": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/reviewed_by_user"}
+      ],
+      "description": "Normalized upstream reviewedByUser relationship ({id, name}) or null when unavailable. Detail-only optional additive property always emitted by the CLI."
     },
     "owner_id": {
       "type": ["string", "null"],
@@ -152,6 +163,15 @@
     }
   },
   "$defs": {
+    "reviewed_by_user": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "name": {"type": ["string", "null"]}
+      }
+    },
     "original_transaction": {
       "type": "object",
       "additionalProperties": false,

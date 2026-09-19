@@ -280,6 +280,54 @@ class TestTransformTransactionDetail:
         assert result["tags"] == []
         assert result["split"]["splits"] == []
 
+    def test_detail_exposes_review_attribution(self):
+        """reviewedAt/reviewedByUser are normalized into the detail shape."""
+        raw = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "needsReview": False,
+                "reviewedAt": "2026-09-19T17:29:12Z",
+                "reviewedByUser": {"id": "user-1", "name": "Alex"},
+            }
+        }
+        result = transform_transaction_detail(raw, requested_id="txn-detail")
+        assert result["reviewed_at"] == "2026-09-19T17:29:12Z"
+        assert result["reviewed_by_user"] == {"id": "user-1", "name": "Alex"}
+
+    @pytest.mark.parametrize(
+        "reviewed_by",
+        [None, "not-an-object", ["user-1"], {}],
+        ids=["null", "string", "list", "empty-object"],
+    )
+    def test_detail_review_attribution_tolerates_malformed_shapes(self, reviewed_by):
+        """A missing/malformed reviewedByUser normalizes to None, never raises."""
+        raw = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "reviewedAt": None,
+                "reviewedByUser": reviewed_by,
+            }
+        }
+        result = transform_transaction_detail(raw, requested_id="txn-detail")
+        assert result["reviewed_at"] is None
+        if isinstance(reviewed_by, dict):
+            assert result["reviewed_by_user"] == {"id": None, "name": None}
+        else:
+            assert result["reviewed_by_user"] is None
+
+    def test_list_record_omits_detail_only_review_attribution(self):
+        """The shared list transformer must not grow list-only review metadata."""
+        result = transform_transaction(
+            {
+                "id": "txn-123",
+                "needsReview": False,
+                "reviewedAt": "2026-09-19T17:29:12Z",
+                "reviewedByUser": {"id": "user-1", "name": "Alex"},
+            }
+        )
+        assert "reviewed_at" not in result
+        assert "reviewed_by_user" not in result
+
     def test_null_detail_is_not_found(self):
         with pytest.raises(NotFoundError):
             transform_transaction_detail({"getTransaction": None}, requested_id="missing")

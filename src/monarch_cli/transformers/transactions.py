@@ -15,7 +15,12 @@ Normalization rules (v1 contract):
   field. Absent or ``null`` values default to ``False``.
 - ``needs_review`` and opaque ``review_status`` are exposed independently when
   supplied by the selected upstream endpoint. ``review_status`` is nullable;
-  detail responses from the released public client may omit it.
+  detail responses from the released public client may omit it, and it has not
+  been observed populated by the public detail endpoint (placeholder).
+- Transaction detail additionally exposes ``reviewed_at`` (literal upstream
+  ``reviewedAt``) and ``reviewed_by_user`` (normalized ``reviewedByUser``
+  ``{id, name}``, or ``null``). These are the fields that actually carry review
+  attribution; they are detail-only and are not part of the list record shape.
 - ``owner_id`` and ``owner_name`` mirror the optional upstream
   ``ownedByUser`` relationship (``id`` and ``name``). ``ownership_overridden_at``
   mirrors the upstream ``ownershipOverriddenAt`` timestamp literally. All three
@@ -33,6 +38,7 @@ Normalization rules (v1 contract):
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from ..core.exceptions import NotFoundError
@@ -62,6 +68,19 @@ def _description(raw: Any) -> str | None:
 def _is_pending(raw: Any) -> bool:
     """Normalize pending state from the real upstream ``pending`` field."""
     return bool_or_default(nested_get(raw, "pending"), False)
+
+
+def _reviewed_by_user(value: Any) -> dict[str, Any] | None:
+    """Normalize the upstream ``reviewedByUser`` object, or ``None``.
+
+    Mirrors the review mutation output shape (``{id, name}``) so read and write
+    surfaces agree. A missing, ``null``, or non-object relationship yields
+    ``None`` rather than raising; the two keys are always present when an
+    object is returned.
+    """
+    if not isinstance(value, Mapping):
+        return None
+    return {"id": value.get("id"), "name": value.get("name")}
 
 
 def transform_transaction(raw: Any) -> dict[str, Any]:
@@ -203,7 +222,10 @@ def transform_transaction_detail(raw: Any, requested_id: str | None = None) -> d
         state (``is_pending``, from the upstream ``pending`` field), review
         state (``needs_review``), and the opaque upstream ``review_status``
         are exposed as distinct concepts. ``review_status`` remains ``None``
-        when the public detail response omits it.
+        when the public detail response omits it. Review attribution is
+        carried by ``reviewed_at`` (literal upstream ``reviewedAt``) and
+        ``reviewed_by_user`` (normalized ``reviewedByUser`` ``{id, name}`` or
+        ``null``); both are detail-only and never fabricated.
 
     Raises:
         APIError: If ``raw`` is not an object, or ``getTransaction`` is
@@ -243,6 +265,8 @@ def transform_transaction_detail(raw: Any, requested_id: str | None = None) -> d
         "is_pending": _is_pending(detail),
         "needs_review": bool_or_default(nested_get(detail, "needsReview"), False),
         "review_status": _opaque_str(nested_get(detail, "reviewStatus")),
+        "reviewed_at": nested_get(detail, "reviewedAt"),
+        "reviewed_by_user": _reviewed_by_user(nested_get(detail, "reviewedByUser")),
         "owner_id": nested_get(detail, "ownedByUser", "id"),
         "owner_name": nested_get(detail, "ownedByUser", "name"),
         "ownership_overridden_at": nested_get(detail, "ownershipOverriddenAt"),
