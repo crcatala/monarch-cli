@@ -44,8 +44,13 @@ chmod 600 ~/.pypirc
 
 ### Step 1: Update Version & Changelog
 
-1. Update version in `src/monarch_cli/__init__.py`
-2. Update `CHANGELOG.md` with release notes under the new version header
+1. Update version in `src/monarch_cli/__init__.py` (the release script reads this)
+2. Update the version in `pyproject.toml` and refresh `uv.lock` (`uv lock`), so the built wheel/sdist and lockfile agree with the source version
+3. Update `CHANGELOG.md`: move the `Unreleased` content under a new `## [<version>] - <date>` header, add a fresh empty `Unreleased` section, and update the comparison links at the bottom
+
+No capabilities-fixture regeneration is needed for a version bump: the canonical
+fixture (see `docs/capabilities.md`) stores a fixed placeholder CLI version. Only
+run `make update-capabilities-fixture` after an intentional manifest change.
 
 ### Step 2: Verify & Build
 

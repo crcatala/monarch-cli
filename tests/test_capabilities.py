@@ -45,6 +45,12 @@ runner = CliRunner()
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "capabilities.manifest.json"
 
+# The canonical fixture pins manifest shape, ordering, and serialization -- not
+# the release version. It is rendered with this fixed placeholder so ordinary
+# version bumps do not churn the fixture or break the byte-for-byte test.
+# Version wiring is asserted separately (see TestSideEffectFreeGeneration).
+FIXTURE_CLI_VERSION = "0.0.0"
+
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -61,10 +67,10 @@ class TestCanonicalFixture:
     def test_matches_checked_in_fixture_byte_for_byte(self) -> None:
         assert FIXTURE_PATH.exists(), "canonical capabilities fixture is missing"
         expected = FIXTURE_PATH.read_text(encoding="utf-8")
-        actual = render_capabilities_manifest(app, cli_version=__version__)
+        actual = render_capabilities_manifest(app, cli_version=FIXTURE_CLI_VERSION)
         assert actual == expected, (
             "capabilities manifest drifted from the canonical fixture; if the "
-            "change is intended, regenerate tests/fixtures/capabilities.manifest.json"
+            "change is intended, regenerate with `make update-capabilities-fixture`"
         )
 
     def test_repeated_runs_serialize_identically(self) -> None:

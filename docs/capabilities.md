@@ -38,6 +38,18 @@ runs over the same installation are byte-for-byte identical. A canonical
 fixture test pins the shape, ordering, and serialization and fails if a
 Typer/framework change silently alters the inventory.
 
+The fixture is rendered with a fixed placeholder CLI version (`0.0.0`) rather
+than the real `__version__`, so routine release version bumps do not churn it.
+Version wiring is covered by separate tests that assert the emitted manifest
+carries the installed `__version__`. Regenerate the fixture only after an
+intentional manifest change:
+
+```bash
+make update-capabilities-fixture
+```
+
+Review the diff before committing.
+
 ## Command entries
 
 Each entry under `commands` contains:

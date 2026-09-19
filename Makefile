@@ -1,4 +1,4 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test test-live test-live-mutation smoke-install release release-dry prepublish
+.PHONY: setup verify format format-check lint lint-fix typecheck test test-live test-live-mutation smoke-install release release-dry prepublish update-capabilities-fixture
 
 # Python version used by the isolated wheel smoke-install environment.
 SMOKE_PYTHON ?= 3.13
@@ -53,6 +53,13 @@ release:
 # Dry-run release to see what would happen
 release-dry:
 	./scripts/release.sh --dry-run
+
+# Regenerate the canonical capabilities manifest fixture after an intentional
+# manifest change (new command/option/effect/schema). Review the diff before
+# committing. Not needed for ordinary version bumps: the fixture stores a fixed
+# placeholder CLI version.
+update-capabilities-fixture:
+	uv run python scripts/regen_capabilities_fixture.py
 
 # Build the wheel and prove it installs and runs from an isolated environment.
 # This is the single maintained implementation of the procedure; CI, prepublish,
