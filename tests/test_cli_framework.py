@@ -354,13 +354,16 @@ class TestNestedOptionAndArgumentParsing:
         assert_parsed_cleanly(result, caught)
         assert captured["account_ids"] == ["acc_123", "acc_456"]
 
-    def test_batch_update_parses_positional_list_argument(self) -> None:
+    def test_batch_update_parses_repeatable_option_list(self) -> None:
         result, caught = invoke(
             [
                 "transactions",
                 "batch-update",
+                "--transaction-id",
                 "txn_1",
+                "--transaction-id",
                 "txn_2",
+                "--transaction-id",
                 "txn_3",
                 "--notes",
                 "framework check",

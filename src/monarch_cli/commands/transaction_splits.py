@@ -385,6 +385,16 @@ def _validate_transaction_id(transaction_id: str) -> None:
         raise ValidationError("Transaction ID must not be empty.", field="transaction_id")
 
 
+def _reject_positional_targets(legacy: list[str] | None) -> None:
+    """Reject a removed positional transaction ID with an actionable error."""
+    if legacy:
+        raise ValidationError(
+            "Positional transaction IDs are no longer supported; use --transaction-id.",
+            field="transaction_id",
+            details={"removed_positional": True, "replacement_option": "--transaction-id"},
+        )
+
+
 def _emit(outcome: dict[str, Any]) -> None:
     emit_mutation_outcome(outcome)
 
@@ -478,28 +488,23 @@ def show_splits(
     )
 
 
-@app.command("replace")
+@app.command("replace", context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def replace_splits(
-    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    ctx: typer.Context,
+    transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
     splits_json: Annotated[
         str | None,
-        typer.Option(
-            "--splits-json", "--json-input", "--input-json", help="Inline split JSON array"
-        ),
+        typer.Option("--splits-json", help="Inline split JSON array"),
     ] = None,
     splits_file: Annotated[
         Path | None,
-        typer.Option(
-            "--splits-file",
-            "--file",
-            "--input-file",
-            help="Readable JSON file containing a split array",
-        ),
+        typer.Option("--splits-file", help="Readable JSON file containing a split array"),
     ] = None,
 ) -> None:
     """Replace every split using one bounded JSON source."""
+    _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     requested = _validate_splits(_load_source(splits_json, splits_file))
     operation = Operation(command="transactions splits replace", effects=MUTATION_EFFECTS)
@@ -608,13 +613,15 @@ def replace_splits(
         )
 
 
-@app.command("clear")
+@app.command("clear", context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def clear_splits(
-    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    ctx: typer.Context,
+    transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
 ) -> None:
     """Explicitly clear every split by sending the canonical empty list."""
+    _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     operation = Operation(command="transactions splits clear", effects=MUTATION_EFFECTS)
     validate_mutation_output()

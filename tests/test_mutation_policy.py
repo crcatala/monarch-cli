@@ -82,8 +82,22 @@ EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
 }
 
 MUTATION_OPERATIONS: dict[str, list[str]] = {
-    "transactions update": ["transactions", "update", "TXN1", "--amount", "1.0"],
-    "transactions batch-update": ["transactions", "batch-update", "TXN1", "--notes", "x"],
+    "transactions update": [
+        "transactions",
+        "update",
+        "--transaction-id",
+        "TXN1",
+        "--amount",
+        "1.0",
+    ],
+    "transactions batch-update": [
+        "transactions",
+        "batch-update",
+        "--transaction-id",
+        "TXN1",
+        "--notes",
+        "x",
+    ],
     "accounts refresh": ["accounts", "refresh"],
 }
 
@@ -283,7 +297,16 @@ class TestReadOnlyDefault:
         # The flag is a global option; after the command path it is a parse
         # error, not authorization.
         result = runner.invoke(
-            app, ["transactions", "update", "TXN1", "--amount", "1.0", "--allow-mutations"]
+            app,
+            [
+                "transactions",
+                "update",
+                "--transaction-id",
+                "TXN1",
+                "--amount",
+                "1.0",
+                "--allow-mutations",
+            ],
         )
         assert result.exit_code != 0
         assert result.exit_code != 3  # a usage error, not a blocked mutation
@@ -338,7 +361,15 @@ class TestReadOnlyDefault:
         with patch("monarchmoney.MonarchMoney.update_transaction", _no_mutation):
             result = runner.invoke(
                 app,
-                ["transactions", "update", "TXN1", "--dry-run", "--amount", "1.0"],
+                [
+                    "transactions",
+                    "update",
+                    "--transaction-id",
+                    "TXN1",
+                    "--dry-run",
+                    "--amount",
+                    "1.0",
+                ],
             )
         assert result.exit_code == 0, result.output
         assert "dry_run" in result.stdout
@@ -346,7 +377,15 @@ class TestReadOnlyDefault:
 
         result = runner.invoke(
             app,
-            ["transactions", "batch-update", "TXN1", "--notes", "x", "--dry-run"],
+            [
+                "transactions",
+                "batch-update",
+                "--transaction-id",
+                "TXN1",
+                "--notes",
+                "x",
+                "--dry-run",
+            ],
         )
         assert result.exit_code == 0, result.output
 

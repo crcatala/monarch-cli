@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -14,6 +15,11 @@ from monarch_cli.core.config import Config, reset_config, set_config
 from monarch_cli.core.operations import reset_mutation_authorization, set_mutation_authorized
 
 runner = CliRunner()
+
+
+def _plain(text: str) -> str:
+    """Strip Rich ANSI styling so option-name assertions are stable."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def payload(amount: float = -10.0, rows: list[dict] | None = None) -> dict:
@@ -91,6 +97,7 @@ def test_replace_inline_reads_parent_then_writes_then_verifies() -> None:
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":-10.00,"categoryId":"cat-1"}]',
@@ -111,13 +118,14 @@ def test_replace_file_source_and_conflict_are_bounded(tmp_path: Path) -> None:
     mock = client()
     mock.get_transaction_splits.side_effect = [payload(), payload(rows=[row()])]
     mock.update_transaction_splits.return_value = mutation_payload([row()])
-    result = invoke(mock, ["replace", "txn-1", "--splits-file", str(source)])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--splits-file", str(source)])
     assert result.exit_code == 0
 
     conflict = invoke(
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":-10,"categoryId":"cat-1"}]',
@@ -136,6 +144,7 @@ def test_replace_rejects_unsupported_fields_and_bad_total_before_write() -> None
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":-10,"categoryId":"cat-1","notes":"no"}]',
@@ -149,6 +158,7 @@ def test_replace_rejects_unsupported_fields_and_bad_total_before_write() -> None
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":-9.99,"categoryId":"cat-1"}]',
@@ -164,6 +174,7 @@ def test_replace_rejects_unrepresentable_wire_amount_before_read() -> None:
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":90071992547409.91,"categoryId":"cat-1"}]',
@@ -187,6 +198,7 @@ def test_replace_rejects_invalid_signs_and_zero_parent(
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             json.dumps([{"merchantName": "Store", "amount": split_amount, "categoryId": "cat-1"}]),
@@ -205,7 +217,7 @@ def test_replace_rejects_invalid_signs_and_zero_parent(
 )
 def test_replace_rejects_scale_and_precision_before_read(split_json: str) -> None:
     mock = client()
-    result = invoke(mock, ["replace", "txn-1", "--splits-json", split_json])
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "--splits-json", split_json])
     assert result.exit_code == 2
     mock.get_transaction_splits.assert_not_awaited()
     mock.update_transaction_splits.assert_not_awaited()
@@ -217,7 +229,9 @@ def test_replace_rejects_more_than_maximum_rows_before_read() -> None:
         {"merchantName": "Store", "amount": -1, "categoryId": f"cat-{index}"}
         for index in range(101)
     ]
-    result = invoke(mock, ["replace", "txn-1", "--splits-json", json.dumps(splits)])
+    result = invoke(
+        mock, ["replace", "--transaction-id", "txn-1", "--splits-json", json.dumps(splits)]
+    )
     assert result.exit_code == 2
     mock.get_transaction_splits.assert_not_awaited()
     mock.update_transaction_splits.assert_not_awaited()
@@ -227,7 +241,7 @@ def test_clear_sends_empty_list_and_verifies() -> None:
     mock = client()
     mock.get_transaction_splits.return_value = payload()
     mock.update_transaction_splits.return_value = mutation_payload([], nullable_errors=True)
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 0
     mock.update_transaction_splits.assert_awaited_once_with(transaction_id="txn-1", split_data=[])
     assert mock.get_transaction_splits.await_count == 1
@@ -239,7 +253,7 @@ def test_payload_errors_are_definitive_failure() -> None:
     mock.update_transaction_splits.return_value = mutation_payload(
         [], [{"code": "PENDING", "message": "pending transaction"}]
     )
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 1
     output = json.loads(result.stdout)
     assert output["status"] == "failed"
@@ -258,7 +272,7 @@ def test_malformed_mutation_payload_is_ambiguous(mutation_result: dict) -> None:
     mock = client()
     mock.get_transaction_splits.return_value = payload()
     mock.update_transaction_splits.return_value = mutation_result
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 4
     output = json.loads(result.stdout)
     assert output["status"] == "ambiguous"
@@ -274,7 +288,7 @@ def test_graphql_payload_errors_remain_definitive_failure() -> None:
         "errors": [{"message": "graphql failure"}],
         "updateTransactionSplit": {"errors": [], "transaction": {}},
     }
-    result = invoke(mock, ["clear", "txn-1"])
+    result = invoke(mock, ["clear", "--transaction-id", "txn-1"])
     assert result.exit_code == 1
     output = json.loads(result.stdout)
     assert output["status"] == "failed"
@@ -289,6 +303,7 @@ def test_verification_mismatch_is_ambiguous_and_sanitized() -> None:
         mock,
         [
             "replace",
+            "--transaction-id",
             "txn-1",
             "--splits-json",
             '[{"merchantName":"Store","amount":-10,"categoryId":"cat-1"}]',
@@ -314,6 +329,7 @@ def test_mutation_is_blocked_before_client_lookup() -> None:
             app,
             [
                 "replace",
+                "--transaction-id",
                 "txn-1",
                 "--splits-json",
                 '[{"merchantName":"Store","amount":-10,"categoryId":"cat-1"}]',
@@ -321,3 +337,41 @@ def test_mutation_is_blocked_before_client_lookup() -> None:
         )
     assert result.exit_code == 3
     assert json.loads(result.stderr)["code"] == "MUTATION_BLOCKED"
+
+
+def test_replace_rejects_removed_positional_id() -> None:
+    """The removed positional transaction ID is a usage error (mc-vv11)."""
+    mock = client()
+    result = invoke(mock, ["replace", "txn-1", "--splits-json", "[]"])
+    assert result.exit_code != 0
+    assert "transaction-id" in _plain(result.output)
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_replace_positional_with_option_reports_removal() -> None:
+    """A leftover positional alongside --transaction-id is explicitly rejected."""
+    mock = client()
+    result = invoke(mock, ["replace", "--transaction-id", "txn-1", "txn-2", "--splits-json", "[]"])
+    assert result.exit_code == 2
+    assert "no longer supported" in result.output.lower()
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_clear_rejects_removed_positional_id() -> None:
+    mock = client()
+    result = invoke(mock, ["clear", "txn-1"])
+    assert result.exit_code != 0
+    assert "transaction-id" in _plain(result.output)
+    mock.update_transaction_splits.assert_not_awaited()
+
+
+def test_replace_rejects_removed_source_aliases() -> None:
+    """Legacy split source aliases are removed, not retained as shims."""
+    mock = client()
+    for alias in ("--json-input", "--input-json"):
+        result = invoke(mock, ["replace", "--transaction-id", "txn-1", alias, "[]"])
+        assert result.exit_code != 0, result.output
+    for alias in ("--file", "--input-file"):
+        result = invoke(mock, ["replace", "--transaction-id", "txn-1", alias, "splits.json"])
+        assert result.exit_code != 0, result.output
+    mock.update_transaction_splits.assert_not_awaited()

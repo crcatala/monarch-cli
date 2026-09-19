@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -895,7 +896,9 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--amount", "25.50"])
+            result = runner.invoke(
+                app, ["update", "--transaction-id", "txn_123", "--amount", "25.50"]
+            )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -938,7 +941,9 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--notes", "Review"])
+            result = runner.invoke(
+                app, ["update", "--transaction-id", "txn_123", "--notes", "Review"]
+            )
 
         assert result.exit_code == 4
         assert attempts == 1
@@ -975,7 +980,9 @@ class TestTransactionsUpdate:
             ),
             patch("monarch_cli.output.progress.is_interactive", return_value=False),
         ):
-            result = runner.invoke(app, ["update", "txn_123", "--notes", "Review"])
+            result = runner.invoke(
+                app, ["update", "--transaction-id", "txn_123", "--notes", "Review"]
+            )
 
         assert result.exit_code == 1
         output = json.loads(result.stdout)
@@ -1014,7 +1021,7 @@ class TestTransactionsUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["update", "txn_123", "--description", "Coffee Shop"],
+                ["update", "--transaction-id", "txn_123", "--description", "Coffee Shop"],
             )
 
             assert result.exit_code == 0
@@ -1042,7 +1049,7 @@ class TestTransactionsUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["update", "txn_123", "--category", "cat_456"],
+                ["update", "--transaction-id", "txn_123", "--category", "cat_456"],
             )
 
             assert result.exit_code == 0
@@ -1070,7 +1077,7 @@ class TestTransactionsUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["update", "txn_123", "--notes", "Business lunch"],
+                ["update", "--transaction-id", "txn_123", "--notes", "Business lunch"],
             )
 
             assert result.exit_code == 0
@@ -1100,6 +1107,7 @@ class TestTransactionsUpdate:
                 app,
                 [
                     "update",
+                    "--transaction-id",
                     "txn_123",
                     "--amount",
                     "30.00",
@@ -1120,7 +1128,9 @@ class TestTransactionsUpdate:
     def test_update_dry_run(self) -> None:
         """Update with --dry-run shows changes without applying."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
-            result = runner.invoke(app, ["update", "txn_123", "--amount", "25.50", "--dry-run"])
+            result = runner.invoke(
+                app, ["update", "--transaction-id", "txn_123", "--amount", "25.50", "--dry-run"]
+            )
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -1132,7 +1142,7 @@ class TestTransactionsUpdate:
     def test_update_no_changes_uses_structured_error_contract(self) -> None:
         """A pre-execution validation failure is a structured error, not an outcome."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
-            result = runner.invoke(app, ["update", "txn_123"])
+            result = runner.invoke(app, ["update", "--transaction-id", "txn_123"])
 
             # Validation failures keep the structured error contract (exit 2
             # on stderr); they are never misrepresented as mutation outcomes.
@@ -1205,7 +1215,9 @@ class TestTransactionsBatchUpdate:
                 app,
                 [
                     "batch-update",
+                    "--transaction-id",
                     "txn_123",
+                    "--transaction-id",
                     "txn_456",
                     "--category",
                     "cat_food",
@@ -1251,7 +1263,7 @@ class TestTransactionsBatchUpdate:
         ):
             result = runner.invoke(
                 app,
-                ["batch-update", "txn_123", "--notes", "Q1 Expenses"],
+                ["batch-update", "--transaction-id", "txn_123", "--notes", "Q1 Expenses"],
             )
             assert result.exit_code == 0
             output = json.loads(result.stdout)
@@ -1328,7 +1340,16 @@ class TestTransactionsBatchUpdate:
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
             result = runner.invoke(
                 app,
-                ["batch-update", "txn_123", "txn_456", "--category", "cat_food", "--dry-run"],
+                [
+                    "batch-update",
+                    "--transaction-id",
+                    "txn_123",
+                    "--transaction-id",
+                    "txn_456",
+                    "--category",
+                    "cat_food",
+                    "--dry-run",
+                ],
             )
 
             assert result.exit_code == 0
@@ -1366,8 +1387,11 @@ class TestTransactionsBatchUpdate:
                 app,
                 [
                     "batch-update",
+                    "--transaction-id",
                     "txn_123",
+                    "--transaction-id",
                     "txn_456",
+                    "--transaction-id",
                     "txn_789",
                     "--category",
                     "cat_food",
@@ -1429,8 +1453,11 @@ class TestTransactionsBatchUpdate:
                 app,
                 [
                     "batch-update",
+                    "--transaction-id",
                     "txn_123",
+                    "--transaction-id",
                     "txn_456",
+                    "--transaction-id",
                     "txn_789",
                     "--category",
                     "cat_food",
@@ -1480,7 +1507,7 @@ class TestTransactionsBatchUpdate:
     def test_batch_update_no_changes_uses_structured_error_contract(self) -> None:
         """Missing changes is a pre-execution validation failure, not an outcome."""
         with patch("monarch_cli.output.progress.is_interactive", return_value=False):
-            result = runner.invoke(app, ["batch-update", "txn_123"])
+            result = runner.invoke(app, ["batch-update", "--transaction-id", "txn_123"])
 
             assert result.exit_code == 2
             assert "mutation-outcome.v1" not in result.stdout
@@ -1512,6 +1539,7 @@ class TestTransactionsBatchUpdate:
                 app,
                 [
                     "batch-update",
+                    "--transaction-id",
                     "txn_arg1",
                     "--stdin",
                     "--category",
@@ -1567,7 +1595,15 @@ class TestTransactionsBatchUpdateInterrupt:
         ):
             result = runner.invoke(
                 app,
-                ["batch-update", "txn_1", "txn_2", "--category", "cat_food"],
+                [
+                    "batch-update",
+                    "--transaction-id",
+                    "txn_1",
+                    "--transaction-id",
+                    "txn_2",
+                    "--category",
+                    "cat_food",
+                ],
             )
 
         assert result.exit_code == 4
@@ -1580,3 +1616,86 @@ class TestTransactionsBatchUpdateInterrupt:
         assert output["verification"]["required"] is True
         assert "verify" in output["verification"]["message"].lower()
         assert output["verification"]["command"] == ["monarch", "transactions", "list"]
+
+
+class TestExplicitMutationTargets:
+    """Removed positional mutation targets report actionable errors (mc-vv11)."""
+
+    def test_update_rejects_removed_positional_id(self) -> None:
+        result = runner.invoke(app, ["update", "txn_123", "--amount", "5"])
+        assert result.exit_code != 0
+        assert "transaction-id" in re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+
+    def test_update_positional_with_option_reports_removal(self) -> None:
+        result = runner.invoke(
+            app, ["update", "--transaction-id", "txn_1", "txn_2", "--amount", "5"]
+        )
+        assert result.exit_code == 2
+        assert "no longer supported" in result.output.lower()
+
+    def test_update_empty_transaction_id_is_validation_error(self) -> None:
+        result = runner.invoke(app, ["update", "--transaction-id", "  ", "--amount", "5"])
+        assert result.exit_code == 2
+        assert "must not be empty" in result.output.lower()
+
+    def test_batch_rejects_removed_positional_ids(self) -> None:
+        result = runner.invoke(app, ["batch-update", "txn_123", "--notes", "x"])
+        assert result.exit_code != 0
+        assert "transaction-id" in re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+
+    def test_batch_positional_with_option_reports_removal(self) -> None:
+        result = runner.invoke(
+            app, ["batch-update", "--transaction-id", "txn_1", "txn_2", "--notes", "x"]
+        )
+        assert result.exit_code == 2
+        assert "no longer supported" in result.output.lower()
+
+    def test_batch_missing_ids_is_validation_error(self) -> None:
+        result = runner.invoke(app, ["batch-update", "--notes", "x"])
+        assert result.exit_code == 2
+        assert "No transaction IDs provided" in result.output
+
+    def test_batch_empty_id_is_validation_error(self) -> None:
+        result = runner.invoke(app, ["batch-update", "--transaction-id", "", "--notes", "x"])
+        assert result.exit_code == 2
+        assert "must not be empty" in result.output.lower()
+
+    def test_batch_dedupes_options_then_stdin_first_seen(
+        self,
+        mock_authenticated_client: MagicMock,
+    ) -> None:
+        """Repeatable options are consumed before stdin, deduped first-seen."""
+        update_calls: list[str] = []
+
+        async def async_update_transaction(**kwargs):
+            update_calls.append(kwargs["transaction_id"])
+            return {"success": True}
+
+        mock_authenticated_client.update_transaction = async_update_transaction
+
+        with (
+            patch(
+                "monarch_cli.commands.transactions.get_authenticated_client",
+                return_value=mock_authenticated_client,
+            ),
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "batch-update",
+                    "--transaction-id",
+                    "txn_1",
+                    "--transaction-id",
+                    "txn_1",
+                    "--transaction-id",
+                    "txn_2",
+                    "--stdin",
+                    "--notes",
+                    "x",
+                ],
+                input="txn_2\ntxn_3\n",
+            )
+
+        assert result.exit_code == 0, result.output
+        assert update_calls == ["txn_1", "txn_2", "txn_3"]
