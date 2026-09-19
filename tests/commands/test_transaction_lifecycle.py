@@ -466,6 +466,18 @@ def test_delete_missing_target_is_not_found_without_delete() -> None:
     mock.delete_transaction.assert_not_awaited()
 
 
+def test_delete_pre_read_failure_is_structured_error() -> None:
+    from monarch_cli.core.exceptions import APIError
+
+    mock = client()
+    mock.get_transaction_details.side_effect = APIError("boom", status_code=500)
+    result = invoke(mock, DELETE_BASE)
+    assert result.exit_code == 1
+    assert json.loads(_plain(result.stderr))["code"] == "API_ERROR"
+    assert result.stdout.strip() == ""
+    mock.delete_transaction.assert_not_awaited()
+
+
 def test_delete_identity_mismatch_refuses_before_delete() -> None:
     mock = client()
     mock.get_transaction_details.return_value = detail(txn="other")

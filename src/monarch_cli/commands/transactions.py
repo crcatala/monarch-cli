@@ -1531,28 +1531,10 @@ def delete_transaction(
     client = get_authenticated_client()
 
     # Read the exact target before deletion so a missing or mismatched target
-    # is a deterministic pre-mutation error, never a claimed deletion.
-    try:
-        before = _fetch_exact_detail(client, transaction_id, "transactions delete verify")
-    except typer.Exit:
-        raise
-    except Exception as exc:
-        error = error_from_exception(exc)
-        _finish_mutation(
-            build_mutation_outcome(
-                operation.command,
-                [
-                    failed_item(
-                        "transaction",
-                        transaction_id,
-                        error["code"],
-                        error["message"],
-                        error["details"],
-                    )
-                ],
-            )
-        )
-        return
+    # is a deterministic pre-mutation error, never a claimed deletion. A read
+    # failure here happens before any mutation was dispatched, so it stays on
+    # the structured error path rather than the mutation-outcome contract.
+    before = _fetch_exact_detail(client, transaction_id, "transactions delete verify")
     if before is None:
         raise NotFoundError(
             message="Transaction not found.",
