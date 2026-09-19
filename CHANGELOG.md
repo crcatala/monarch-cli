@@ -133,6 +133,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Released read-shape compatibility** - Snapshot requests serialize validated dates as ISO strings, while transaction summary and cashflow detail normalize the list/object envelopes returned by the released client without dropping aggregate values
 - **Transaction pending state** - `is_pending` now reads the real upstream `pending` field instead of the incorrect `isPending` key (which made it always `false`)
 
+### Security
+
+#### Credential-safe third-party upload transport
+- Added `monarch_cli.core.upload_transport`, a public adapter boundary for the transaction-attachment upload path that builds third-party media requests from explicit destination and signed-field allowlists instead of copying and pruning the authenticated client's headers
+- The transport pins the media destination, refuses redirects so credential headers can never cross origins, and keeps signed-parameter acquisition, media upload, and attachment registration as distinct stages; signed material and raw responses never reach logs, structured errors, or diagnostics
+- Commands and services never call `MonarchMoney.upload_attachment()` or its private upload methods directly; the released client is unpatched and `monarchmoneycommunity` 1.5.2 is the current floor, so the local adapter and its maintenance assumptions are documented in [docs/upload-transport.md](docs/upload-transport.md)
+
 ## [0.1.0] - 2026-01-18
 
 Initial release of Monarch CLI - a command-line interface for Monarch Money.

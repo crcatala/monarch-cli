@@ -149,3 +149,41 @@ class TestMonarchMoneyOwnershipSurface:
         assert type_block and subtype_block, "type/subtype selections missing"
         assert "name" in type_block.group(0)
         assert "name" in subtype_block.group(0)
+
+
+class TestAttachmentUploadCompatibilityContract:
+    """Contract for the declared attachment-upload transport floor (mc-sr92).
+
+    The credential-safe transport adapter (``core.upload_transport``) depends on
+    the released client exposing the two authenticated attachment stages as
+    private methods, because no public per-stage interface exists in
+    ``monarchmoneycommunity`` 1.5.2. Commands and services never call these
+    methods directly; the adapter is the only owner. If a future release renames
+    or removes them, these tests fail loudly so the adapter's maintenance
+    assumptions are revisited.
+    """
+
+    @pytest.mark.parametrize(
+        "method_name",
+        ["_get_transaction_attachment_upload_info", "_add_transaction_attachment"],
+    )
+    def test_released_client_exposes_attachment_stage_method(self, method_name: str) -> None:
+        method = getattr(MonarchMoney, method_name, None)
+        assert callable(method), (
+            f"MonarchMoney.{method_name} is missing from the installed client; "
+            "the attachment-upload transport adapter's compatibility floor is "
+            "no longer satisfied"
+        )
+        assert inspect.iscoroutinefunction(method), (
+            f"MonarchMoney.{method_name} must remain awaitable; the transport adapter awaits it"
+        )
+
+    def test_released_client_still_ships_unsafe_monolithic_upload(self) -> None:
+        """Document why the local adapter boundary exists.
+
+        The released client still exposes the monolithic credential-forwarding
+        ``upload_attachment()``; the transport adapter deliberately never calls
+        it. Its presence is asserted so this ticket's rationale is revisited if
+        upstream removes or fixes it.
+        """
+        assert callable(getattr(MonarchMoney, "upload_attachment", None))
