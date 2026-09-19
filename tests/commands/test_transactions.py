@@ -705,7 +705,6 @@ class TestTransactionsGet:
     def test_get_exposes_owner_fields_and_literal_override_timestamp(
         self, mock_authenticated_client: MagicMock
     ) -> None:
-
         detail_response = {
             "getTransaction": {
                 "id": "txn-detail",
