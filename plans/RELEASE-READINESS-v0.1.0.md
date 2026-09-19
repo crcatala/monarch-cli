@@ -85,7 +85,6 @@ These items are complete and well-implemented:
 - ✅ `Makefile` with `verify` target
 - ✅ Version sourced from `__init__.py`
 - ✅ Good `.gitignore`
-- ✅ Pre-commit hooks (via prek)
 - ✅ 91% test coverage
 - ✅ Multiple output formats (JSON, table, CSV, etc.)
 - ✅ AI-agent friendly design

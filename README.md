@@ -979,14 +979,6 @@ The dedicated live mutation run is an explicit human gate: merge evidence
 must not claim the contract is live-proven until an operator-authenticated
 gated run succeeds.
 
-### Pre-commit hooks
-
-Git hooks are managed with [prek](https://github.com/j178/prek):
-
-```bash
-uv run prek install  # Install hooks
-```
-
 ### Releasing
 
 Releases are a two-step process:
