@@ -283,6 +283,26 @@ def test_removed_positional_id_is_rejected() -> None:
     mock.gql_call.assert_not_awaited()
 
 
+def test_permission_failure_is_definitive_and_sanitized() -> None:
+    from monarch_cli.core.exceptions import APIError
+
+    mock = client()
+    mock.get_transaction_details.return_value = detail(needs_review=True)
+    mock.gql_call.side_effect = APIError("Forbidden", status_code=403)
+    result = invoke(mock, [*MARK, "--transaction-id", "txn-1"])
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["status"] == "failed"
+    assert output["verification"] is None
+    error = output["items"][0]["error"]
+    assert error["code"] == "API_ERROR"
+    assert error["details"]["status_code"] == 403
+    # The write was attempted exactly once and not retried.
+    mock.gql_call.assert_awaited_once()
+    # No post-read after a definitive rejection.
+    assert mock.get_transaction_details.await_count == 1
+
+
 def test_payload_errors_are_definitive_failure() -> None:
     mock = client()
     mock.get_transaction_details.return_value = detail(needs_review=True)
