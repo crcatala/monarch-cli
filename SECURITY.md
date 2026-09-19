@@ -25,7 +25,7 @@ We will respond within 48 hours and work with you to address the issue.
 Monarch CLI stores session tokens (not passwords) using:
 
 1. **System keyring** (preferred) - OS-level secure storage
-2. **File storage** - `~/.config/monarch-cli/session.json` with 600 permissions
+2. **File storage** - a JSON session file in the platform-specific Monarch CLI configuration directory (typically `~/.config/monarch-cli/session.json` on Linux) with 600 permissions on POSIX systems
 
 ### What We Don't Store
 
