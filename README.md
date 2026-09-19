@@ -49,6 +49,11 @@ Verify the installation:
 monarch --version
 ```
 
+## Upgrading
+
+Version-specific migration guides, including breaking-change notes, are in
+[docs/migrations/](docs/migrations/).
+
 ## Quick start
 
 Authenticate interactively:
