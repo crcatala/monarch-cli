@@ -1,6 +1,6 @@
 ---
 id: mc-8dfd
-status: in_progress
+status: closed
 deps: [mc-hszv]
 links: []
 created: 2026-09-11T01:36:40Z
