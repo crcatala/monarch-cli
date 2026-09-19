@@ -9,7 +9,6 @@ from typing import Annotated, Any
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.config import get_config
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, MutationAmbiguousError, NotFoundError, ValidationError
 from ..core.mutation_outcomes import (
@@ -28,8 +27,22 @@ from ..core.operations import (
     run_mutation_call,
     run_read_call,
 )
-from ..core.prompting import confirm_action
 from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
+from .mutation_helpers import (
+    as_object as _as_object,
+)
+from .mutation_helpers import (
+    confirm_destructive,
+)
+from .mutation_helpers import (
+    payload_error_details as _payload_error_details,
+)
+from .mutation_helpers import (
+    reject_positional_targets as _reject_positional_targets,
+)
+from .mutation_helpers import (
+    validate_transaction_id as _validate_transaction_id,
+)
 
 app = typer.Typer(help="Discover and safely assign transaction tags", no_args_is_help=True)
 
@@ -38,15 +51,6 @@ MUTATION_EFFECTS: frozenset[Effect] = frozenset({Effect.REMOTE_MUTATION})
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 _TAG_VERIFICATION_COMMAND = ["monarch", "transactions", "tags", "show"]
-
-
-def _as_object(value: Any, label: str) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise APIError(
-            message=f"Malformed {label} response.",
-            details={"expected": "object", "received": type(value).__name__},
-        )
-    return value
 
 
 def _normal_tag(value: Any) -> dict[str, Any]:
@@ -72,33 +76,6 @@ def _tag_list(payload: Any) -> list[dict[str, Any]]:
             details={"field": "householdTransactionTags", "expected": "array"},
         )
     return [_normal_tag(tag) for tag in tags]
-
-
-def _payload_error_details(errors: Any) -> list[dict[str, Any]]:
-    if not isinstance(errors, list):
-        return [{"message": "The service returned an invalid error payload."}]
-    result: list[dict[str, Any]] = []
-    for error in errors:
-        if not isinstance(error, Mapping):
-            result.append({"message": "The service returned an invalid error payload."})
-            continue
-        item: dict[str, Any] = {}
-        for key in ("message", "code", "field"):
-            if isinstance(error.get(key), str):
-                item[key] = error[key]
-        field_errors = error.get("fieldErrors")
-        if isinstance(field_errors, list):
-            item["field_errors"] = [
-                {
-                    key: entry[key]
-                    for key in ("field", "messages")
-                    if isinstance(entry, Mapping) and key in entry
-                }
-                for entry in field_errors
-                if isinstance(entry, Mapping)
-            ]
-        result.append(item or {"message": "The service rejected the request."})
-    return result
 
 
 def _mutation_container(payload: Any, key: str) -> Mapping[str, Any]:
@@ -161,26 +138,8 @@ def _dedupe(ids: list[str]) -> list[str]:
     return result
 
 
-def _validate_transaction_id(transaction_id: str) -> None:
-    if not transaction_id.strip():
-        raise ValidationError("Transaction ID must not be empty.", field="transaction_id")
-
-
 def _emit(outcome: dict[str, Any]) -> None:
     emit_mutation_outcome(outcome)
-
-
-def _confirm(operation: str, transaction_id: str, tag_ids: list[str]) -> None:
-    config = get_config()
-    if not config.confirm_destructive:
-        return
-    if not confirm_action(
-        f"Replace all tags on transaction {transaction_id} with {tag_ids!r}?",
-        missing_input="destructive confirmation",
-        remedy="pass --yes (after --allow-mutations) or disable confirm_destructive",
-        operation=operation,
-    ):
-        raise ValidationError("Mutation was not confirmed.", field="confirmation")
 
 
 @app.command("list")
@@ -290,26 +249,73 @@ def create_tag(
         )
 
 
-def _set_tags(transaction_id: str, requested: list[str], operation_name: str) -> None:
-    operation = Operation(command=operation_name, effects=MUTATION_EFFECTS)
-    validate_mutation_output()
-    require_mutation_authorization(operation)
-    client = get_authenticated_client()
-    # Discovery is read-only and deliberately precedes confirmation/mutation.
-    known = _tag_list(
+def _fetch_known_tags(client: Any) -> list[dict[str, Any]]:
+    """Fetch the household tag collection once for resolution/validation."""
+    return _tag_list(
         run_read_call(
             lambda: client.get_transaction_tags(),
             Operation(command="transactions tags list", effects=READ_EFFECTS),
         )
     )
+
+
+def _resolve_tag_refs(
+    known: list[dict[str, Any]],
+    tag_ids: list[str],
+    tag_names: list[str],
+) -> list[str]:
+    """Resolve and validate mixed ``--tag-id`` / ``--tag-name`` references.
+
+    Names match exactly and case-sensitively, with CLI-input-only whitespace
+    trimming; upstream names are never normalized. Unknown names/IDs and
+    duplicate-name ambiguities are pre-mutation validation errors. Resolved IDs
+    are deduplicated in first-seen order.
+    """
     known_ids = {tag["id"] for tag in known if isinstance(tag.get("id"), str)}
-    unknown = [tag_id for tag_id in requested if tag_id not in known_ids]
-    if unknown:
+    resolved: list[str] = []
+    unknown_ids: list[str] = []
+    for raw in tag_ids:
+        tag_id = raw.strip()
+        if tag_id in known_ids:
+            resolved.append(tag_id)
+        else:
+            unknown_ids.append(tag_id)
+    if unknown_ids:
         raise ValidationError(
             "Unknown transaction tag ID(s).",
             field="tag_ids",
-            details={"unknown_ids": unknown},
+            details={"unknown_ids": unknown_ids},
         )
+
+    unknown_names: list[str] = []
+    ambiguous: dict[str, list[str]] = {}
+    for raw in tag_names:
+        name = raw.strip()
+        matches = [
+            tag["id"] for tag in known if tag.get("name") == name and isinstance(tag.get("id"), str)
+        ]
+        if not matches:
+            unknown_names.append(name)
+        elif len(matches) > 1:
+            ambiguous[name] = matches
+        else:
+            resolved.append(matches[0])
+    if unknown_names:
+        raise ValidationError(
+            "Unknown transaction tag name(s).",
+            field="tag_names",
+            details={"unknown_names": unknown_names},
+        )
+    if ambiguous:
+        raise ValidationError(
+            "Ambiguous transaction tag name(s): multiple tags share the name.",
+            field="tag_names",
+            details={"ambiguous_names": ambiguous},
+        )
+    return _dedupe(resolved)
+
+
+def _read_current_tags(client: Any, transaction_id: str) -> list[str]:
     detail = _transaction_detail(
         run_read_call(
             lambda: client.get_transaction_details(
@@ -319,23 +325,36 @@ def _set_tags(transaction_id: str, requested: list[str], operation_name: str) ->
         ),
         transaction_id,
     )
-    current = _tag_ids(detail)
-    if set(current) == set(requested):
-        _emit(
-            build_mutation_outcome(
-                operation.command,
-                [
-                    succeeded_item(
-                        "transaction", transaction_id, {"tag_ids": requested, "no_op": True}
-                    )
-                ],
-            )
-        )
-        return
-    _confirm(operation_name, transaction_id, requested)
+    return _tag_ids(detail)
+
+
+def _require_tag_refs(tag_id: list[str] | None, tag_name: list[str] | None) -> None:
+    if not tag_id and not tag_name:
+        raise ValidationError("At least one --tag-id or --tag-name is required.", field="tag_ids")
+
+
+def _write_tag_set(
+    client: Any,
+    transaction_id: str,
+    final_ids: list[str],
+    operation: Operation,
+    *,
+    confirmation_message: str | None,
+    result: dict[str, Any],
+) -> None:
+    """Confirm, write the full tag set once, verify it, and emit the outcome.
+
+    ``add`` is a read-modify-write over the full-set endpoint: it is not atomic
+    against concurrent tag changes because the upstream API has no add
+    endpoint. A verified response whose tag set differs from ``final_ids`` is
+    reported as a verification-mismatch ambiguous outcome, never silently
+    repaired.
+    """
+    if confirmation_message is not None:
+        confirm_destructive(confirmation_message, operation=operation.command)
     try:
         payload = run_mutation_call(
-            lambda: client.set_transaction_tags(transaction_id=transaction_id, tag_ids=requested),
+            lambda: client.set_transaction_tags(transaction_id=transaction_id, tag_ids=final_ids),
             operation,
             entity_ids=(transaction_id,),
             verification=(
@@ -346,9 +365,9 @@ def _set_tags(transaction_id: str, requested: list[str], operation_name: str) ->
         container = _mutation_container(payload, "setTransactionTags")
         tx = container.get("transaction")
         if not isinstance(tx, Mapping):
-            raise APIError(message="The tag replacement response did not include the transaction.")
+            raise APIError(message="The tag write response did not include the transaction.")
         observed = _tag_ids(tx)
-        if set(observed) != set(requested):
+        if set(observed) != set(final_ids):
             _emit(
                 build_mutation_outcome(
                     operation.command,
@@ -357,10 +376,10 @@ def _set_tags(transaction_id: str, requested: list[str], operation_name: str) ->
                             "transaction",
                             transaction_id,
                             "The tag write returned a tag set different from the "
-                            "requested set; remote state is unknown.",
+                            "final set; remote state is unknown.",
                             {
                                 "reason": "verification_mismatch",
-                                "expected_tag_ids": requested,
+                                "expected_tag_ids": final_ids,
                                 "observed_tag_ids": observed,
                                 "remote_state": "unknown",
                             },
@@ -377,11 +396,7 @@ def _set_tags(transaction_id: str, requested: list[str], operation_name: str) ->
         _emit(
             build_mutation_outcome(
                 operation.command,
-                [
-                    succeeded_item(
-                        "transaction", transaction_id, {"tag_ids": requested, "no_op": False}
-                    )
-                ],
+                [succeeded_item("transaction", transaction_id, result)],
             )
         )
     except typer.Exit:
@@ -422,27 +437,162 @@ def _set_tags(transaction_id: str, requested: list[str], operation_name: str) ->
         )
 
 
-@app.command("replace")
+def _start_tag_mutation(command: str) -> tuple[Operation, Any]:
+    """Validate output, authorize, and return the operation plus a client."""
+    operation = Operation(command=command, effects=MUTATION_EFFECTS)
+    validate_mutation_output()
+    require_mutation_authorization(operation)
+    return operation, get_authenticated_client()
+
+
+@app.command("replace", context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def replace_tags(
-    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
-    tag_ids: Annotated[list[str], typer.Argument(help="One or more known tag IDs")],
+    ctx: typer.Context,
+    transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
+    tag_id: Annotated[
+        list[str] | None,
+        typer.Option("--tag-id", help="Known tag ID (repeatable)"),
+    ] = None,
+    tag_name: Annotated[
+        list[str] | None,
+        typer.Option("--tag-name", help="Exact tag name (repeatable)"),
+    ] = None,
 ) -> None:
-    """Replace the complete tag set for one transaction."""
+    """Replace the complete tag set for one transaction.
+
+    Examples:
+        monarch --allow-mutations transactions tags replace \\
+            --transaction-id TXN123 --tag-id TAG1 --tag-name "Travel"
+    """
+    _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
-    requested = _dedupe(tag_ids)
-    if not requested:
-        raise ValidationError("Replacement requires at least one tag ID.", field="tag_ids")
-    _set_tags(transaction_id, requested, "transactions tags replace")
+    _require_tag_refs(tag_id, tag_name)
+    operation, client = _start_tag_mutation("transactions tags replace")
+    known = _fetch_known_tags(client)
+    requested = _resolve_tag_refs(known, tag_id or [], tag_name or [])
+    current = _read_current_tags(client, transaction_id)
+    if set(current) == set(requested):
+        _emit(
+            build_mutation_outcome(
+                operation.command,
+                [
+                    succeeded_item(
+                        "transaction", transaction_id, {"tag_ids": requested, "no_op": True}
+                    )
+                ],
+            )
+        )
+        return
+    _write_tag_set(
+        client,
+        transaction_id,
+        requested,
+        operation,
+        confirmation_message=(
+            f"Replace all tags on transaction {transaction_id} with {requested!r}?"
+        ),
+        result={"tag_ids": requested, "no_op": False},
+    )
 
 
-@app.command("clear")
+@app.command("add", context_settings={"allow_extra_args": True})
+@handle_errors
+@operation_effects(Effect.REMOTE_MUTATION)
+def add_tags(
+    ctx: typer.Context,
+    transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
+    tag_id: Annotated[
+        list[str] | None,
+        typer.Option("--tag-id", help="Known tag ID (repeatable)"),
+    ] = None,
+    tag_name: Annotated[
+        list[str] | None,
+        typer.Option("--tag-name", help="Exact tag name (repeatable)"),
+    ] = None,
+) -> None:
+    """Add tags to a transaction, preserving its existing tags.
+
+    Read-modify-write over the full-set endpoint; not atomic against concurrent
+    tag changes. Already-present tags are skipped; an already-satisfied request
+    is a deterministic no-op. Existing tags not present in household discovery
+    are preserved verbatim.
+
+    Examples:
+        monarch --allow-mutations transactions tags add \\
+            --transaction-id TXN123 --tag-name "Travel"
+    """
+    _reject_positional_targets(ctx.args)
+    _validate_transaction_id(transaction_id)
+    _require_tag_refs(tag_id, tag_name)
+    operation, client = _start_tag_mutation("transactions tags add")
+    known = _fetch_known_tags(client)
+    requested = _resolve_tag_refs(known, tag_id or [], tag_name or [])
+    current = _read_current_tags(client, transaction_id)
+    current_set = set(current)
+    added = [tag for tag in requested if tag not in current_set]
+    skipped = [tag for tag in requested if tag in current_set]
+    final = _dedupe([*current, *added])
+    if not added:
+        _emit(
+            build_mutation_outcome(
+                operation.command,
+                [
+                    succeeded_item(
+                        "transaction",
+                        transaction_id,
+                        {
+                            "tag_ids": current,
+                            "added_tag_ids": [],
+                            "skipped_tag_ids": skipped,
+                            "no_op": True,
+                        },
+                    )
+                ],
+            )
+        )
+        return
+    _write_tag_set(
+        client,
+        transaction_id,
+        final,
+        operation,
+        confirmation_message=None,
+        result={
+            "tag_ids": final,
+            "added_tag_ids": added,
+            "skipped_tag_ids": skipped,
+            "no_op": False,
+        },
+    )
+
+
+@app.command("clear", context_settings={"allow_extra_args": True})
 @handle_errors
 @operation_effects(Effect.REMOTE_MUTATION)
 def clear_tags(
-    transaction_id: Annotated[str, typer.Argument(help="Transaction ID")],
+    ctx: typer.Context,
+    transaction_id: Annotated[str, typer.Option("--transaction-id", help="Transaction ID")],
 ) -> None:
     """Explicitly clear every tag from one transaction."""
+    _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
-    _set_tags(transaction_id, [], "transactions tags clear")
+    operation, client = _start_tag_mutation("transactions tags clear")
+    current = _read_current_tags(client, transaction_id)
+    if not current:
+        _emit(
+            build_mutation_outcome(
+                operation.command,
+                [succeeded_item("transaction", transaction_id, {"tag_ids": [], "no_op": True})],
+            )
+        )
+        return
+    _write_tag_set(
+        client,
+        transaction_id,
+        [],
+        operation,
+        confirmation_message=f"Clear all tags on transaction {transaction_id}?",
+        result={"tag_ids": [], "no_op": False},
+    )

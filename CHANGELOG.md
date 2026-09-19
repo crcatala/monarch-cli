@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+#### Transaction tag assignment redesign and additive `add`
+- `transactions tags replace`/`clear` require `--transaction-id` and use repeatable `--tag-id`/`--tag-name` options instead of positional arguments; `transactions tags add` is new (mc-46gq)
+- Tag names resolve through household discovery with exact, case-sensitive matching; unknown names/IDs and duplicate-name ambiguities are pre-mutation errors
+- `add` is a read-modify-write over the full-set endpoint, preserves existing (including stale) tags, deduplicates, and reports `added`/`skipped`/`no_op`; it is not atomic against concurrent changes
+- The README no longer states that incremental tag additions are never exposed
+
 #### Explicit transaction mutation targets
 - `transactions update`, `transactions batch-update`, `transactions splits replace`, and `transactions splits clear` now require `--transaction-id` and no longer accept positional transaction IDs; a removed positional produces an actionable usage error pointing at `--transaction-id` (mc-vv11)
 - `transactions batch-update` accepts repeatable `--transaction-id` options (repeatable values first, then `--stdin`), deduplicated in first-seen order

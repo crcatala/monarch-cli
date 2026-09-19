@@ -11,7 +11,6 @@ from typing import Annotated, Any, NoReturn
 import typer
 
 from ..core.adapter import get_authenticated_client
-from ..core.config import get_config
 from ..core.error_handler import handle_errors
 from ..core.exceptions import APIError, MutationAmbiguousError, NotFoundError, ValidationError
 from ..core.mutation_outcomes import (
@@ -30,8 +29,22 @@ from ..core.operations import (
     run_mutation_call,
     run_read_call,
 )
-from ..core.prompting import confirm_action
 from ..output import OutputFormat, emit_mutation_outcome, output, validate_mutation_output
+from .mutation_helpers import (
+    as_object as _as_object,
+)
+from .mutation_helpers import (
+    confirm_destructive,
+)
+from .mutation_helpers import (
+    payload_error_details as _payload_errors,
+)
+from .mutation_helpers import (
+    reject_positional_targets as _reject_positional_targets,
+)
+from .mutation_helpers import (
+    validate_transaction_id as _validate_transaction_id,
+)
 
 app = typer.Typer(help="Inspect and safely replace transaction splits", no_args_is_help=True)
 
@@ -54,15 +67,6 @@ _VERIFICATION_MESSAGE = (
     "Inspect the transaction's splits with 'monarch transactions splits show "
     "TRANSACTION_ID' and confirm the applied set before retrying."
 )
-
-
-def _as_object(value: Any, label: str) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise APIError(
-            message=f"Malformed {label} response.",
-            details={"expected": "object", "received": type(value).__name__},
-        )
-    return value
 
 
 def _as_transaction(payload: Any, transaction_id: str) -> Mapping[str, Any]:
@@ -311,26 +315,6 @@ def _read_splits(
     return transaction, [_normal_row(row) for row in rows]
 
 
-def _payload_errors(errors: Any) -> list[dict[str, Any]]:
-    if not isinstance(errors, list):
-        return [{"message": "The service returned an invalid error payload."}]
-    result: list[dict[str, Any]] = []
-    for error in errors:
-        if not isinstance(error, Mapping):
-            result.append({"message": "The service returned an invalid error payload."})
-            continue
-        item = {key: error[key] for key in ("message", "code") if isinstance(error.get(key), str)}
-        field_errors = error.get("fieldErrors")
-        if isinstance(field_errors, list):
-            item["field_errors"] = [
-                {key: entry[key] for key in ("field", "messages") if key in entry}
-                for entry in field_errors
-                if isinstance(entry, Mapping)
-            ]
-        result.append(item or {"message": "The service rejected the request."})
-    return result
-
-
 def _mutation_container(payload: Any) -> Mapping[str, Any]:
     response = _as_object(payload, "split mutation")
     if "errors" in response:
@@ -380,36 +364,15 @@ def _mutation_container(payload: Any) -> Mapping[str, Any]:
     return container
 
 
-def _validate_transaction_id(transaction_id: str) -> None:
-    if not transaction_id.strip():
-        raise ValidationError("Transaction ID must not be empty.", field="transaction_id")
-
-
-def _reject_positional_targets(legacy: list[str] | None) -> None:
-    """Reject a removed positional transaction ID with an actionable error."""
-    if legacy:
-        raise ValidationError(
-            "Positional transaction IDs are no longer supported; use --transaction-id.",
-            field="transaction_id",
-            details={"removed_positional": True, "replacement_option": "--transaction-id"},
-        )
-
-
 def _emit(outcome: dict[str, Any]) -> None:
     emit_mutation_outcome(outcome)
 
 
 def _confirm(operation: str, transaction_id: str, requested: list[dict[str, Any]]) -> None:
-    config = get_config()
-    if not config.confirm_destructive:
-        return
-    if not confirm_action(
+    confirm_destructive(
         f"Replace all splits on transaction {transaction_id} with {len(requested)} row(s)?",
-        missing_input="destructive confirmation",
-        remedy="pass --yes (after --allow-mutations) or disable confirm_destructive",
         operation=operation,
-    ):
-        raise ValidationError("Mutation was not confirmed.", field="confirmation")
+    )
 
 
 def _verify(
