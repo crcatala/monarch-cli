@@ -1,6 +1,6 @@
 ---
 id: mc-cpzi
-status: in_progress
+status: closed
 deps: [mc-cd12, mc-h3cl, mc-ik8o]
 links: [mc-82kf]
 created: 2026-09-11T01:47:48Z
