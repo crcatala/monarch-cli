@@ -100,6 +100,18 @@ class TestAccountSchemaContract:
     - is_manual: bool - Whether manually tracked (True) or linked (False)
     - owner_id: str | None - Upstream ownedByUser.id when provided, else None
     - owner_name: str | None - Upstream ownedByUser.displayName when provided
+    - type_name: str | None - Upstream type.name identifier (same identifiers
+      as `monarch accounts types`)
+    - subtype_name: str | None - Upstream subtype.name identifier
+    - is_asset: bool | None - Direct upstream asset/liability classification
+      (isAsset); None when unavailable, never inferred from display labels
+    - credit_limit: number | None - Upstream limit (user-facing credit limit)
+    - provider_credit_limit: number | None - Upstream dataProviderCreditLimit
+    - apr: number | None - Upstream apr in upstream numeric units
+    - interest_rate: number | None - Upstream interestRate in upstream units
+    - minimum_payment: number | None - Upstream minimumPayment
+    - planned_payment: number | None - Upstream plannedPayment
+    - excluded_from_debt_paydown: bool | None - Upstream excludeFromDebtPaydown
     - last_updated: str | None - ISO timestamp of last sync
 
     Example output:
@@ -133,6 +145,16 @@ class TestAccountSchemaContract:
         "is_manual",
         "owner_id",
         "owner_name",
+        "type_name",
+        "subtype_name",
+        "is_asset",
+        "credit_limit",
+        "provider_credit_limit",
+        "apr",
+        "interest_rate",
+        "minimum_payment",
+        "planned_payment",
+        "excluded_from_debt_paydown",
         "last_updated",
     }
 
@@ -249,6 +271,51 @@ class TestAccountSchemaContract:
             assert "owner_id" in result and "owner_name" in result
             assert result["owner_id"] is None or isinstance(result["owner_id"], str)
             assert result["owner_name"] is None or isinstance(result["owner_name"], str)
+
+    def test_liability_fields_nullable_and_distinct(self):
+        """Liability fields exist for every shape and never merge or fabricate."""
+        credit = transform_account(
+            {
+                **FULL_ACCOUNT_RAW,
+                "isAsset": False,
+                "limit": 5000,
+                "dataProviderCreditLimit": 5100,
+                "apr": 0.2499,
+                "interestRate": 24.99,
+                "minimumPayment": 25.0,
+                "plannedPayment": 50.0,
+                "excludeFromDebtPaydown": False,
+            }
+        )
+        assert credit["credit_limit"] == 5000
+        assert credit["provider_credit_limit"] == 5100
+        assert credit["apr"] == 0.2499
+        assert credit["interest_rate"] == 24.99
+        assert credit["excluded_from_debt_paydown"] is False
+
+        for raw in (
+            FULL_ACCOUNT_RAW,
+            {**FULL_ACCOUNT_RAW, "limit": None, "apr": "24.9%", "isAsset": None},
+            {**FULL_ACCOUNT_RAW, "limit": 0, "minimumPayment": -1.5},
+        ):
+            result = transform_account(raw)
+            for field in (
+                "type_name",
+                "subtype_name",
+                "is_asset",
+                "credit_limit",
+                "provider_credit_limit",
+                "apr",
+                "interest_rate",
+                "minimum_payment",
+                "planned_payment",
+                "excluded_from_debt_paydown",
+            ):
+                assert field in result
+            assert result["is_asset"] is None or isinstance(result["is_asset"], bool)
+            assert result["credit_limit"] is None or isinstance(
+                result["credit_limit"], (int, float)
+            )
 
     def test_malformed_root_raises_typed_error(self):
         """Non-object account/transaction roots raise a typed APIError."""

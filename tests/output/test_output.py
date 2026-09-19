@@ -368,11 +368,12 @@ class TestQuietModeOutput:
 
 
 class TestDisplayFieldProjection:
-    """Concise human-format field selection (owner attribution display).
+    """Concise-format field selection (owner attribution and liability display).
 
-    ``display_fields`` restricts plain and table output to the ordered field
-    selection. Machine-readable formats (JSON, CSV, compact) always keep the
-    complete normalized record, and ``--raw`` is never projected.
+    ``display_fields`` restricts plain, table, and compact output to the
+    ordered field selection. Machine-readable formats (JSON, CSV, NDJSON)
+    always keep the complete normalized record, and ``--raw`` is never
+    projected.
     """
 
     DATA = [
@@ -402,11 +403,13 @@ class TestDisplayFieldProjection:
         assert result[0] == self.DATA[0]
         assert result[1] == self.DATA[1]
 
-    def test_compact_keeps_complete_record(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_compact_projects_to_display_fields(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Compact is a concise single-line summary view, like plain/table."""
         output(self.DATA, OutputFormat.COMPACT, display_fields=self.FIELDS)
         captured = capsys.readouterr()
         result = json.loads(captured.out)
-        assert result == self.DATA
+        assert result[0] == {"id": "a1", "name": "Checking", "owner_name": "Alex"}
+        assert result[1] == {"id": "a2", "name": "Savings", "owner_name": None}
 
     def test_csv_keeps_complete_record(self, capsys: pytest.CaptureFixture[str]) -> None:
         output(self.DATA, OutputFormat.CSV, display_fields=self.FIELDS)

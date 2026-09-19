@@ -226,6 +226,16 @@ class TestSchemaContract:
         "is_manual",
         "owner_id",
         "owner_name",
+        "type_name",
+        "subtype_name",
+        "is_asset",
+        "credit_limit",
+        "provider_credit_limit",
+        "apr",
+        "interest_rate",
+        "minimum_payment",
+        "planned_payment",
+        "excluded_from_debt_paydown",
         "last_updated",
     }
 
@@ -301,6 +311,155 @@ class TestOwnershipNormalization:
         assert result["owner_name"] is None
         assert "is_shared" not in result
         assert "ownership_state" not in result
+
+
+class TestLiabilityMetadata:
+    """Liability and debt-service metadata passes through literally.
+
+    ``is_asset`` is the direct upstream classification; the two limit fields
+    and APR/interest rate never merge; missing values stay ``null`` rather
+    than becoming fabricated zeroes; rates keep upstream numeric units.
+    """
+
+    def test_credit_account_liability_metadata(self):
+        raw = {
+            **SAMPLE_ACCOUNT_FULL,
+            "isAsset": False,
+            "type": {"name": "liability", "display": "Credit Card"},
+            "subtype": {"name": "credit_card", "display": "Credit Card"},
+            "limit": 5000.00,
+            "dataProviderCreditLimit": 5100.00,
+            "apr": 0.2499,
+            "interestRate": 24.99,
+            "minimumPayment": 25.0,
+            "plannedPayment": 50.0,
+            "excludeFromDebtPaydown": False,
+        }
+        result = transform_account(raw)
+        assert result["is_asset"] is False
+        assert result["type_name"] == "liability"
+        assert result["subtype_name"] == "credit_card"
+        assert result["type"] == "Credit Card"
+        assert result["credit_limit"] == 5000.00
+        assert result["provider_credit_limit"] == 5100.00
+        assert result["apr"] == 0.2499
+        assert result["interest_rate"] == 24.99
+        assert result["minimum_payment"] == 25.0
+        assert result["planned_payment"] == 50.0
+        assert result["excluded_from_debt_paydown"] is False
+
+    def test_loan_account_partial_metadata(self):
+        raw = {
+            **SAMPLE_ACCOUNT_FULL,
+            "isAsset": False,
+            "interestRate": 6.75,
+            "minimumPayment": 320.0,
+        }
+        result = transform_account(raw)
+        assert result["is_asset"] is False
+        assert result["interest_rate"] == 6.75
+        assert result["minimum_payment"] == 320.0
+        assert result["credit_limit"] is None
+        assert result["provider_credit_limit"] is None
+        assert result["apr"] is None
+        assert result["planned_payment"] is None
+        assert result["excluded_from_debt_paydown"] is None
+
+    def test_ordinary_asset_account_has_null_liability_fields(self):
+        raw = {**SAMPLE_ACCOUNT_FULL, "isAsset": True}
+        result = transform_account(raw)
+        assert result["is_asset"] is True
+        for field in (
+            "credit_limit",
+            "provider_credit_limit",
+            "apr",
+            "interest_rate",
+            "minimum_payment",
+            "planned_payment",
+            "excluded_from_debt_paydown",
+        ):
+            assert result[field] is None
+
+    def test_missing_is_asset_is_null_not_a_default(self):
+        """A missing classification stays null; no misleading liability default."""
+        assert transform_account(SAMPLE_ACCOUNT_FULL)["is_asset"] is None
+        assert transform_account({"id": "acc"})["is_asset"] is None
+        assert transform_account({"id": "acc", "isAsset": None})["is_asset"] is None
+
+    @pytest.mark.parametrize(
+        "drifted",
+        ["true", 1, None, ["true"]],
+        ids=["string", "number", "null", "list"],
+    )
+    def test_drifted_is_asset_yields_null(self, drifted):
+        result = transform_account({**SAMPLE_ACCOUNT_FULL, "isAsset": drifted})
+        assert result["is_asset"] is None
+
+    def test_limits_and_rates_never_merge(self):
+        """Provider and user-facing limits, APR and interest rate stay distinct."""
+        raw = {
+            **SAMPLE_ACCOUNT_FULL,
+            "limit": 1000,
+            "dataProviderCreditLimit": 2000,
+            "apr": 0.19,
+            "interestRate": 19.0,
+        }
+        result = transform_account(raw)
+        assert result["credit_limit"] != result["provider_credit_limit"]
+        assert result["apr"] != result["interest_rate"]
+
+    def test_zero_negative_and_inapplicable_stay_distinguishable(self):
+        raw = {
+            **SAMPLE_ACCOUNT_FULL,
+            "limit": 0,
+            "minimumPayment": -1.5,
+            "apr": None,
+        }
+        result = transform_account(raw)
+        assert result["credit_limit"] == 0
+        assert result["minimum_payment"] == -1.5
+        assert result["apr"] is None
+
+    @pytest.mark.parametrize(
+        "drifted",
+        ["24.9%", True, None, [0.25]],
+        ids=["string", "boolean", "null", "list"],
+    )
+    def test_drifted_numeric_rates_yield_null_without_scaling(self, drifted):
+        result = transform_account({**SAMPLE_ACCOUNT_FULL, "apr": drifted})
+        assert result["apr"] is None
+
+    def test_rates_pass_through_without_scaling(self):
+        raw = {**SAMPLE_ACCOUNT_FULL, "apr": 24.99, "interestRate": 0.2499}
+        result = transform_account(raw)
+        assert result["apr"] == 24.99
+        assert result["interest_rate"] == 0.2499
+
+    def test_manual_hidden_and_deactivated_normalize(self):
+        manual = transform_account({"id": "acc", "isManual": True, "isAsset": False, "limit": 500})
+        assert manual["is_manual"] is True
+        assert manual["is_asset"] is False
+        assert manual["credit_limit"] == 500
+
+        hidden = transform_account({"id": "acc", "isHidden": True, "isAsset": True})
+        assert hidden["is_active"] is False
+        assert hidden["is_asset"] is True
+
+        deactivated = transform_account({"id": "acc", "deactivatedAt": "2026-01-01T00:00:00Z"})
+        assert deactivated["is_asset"] is None
+        assert deactivated["credit_limit"] is None
+
+    def test_stable_type_names_coordinate_with_account_types_discovery(self):
+        """type_name/subtype_name mirror the `monarch accounts types` identifiers."""
+        raw = {
+            **SAMPLE_ACCOUNT_FULL,
+            "type": {"name": "depository", "display": "Checking"},
+            "subtype": {"name": "checking", "display": "Checking"},
+        }
+        result = transform_account(raw)
+        assert result["type_name"] == "depository"
+        assert result["subtype_name"] == "checking"
+        assert result["type"] == "Checking"
 
 
 SAMPLE_TYPE_OPTIONS_RAW = {

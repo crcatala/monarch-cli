@@ -440,8 +440,12 @@ Monarch CLI supports multiple output formats for different use cases:
 | `json` | Pretty-printed JSON | Scripts, parsing |
 | `table` | Rich table format | Terminal display |
 | `csv` | Comma-separated values | Spreadsheets |
-| `compact` | Minimal JSON | Compact storage |
+| `compact` | Concise single-line JSON summary | Compact storage, quick glance |
 | `ndjson` | Newline-delimited JSON | Stream processing |
+
+For list commands that offer a concise display selection, `plain`, `table`,
+and `compact` show a curated field subset; `json`, `csv`, and `ndjson` always
+keep the complete normalized records with every stable field.
 
 ```bash
 # Explicit format selection
@@ -616,7 +620,7 @@ print(f"Found {len(transactions)} transactions")
 
 These output fields are guaranteed stable across versions:
 
-**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `owner_id`, `owner_name`, `last_updated`
+**Accounts:** `id`, `name`, `balance`, `type`, `is_active`, `institution`, `owner_id`, `owner_name`, `type_name`, `subtype_name`, `is_asset`, `credit_limit`, `provider_credit_limit`, `apr`, `interest_rate`, `minimum_payment`, `planned_payment`, `excluded_from_debt_paydown`, `last_updated`
 
 **Account types:** `group`, `type`, `type_display`, `subtype`, `subtype_display`
 
@@ -652,6 +656,26 @@ unknown fields).
   shared, unassigned, unavailable, or unsupported upstream states** — the
   released upstream response provides no field that separates those meanings,
   so none is invented.
+- `is_asset` is the direct upstream asset/liability classification
+  (`isAsset`). It is nullable: an unavailable classification stays `null` and
+  liability is never inferred from localized display labels.
+- `type_name` and `subtype_name` mirror the upstream `type.name`/
+  `subtype.name` identifiers — the same stable identifiers used by
+  `monarch accounts types` — while `type`/`subtype` remain display labels.
+- Liability and debt-service fields (`credit_limit` from upstream `limit`,
+  `provider_credit_limit` from `dataProviderCreditLimit`, `apr`,
+  `interest_rate` from `interestRate`, `minimum_payment`, `planned_payment`,
+  `excluded_from_debt_paydown` from `excludeFromDebtPaydown`) pass through
+  literally. The two limit fields never merge; APR and interest rate never
+  merge; missing or malformed values stay `null` and are never fabricated
+  zeroes; zero and negative values pass through unchanged. Rate values keep
+  their upstream numeric units — no scaling is applied because no
+  authoritative unit evidence exists yet. Upstream does not document whether
+  planned payments, provider limits, or minimum payments are current
+  snapshots or persisted settings; this documentation makes no claim either
+  way. Human `plain`/`table`/`compact` views show only the classification
+  and a small useful subset (owner name, `is_asset`, `credit_limit`, `apr`);
+  JSON/CSV/NDJSON keep every stable field.
 - `ownership_overridden_at` mirrors the upstream override timestamp literally.
   It proves only that an override timestamp exists; it never identifies the
   actor, the previous owner, or the direction of reassignment, and no boolean

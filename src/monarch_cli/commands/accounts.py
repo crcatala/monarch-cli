@@ -36,12 +36,13 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-#: Concise ordered field selection for ``accounts list`` human formats
-#: (plain/table). Machine-readable formats (JSON, CSV, compact/NDJSON) always
-#: emit the complete normalized account fields, and ``--raw`` is untouched.
-#: ``owner_id`` is omitted here because only a legible owner name is useful in
-#: a table; the stable identifier remains available in the machine-readable
-#: formats.
+#: Concise ordered field selection for ``accounts list`` concise formats
+#: (plain/table/compact). Machine-readable formats (JSON, CSV, and NDJSON)
+#: always emit the complete normalized account fields, and ``--raw`` is
+#: untouched. Explicit display decision: the concise views show the direct
+#: ``is_asset`` classification plus the two most useful liability numbers
+#: (``credit_limit``, ``apr``); the remaining liability fields stay available
+#: in the machine-readable formats.
 ACCOUNT_LIST_DISPLAY_FIELDS: tuple[str, ...] = (
     "id",
     "name",
@@ -50,6 +51,9 @@ ACCOUNT_LIST_DISPLAY_FIELDS: tuple[str, ...] = (
     "balance",
     "institution",
     "owner_name",
+    "is_asset",
+    "credit_limit",
+    "apr",
     "is_active",
     "is_manual",
     "last_updated",

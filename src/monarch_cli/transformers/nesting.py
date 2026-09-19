@@ -118,6 +118,30 @@ def bool_or_default(value: Any, default: bool) -> bool:
     return default
 
 
+def nullable_bool(value: Any) -> bool | None:
+    """Pass an upstream boolean through literally, or ``None`` when unavailable.
+
+    Unlike :func:`bool_or_default`, absence is meaningful and must stay
+    distinguishable from ``False``: a missing or malformed flag normalizes to
+    ``None`` rather than a default that could misrepresent classification
+    (for example an asset/liability indicator or an opt-out flag).
+    """
+    return value if isinstance(value, bool) else None
+
+
+def nullable_number(value: Any) -> int | float | None:
+    """Pass an upstream number through literally, or ``None`` when unavailable.
+
+    ``bool`` is explicitly rejected so ``True`` never leaks in as a numeric
+    value. No scaling, rounding, or default is applied: zero, negative, and
+    inapplicable upstream values remain exactly as sent, and missing values
+    stay ``None`` instead of a fabricated zero.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
+
+
 def number_or_zero(value: Any) -> int | float:
     """Return a numeric value unchanged, or ``0`` for unavailable/malformed data.
 
@@ -136,6 +160,8 @@ __all__ = [
     "list_or_empty",
     "mapping_or_empty",
     "nested_get",
+    "nullable_bool",
+    "nullable_number",
     "number_or_zero",
     "require_list",
     "require_object",

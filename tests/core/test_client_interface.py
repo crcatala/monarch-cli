@@ -120,3 +120,32 @@ class TestMonarchMoneyOwnershipSurface:
             "ownershipOverriddenAt missing from the installed client; "
             "the declared monarchmoneycommunity>=1.5.2 floor must be preserved"
         )
+
+    def test_accounts_query_selects_liability_and_debt_service_fields(self) -> None:
+        """The accounts read selects the literal liability metadata fields."""
+        client_source = self._client_source()
+        for field in (
+            "isAsset",
+            "limit",
+            "dataProviderCreditLimit",
+            "apr",
+            "interestRate",
+            "minimumPayment",
+            "plannedPayment",
+            "excludeFromDebtPaydown",
+        ):
+            assert field in client_source, (
+                f"{field} missing from the installed client; liability "
+                "normalization requires the declared client floor"
+            )
+
+    def test_accounts_query_selects_stable_type_names(self) -> None:
+        """The accounts read selects ``type.name``/``subtype.name`` identifiers."""
+        import re
+
+        client_source = self._client_source()
+        type_block = re.search(r"type\s*\{[^}]*\}", client_source)
+        subtype_block = re.search(r"subtype\s*\{[^}]*\}", client_source)
+        assert type_block and subtype_block, "type/subtype selections missing"
+        assert "name" in type_block.group(0)
+        assert "name" in subtype_block.group(0)
