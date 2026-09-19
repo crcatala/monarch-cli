@@ -185,6 +185,9 @@ monarch --allow-mutations --yes transactions splits replace \
 Remote mutation results always use the machine-readable
 `mutation-outcome.v1` contract. See [Mutation outcomes](docs/mutation-outcomes.md)
 for ambiguity, retry, verification, exit-code, and dry-run behavior.
+Third-party uploads (for example, attachment media) use a credential-safe
+adapter boundary that never forwards Monarch credentials, cookies, or session
+state; see [Credential-safe upload transport](docs/upload-transport.md).
 
 ## Output and automation
 

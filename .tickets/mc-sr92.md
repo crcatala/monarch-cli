@@ -1,6 +1,6 @@
 ---
 id: mc-sr92
-status: open
+status: closed
 deps: [mc-43s0]
 links: [mc-2v9a]
 created: 2026-09-11T12:39:30Z
