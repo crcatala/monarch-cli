@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-19
+
 ### Changed
 
 #### Dry-run previews for tag and split mutations
@@ -256,5 +258,6 @@ Initial release of Monarch CLI - a command-line interface for Monarch Money.
 - No credentials stored after authentication
 - Token refresh handled automatically
 
-[Unreleased]: https://github.com/crcatala/monarch-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/crcatala/monarch-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/crcatala/monarch-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/crcatala/monarch-cli/releases/tag/v0.1.0
