@@ -177,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Normalization at upstream API boundaries** - Account, transaction, and cashflow transformers now tolerate present-but-null or missing nested relationships, summary blocks, and collection containers instead of raising `AttributeError`/`TypeError`; a non-object top-level payload fails deliberately with a typed `APIError`; raw passthrough is unchanged
 - **Released read-shape compatibility** - Snapshot requests serialize validated dates as ISO strings, while transaction summary and cashflow detail normalize the list/object envelopes returned by the released client without dropping aggregate values
 - **Transaction pending state** - `is_pending` now reads the real upstream `pending` field instead of the incorrect `isPending` key (which made it always `false`)
+- **gql transport failures during mutations** - A dispatched mutation whose transport fails is now reported `ambiguous` (exit 4, `remote_state: unknown`, verification hint) instead of a definitive `failed` with `code: UNKNOWN` (mc-ic7w). The upstream client performs every call through the gql transport, which wraps all connection-level failures as `gql.transport.exceptions.TransportConnectionFailed`; that type — and the rest of the gql transport hierarchy — is now classified as an ambiguity/retryable transport failure, while GraphQL `errors` payloads and 4xx server responses remain definitive failures. Mutations still make exactly one attempt.
 
 ### Security
 

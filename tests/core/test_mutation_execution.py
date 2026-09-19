@@ -407,3 +407,133 @@ class TestKeyboardInterruptIsAmbiguous:
         assert attempts == 1
         assert exc_info.value.details["reason"] == "cancelled"
         assert exc_info.value.exit_code == 4
+
+
+class TestRealGqlTransportClassification:
+    """The production gql wrapping is exercised, not just inner aiohttp types.
+
+    Every upstream API call goes through ``MonarchMoney.gql_call`` -> the gql
+    aiohttp transport, which wraps any connection-level failure as
+    ``TransportConnectionFailed``. These tests raise the failure through that
+    real transport (or the real gql exception hierarchy) so classification
+    sees the production exception type (mc-ic7w).
+    """
+
+    @pytest.mark.asyncio
+    async def test_gql_wrapped_disconnect_is_ambiguous_and_single_attempt(self) -> None:
+        """A real gql transport disconnect must be ambiguous, not failed."""
+        import aiohttp
+        from gql import Client, gql
+        from gql.transport.aiohttp import AIOHTTPTransport
+
+        attempts = 0
+
+        async def gql_mutation() -> Any:
+            nonlocal attempts
+            attempts += 1
+            transport = AIOHTTPTransport(url="https://example.invalid/graphql")
+            client = Client(transport=transport, fetch_schema_from_transport=False)
+            with patch.object(
+                aiohttp.ClientSession,
+                "post",
+                side_effect=aiohttp.ClientConnectionError("simulated disconnect"),
+            ):
+                async with client as session:
+                    return await session.execute(gql("mutation { noop }"))
+
+        with pytest.raises(MutationAmbiguousError) as exc_info:
+            await run_mutation_api_call_async(
+                gql_mutation,
+                operation="transactions review return",
+                entity_ids=("TXN9",),
+            )
+
+        err = exc_info.value
+        assert attempts == 1
+        assert err.exit_code == 4
+        assert err.details["remote_state"] == "unknown"
+        assert err.details["reason"] == "transport_failure"
+        assert err.details["entity_ids"] == ["TXN9"]
+        assert err.details["verification"]
+
+    @pytest.mark.asyncio
+    async def test_raw_gql_connection_failure_is_ambiguous(self) -> None:
+        """The bare gql transport wrapper type is classified ambiguous."""
+        from gql.transport.exceptions import TransportConnectionFailed
+
+        async def may_have_dispatched() -> Any:
+            raise TransportConnectionFailed("wrapped transport failure")
+
+        with pytest.raises(MutationAmbiguousError) as exc_info:
+            await run_mutation_api_call_async(
+                may_have_dispatched,
+                operation="budgets set",
+                entity_ids=("BUD1",),
+            )
+
+        assert exc_info.value.details["reason"] == "transport_failure"
+
+    @pytest.mark.asyncio
+    async def test_graphql_errors_payload_stays_definitive(self) -> None:
+        """A GraphQL ``errors`` payload is a definitive rejection, not ambiguous."""
+        from gql.transport.exceptions import TransportQueryError
+
+        async def rejected() -> Any:
+            raise TransportQueryError("bad input", errors=[{"message": "bad input"}])
+
+        with pytest.raises(TransportQueryError):
+            await run_mutation_api_call_async(rejected, operation="budgets set")
+
+    @pytest.mark.asyncio
+    async def test_4xx_server_error_stays_definitive(self) -> None:
+        """A 4xx TransportServerError is a service rejection, not ambiguous."""
+        from gql.transport.exceptions import TransportServerError
+
+        async def rejected() -> Any:
+            raise TransportServerError("Forbidden", 403)
+
+        with pytest.raises(TransportServerError):
+            await run_mutation_api_call_async(rejected, operation="budgets set")
+
+    @pytest.mark.asyncio
+    async def test_5xx_server_error_is_ambiguous(self) -> None:
+        """A 5xx may have applied the write, so it must be ambiguous."""
+        from gql.transport.exceptions import TransportServerError
+
+        async def failed_after_dispatch() -> Any:
+            raise TransportServerError("Bad Gateway", 502)
+
+        with pytest.raises(MutationAmbiguousError):
+            await run_mutation_api_call_async(
+                failed_after_dispatch,
+                operation="transactions update",
+            )
+
+    @pytest.mark.asyncio
+    async def test_reads_retry_gql_wrapped_transport_failure(self) -> None:
+        """Reads keep bounded retries for the gql-wrapped transport failure."""
+        import aiohttp
+        from gql import Client, gql
+        from gql.transport.aiohttp import AIOHTTPTransport
+
+        from monarch_cli.core.async_utils import _with_timeout_and_retry
+
+        attempts = 0
+
+        async def gql_read() -> Any:
+            nonlocal attempts
+            attempts += 1
+            transport = AIOHTTPTransport(url="https://example.invalid/graphql")
+            client = Client(transport=transport, fetch_schema_from_transport=False)
+            with patch.object(
+                aiohttp.ClientSession,
+                "post",
+                side_effect=aiohttp.ClientConnectionError("simulated disconnect"),
+            ):
+                async with client as session:
+                    return await session.execute(gql("query { noop }"))
+
+        with pytest.raises(NetworkError):
+            await _with_timeout_and_retry(gql_read, timeout_seconds=2, max_retries=1)
+
+        assert attempts == 2

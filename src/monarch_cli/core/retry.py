@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 from enum import StrEnum
 
 import aiohttp
+from gql.transport.exceptions import TransportConnectionFailed
 
 from .exceptions import NetworkError
 
@@ -42,8 +43,8 @@ class MutationRetryPolicy(StrEnum):
 
 
 # Exceptions that are safe to retry - typically transient network issues.
-# Includes both stdlib exceptions and aiohttp-specific exceptions since
-# monarchmoney uses aiohttp for HTTP requests.
+# Includes stdlib exceptions, aiohttp-specific exceptions, and the gql
+# transport wrapper that every upstream API call passes through.
 RETRYABLE_EXCEPTIONS: tuple[type[BaseException], ...] = (
     # Standard library exceptions
     ConnectionError,
@@ -54,6 +55,13 @@ RETRYABLE_EXCEPTIONS: tuple[type[BaseException], ...] = (
     aiohttp.ServerConnectionError,
     aiohttp.ServerDisconnectedError,
     aiohttp.ServerTimeoutError,
+    # gql transport failures. The upstream monarchmoney client executes every
+    # call through gql, whose aiohttp transport wraps all connection-level
+    # failures (including the aiohttp types above) as
+    # ``TransportConnectionFailed``. Without this entry a real transport
+    # failure is neither retried on the read path nor classified as
+    # ambiguous on the mutation path.
+    TransportConnectionFailed,
 )
 
 
