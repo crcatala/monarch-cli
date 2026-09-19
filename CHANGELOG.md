@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Published machine-readable output schemas (mc-cpzi)
+- Published checked-in JSON Schema Draft 2020-12 artifacts for normalized account, transaction (list), transaction detail, structured error, and `mutation-outcome.v1`; each carries a stable versioned URN `$id` (for example `urn:monarch-cli:schema:account:v1`) and ships as a package resource in the wheel and sdist
+- Added the `monarch_cli.schemas` module-level mapping resolving contract name/version and URN to the packaged artifact, plus the shared operation/effect-entity mapping (`transactions.attachments.add` uses `attachment_media` and `attachment`)
+- Published schemas use `additionalProperties: false` so undocumented stable fields and removals fail validation; mutation-outcome fixtures cover successful, definitive-stage-failure, ambiguous-registration, and partial/orphaned-media attachment outcomes
+- Documented the compatibility policy (optional additions and open error-code additions are additive; removals, required-field additions, type/nullability changes, and closed-enum changes require a new version) and how to locate, resolve, validate, and migrate schemas in `docs/schema-contracts.md`
+- JSON Schema validation remains development/test-only (`jsonschema` is a dev extra); schemas are resolved from package resources and the CLI adds no runtime schema dependency
+
 #### Transaction discovery and detail
 - Expanded `transactions list` with repeatable account/category/tag filters, tri-state status filters, visibility controls, and bounded pagination
 - Added read-only `transactions get TXN_ID` with normalized detail; pending IDs redirect by default, while `--strict` disables that redirect

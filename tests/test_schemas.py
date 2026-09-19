@@ -4,52 +4,113 @@ API Schema Contract Tests for AI Agents
 
 ⚠️  IMPORTANT: BREAKING THESE TESTS = BREAKING CHANGE FOR AI AGENTS ⚠️
 
-This module defines the guaranteed output schema contracts that AI agents
-(Claude, GPT, etc.) can rely on when integrating with monarch-cli.
-
-Why This Matters
-----------------
-AI agents parse the JSON output from monarch-cli commands to understand
-financial data. They build prompts, make decisions, and take actions based
-on specific field names and data types. If we change these schemas without
-warning, agents will break silently or produce incorrect results.
+These tests validate representative *runtime* output against the published,
+checked-in JSON Schema artifacts in ``monarch_cli.schemas``. The artifacts are
+the normative contract; this module does not maintain a second independent
+field list. Adding, removing, or retyping a normalized field is a contract
+change and is detected here.
 
 Contract Guarantees
 -------------------
-For each entity type, we guarantee:
+- Fields declared required in the schema are ALWAYS present.
+- Field names are stable snake_case and never change in place.
+- Types and nullability match the schema exactly.
+- No undocumented stable field may appear (schemas use
+  ``additionalProperties: false``).
+- Closed enums (mutation-outcome statuses) only accept documented values.
+- Open sets (structured error ``code``) may grow additively.
 
-1. **Field Presence**: Listed fields will ALWAYS be present in output
-2. **Field Names**: Names use snake_case and will not change
-3. **Field Types**: Types (str, float, bool, None) are stable
-4. **Null Safety**: Fields may be None but will never be missing
+Compatibility policy
+--------------------
+Optional additive properties and new open error codes are additive and may
+land without a version change. Removals, required-field additions,
+type/nullability changes, and closed-enum changes require a new schema
+version. See ``docs/schema-contracts.md`` for the full policy.
 
-Adding new fields is safe (non-breaking).
-Removing or renaming fields is BREAKING.
-
-Schema Versions
----------------
-- v1 (0.1.0): Initial schema, documented below
-
-To upgrade schemas with breaking changes:
-1. Bump major version (e.g., 1.0.0 → 2.0.0)
-2. Document migration in CHANGELOG
-3. Consider --schema-version flag for compatibility
-
+The richer single-transaction detail shape is published separately as
+``urn:monarch-cli:schema:transaction-detail:v1``.
 """
 
-import pytest
+from __future__ import annotations
 
+from typing import Any
+
+import pytest
+from jsonschema import Draft202012Validator
+
+from monarch_cli.core.exceptions import APIError, ValidationError
+from monarch_cli.core.mutation_outcomes import (
+    ambiguous_item,
+    build_mutation_outcome,
+    failed_item,
+    succeeded_item,
+    verification_object,
+)
+from monarch_cli.schemas import (
+    ATTACHMENT_ENTITY,
+    ATTACHMENT_MEDIA_ENTITY,
+    OPERATION_CONTRACTS,
+    SCHEMA_ARTIFACTS,
+    SCHEMA_ARTIFACTS_BY_URN,
+    load_schema,
+    operation_contract,
+    schema_artifact,
+    schema_artifact_by_urn,
+)
 from monarch_cli.transformers.accounts import transform_account, transform_accounts
 from monarch_cli.transformers.transactions import (
     transform_transaction,
+    transform_transaction_detail,
     transform_transactions,
 )
+
+# =============================================================================
+# SCHEMA-DERIVED CONTRACT VIEWS
+# =============================================================================
+
+ACCOUNT_SCHEMA = load_schema("account")
+TRANSACTION_SCHEMA = load_schema("transaction")
+TRANSACTION_DETAIL_SCHEMA = load_schema("transaction-detail")
+ERROR_SCHEMA = load_schema("error")
+MUTATION_OUTCOME_SCHEMA = load_schema("mutation-outcome")
+
+ACCOUNT_REQUIRED_FIELDS = set(ACCOUNT_SCHEMA["required"])
+TRANSACTION_REQUIRED_FIELDS = set(TRANSACTION_SCHEMA["required"])
+
+
+def _assert_valid(instance: Any, contract: str) -> dict[str, Any]:
+    """Validate ``instance`` against a published artifact, or fail loudly."""
+    validator = Draft202012Validator(load_schema(contract))
+    errors = sorted(validator.iter_errors(instance), key=lambda e: list(e.absolute_path))
+    assert not errors, f"{contract} output violates the published schema:\n" + "\n".join(
+        f"- {list(e.absolute_path)}: {e.message}" for e in errors
+    )
+    return instance
+
+
+def _assert_mutation_outcome_contract(outcome: dict[str, Any]) -> dict[str, Any]:
+    """Validate the envelope and enforce its non-schema arithmetic invariants.
+
+    JSON Schema Draft 2020-12 cannot express ``summary.total == len(items)`` or
+    per-status counts matching items, so those cross-field rules are enforced
+    here in addition to schema validation.
+    """
+    _assert_valid(outcome, "mutation-outcome")
+    items = outcome["items"]
+    summary = outcome["summary"]
+    assert summary["total"] == len(items), "summary.total must equal len(items)"
+    counts = {"succeeded": 0, "failed": 0, "ambiguous": 0}
+    for item in items:
+        counts[item["status"]] += 1
+    for status, count in counts.items():
+        assert summary[status] == count, f"summary.{status} must match items"
+    return outcome
+
 
 # =============================================================================
 # TEST DATA
 # =============================================================================
 
-# Realistic API response structures
 FULL_ACCOUNT_RAW = {
     "id": "acc-123456",
     "displayName": "Primary Checking",
@@ -74,6 +135,124 @@ FULL_TRANSACTION_RAW = {
     "notes": "Team lunch",
 }
 
+FULL_TRANSACTION_DETAIL_RAW = {
+    "getTransaction": {
+        "id": "txn-789012",
+        "date": "2024-01-15",
+        "amount": -42.50,
+        "merchant": {"name": "Coffee Shop"},
+        "category": {"id": "cat-food", "name": "Food & Drink"},
+        "account": {"id": "acc-123456", "displayName": "Primary Checking"},
+        "pending": False,
+        "needsReview": True,
+        "reviewStatus": "REVIEWED",
+        "notes": "Team lunch",
+        "isRecurring": False,
+        "hideFromReports": False,
+        "isManual": False,
+        "isSplitTransaction": True,
+        "hasSplitTransactions": True,
+        "originalTransaction": {
+            "id": "txn-original",
+            "date": "2024-01-14",
+            "amount": -42.50,
+            "merchant": {"name": "Coffee Shop"},
+        },
+        "attachments": [
+            {"id": "att-1", "filename": "receipt.pdf", "extension": "pdf", "sizeBytes": 12345}
+        ],
+        "tags": [{"id": "tag-1", "name": "Work", "color": "#ff0000"}],
+        "splitTransactions": [
+            {
+                "id": "split-1",
+                "amount": -21.25,
+                "merchant": {"name": "Coffee Shop"},
+                "category": {"name": "Food & Drink"},
+            }
+        ],
+    }
+}
+
+
+# =============================================================================
+# PUBLISHED ARTIFACT MAPPING
+# =============================================================================
+
+
+class TestPublishedSchemaArtifacts:
+    """The module-level mapping is the normative, packaged contract."""
+
+    def test_every_artifact_is_packaged_valid_json_schema(self):
+        for artifact in SCHEMA_ARTIFACTS.values():
+            document = artifact.load()
+            assert isinstance(document, dict), artifact.resource
+            assert document.get("$schema") == "https://json-schema.org/draft/2020-12/schema"
+            # The packaged artifact is itself a valid Draft 2020-12 schema.
+            Draft202012Validator.check_schema(document)
+
+    def test_artifact_id_matches_stable_urn(self):
+        for artifact in SCHEMA_ARTIFACTS.values():
+            assert artifact.load()["$id"] == artifact.urn, artifact.resource
+            assert artifact.urn.startswith("urn:monarch-cli:schema:")
+
+    def test_expected_contracts_are_published(self):
+        published = {
+            (artifact.contract, artifact.version) for artifact in SCHEMA_ARTIFACTS.values()
+        }
+        assert published == {
+            ("account", "v1"),
+            ("transaction", "v1"),
+            ("transaction-detail", "v1"),
+            ("error", "v1"),
+            ("mutation-outcome", "v1"),
+        }
+
+    def test_lookup_by_name_version_and_urn_agree(self):
+        artifact = schema_artifact("account", "v1")
+        assert schema_artifact_by_urn(artifact.urn) is artifact
+        assert SCHEMA_ARTIFACTS_BY_URN[artifact.urn] is artifact
+
+    def test_unknown_lookups_fail(self):
+        with pytest.raises(KeyError):
+            schema_artifact("account", "v2")
+        with pytest.raises(KeyError):
+            schema_artifact_by_urn("urn:monarch-cli:schema:account:v9")
+
+    def test_every_property_is_documented(self):
+        """Every published property carries a description for consumers."""
+        documents = [artifact.load() for artifact in SCHEMA_ARTIFACTS.values()]
+        for document in documents:
+            for name, prop in document.get("properties", {}).items():
+                assert prop.get("description"), f"{name} lacks a description"
+
+
+# =============================================================================
+# OPERATION / SCHEMA MAPPING
+# =============================================================================
+
+
+class TestOperationSchemaMapping:
+    """The shared operation mapping links outcomes to schemas and entities."""
+
+    def test_every_operation_references_a_published_schema(self):
+        for contract in OPERATION_CONTRACTS.values():
+            assert schema_artifact(contract.schema_contract).contract == "mutation-outcome"
+            assert contract.effect_entities, contract.operation
+
+    def test_attachment_operation_and_effect_entities(self):
+        contract = operation_contract("transactions.attachments.add")
+        assert contract.schema_contract == "mutation-outcome"
+        assert contract.effect_entities == (ATTACHMENT_MEDIA_ENTITY, ATTACHMENT_ENTITY)
+
+    def test_unknown_operation_fails(self):
+        with pytest.raises(KeyError):
+            operation_contract("transactions.made.up")
+
+    def test_mapping_covers_every_registered_outcome_operation(self):
+        from monarch_cli.core.mutation_outcomes import OUTCOME_OPERATIONS
+
+        assert set(OPERATION_CONTRACTS) == set(OUTCOME_OPERATIONS.values())
+
 
 # =============================================================================
 # ACCOUNT SCHEMA CONTRACT
@@ -81,250 +260,64 @@ FULL_TRANSACTION_RAW = {
 
 
 class TestAccountSchemaContract:
-    """
-    Account Schema Contract v1
-    --------------------------
-
-    AI agents can rely on these fields being present in all account output:
-
-    REQUIRED CORE FIELDS (agents should expect these):
-    - id: str | None - Unique account identifier
-    - name: str | None - Human-readable account name
-    - balance: float | None - Current balance in account currency
-    - type: str | None - Account type (e.g., "Checking", "Savings", "Credit Card")
-    - is_active: bool - Whether account is active (True) or hidden (False)
-
-    ADDITIONAL STABLE FIELDS (also guaranteed):
-    - subtype: str | None - Account subtype if available
-    - institution: str | None - Financial institution name
-    - is_manual: bool - Whether manually tracked (True) or linked (False)
-    - owner_id: str | None - Upstream ownedByUser.id when provided, else None
-    - owner_name: str | None - Upstream ownedByUser.displayName when provided
-    - type_name: str | None - Upstream type.name identifier (same identifiers
-      as `monarch accounts types`)
-    - subtype_name: str | None - Upstream subtype.name identifier
-    - is_asset: bool | None - Direct upstream asset/liability classification
-      (isAsset); None when unavailable, never inferred from display labels
-    - credit_limit: number | None - Upstream limit (user-facing credit limit)
-    - provider_credit_limit: number | None - Upstream dataProviderCreditLimit
-    - apr: number | None - Upstream apr in upstream numeric units
-    - interest_rate: number | None - Upstream interestRate in upstream units
-    - minimum_payment: number | None - Upstream minimumPayment
-    - planned_payment: number | None - Upstream plannedPayment
-    - excluded_from_debt_paydown: bool | None - Upstream excludeFromDebtPaydown
-    - last_updated: str | None - ISO timestamp of last sync
-
-    Example output:
-    ```json
-    {
-      "id": "acc-123456",
-      "name": "Primary Checking",
-      "balance": 5432.10,
-      "type": "Checking",
-      "is_active": true,
-      "subtype": "Personal",
-      "institution": "Example Bank",
-      "is_manual": false,
-      "last_updated": "2024-01-15T10:30:00Z"
-    }
-    ```
-    """
-
-    # The core fields that AI agents absolutely depend on
-    CORE_REQUIRED_FIELDS = {"id", "name", "balance", "type", "is_active"}
-
-    # All fields in the account schema (core + additional)
-    ALL_SCHEMA_FIELDS = {
-        "id",
-        "name",
-        "balance",
-        "type",
-        "is_active",
-        "subtype",
-        "institution",
-        "is_manual",
-        "owner_id",
-        "owner_name",
-        "type_name",
-        "subtype_name",
-        "is_asset",
-        "credit_limit",
-        "provider_credit_limit",
-        "apr",
-        "interest_rate",
-        "minimum_payment",
-        "planned_payment",
-        "excluded_from_debt_paydown",
-        "last_updated",
-    }
+    """Normalized account output conforms to the published account schema."""
 
     def test_core_fields_present(self):
-        """
-        CRITICAL: Core fields must always be present.
-
-        These are the minimum fields an AI agent needs to understand accounts.
-        Breaking this test means agents will crash or produce wrong results.
-        """
         result = transform_account(FULL_ACCOUNT_RAW)
+        for field in ACCOUNT_REQUIRED_FIELDS:
+            assert field in result, f"Missing required field: {field}"
 
-        for field in self.CORE_REQUIRED_FIELDS:
-            assert field in result, f"Missing core field: {field}"
-
-    def test_all_schema_fields_present(self):
-        """All documented schema fields must be present."""
-        result = transform_account(FULL_ACCOUNT_RAW)
-
-        for field in self.ALL_SCHEMA_FIELDS:
-            assert field in result, f"Missing schema field: {field}"
+    def test_matches_published_schema(self):
+        _assert_valid(transform_account(FULL_ACCOUNT_RAW), "account")
 
     def test_no_undocumented_fields(self):
-        """
-        No undocumented fields should appear.
-
-        Adding new fields requires:
-        1. Add to ALL_SCHEMA_FIELDS set
-        2. Document in class docstring
-        3. Note in CHANGELOG
-        """
+        """additionalProperties: false rejects any undocumented stable field."""
         result = transform_account(FULL_ACCOUNT_RAW)
-        actual_fields = set(result.keys())
-        extra_fields = actual_fields - self.ALL_SCHEMA_FIELDS
-
-        assert extra_fields == set(), (
-            f"Undocumented fields found: {extra_fields}. "
-            "Add to ALL_SCHEMA_FIELDS and document in docstring."
-        )
-
-    def test_field_types_stable(self):
-        """Field types must remain stable."""
-        result = transform_account(FULL_ACCOUNT_RAW)
-
-        # String or None fields
-        assert result["id"] is None or isinstance(result["id"], str)
-        assert result["name"] is None or isinstance(result["name"], str)
-        assert result["type"] is None or isinstance(result["type"], str)
-        assert result["subtype"] is None or isinstance(result["subtype"], str)
-        assert result["institution"] is None or isinstance(result["institution"], str)
-        assert result["last_updated"] is None or isinstance(result["last_updated"], str)
-
-        # Numeric or None fields
-        assert result["balance"] is None or isinstance(result["balance"], (int, float))
-
-        # Boolean fields (never None)
-        assert isinstance(result["is_active"], bool)
-        assert isinstance(result["is_manual"], bool)
-
-    def test_snake_case_field_names(self):
-        """All field names must be snake_case for consistency."""
-        result = transform_account(FULL_ACCOUNT_RAW)
-
-        for field_name in result:
-            # No spaces
-            assert " " not in field_name, f"Field '{field_name}' contains space"
-            # Lowercase
-            assert field_name == field_name.lower(), f"Field '{field_name}' not lowercase"
-            # No camelCase (no lowercase followed by uppercase)
-            assert field_name.islower() or "_" in field_name, (
-                f"Field '{field_name}' may be camelCase"
-            )
+        assert set(result) == set(ACCOUNT_SCHEMA["properties"])
 
     def test_handles_minimal_input_gracefully(self):
-        """Schema works even with minimal API data (no crashes, predictable None values)."""
-        minimal_raw = {"id": "acc-minimal"}
-        result = transform_account(minimal_raw)
-
-        # Core fields present
-        for field in self.CORE_REQUIRED_FIELDS:
-            assert field in result
-
-        # None values for missing data (not KeyError)
+        result = transform_account({"id": "acc-minimal"})
         assert result["name"] is None
         assert result["balance"] is None
         assert result["type"] is None
+        _assert_valid(result, "account")
 
-    def test_boolean_fields_never_none_for_absent_or_null(self):
-        """is_active/is_manual stay real bools when their sources are absent/null."""
+    def test_boolean_fields_never_none(self):
         absent = transform_account({"id": "acc"})
         assert absent["is_active"] is True
         assert absent["is_manual"] is False
         nulled = transform_account({"id": "acc", "isHidden": None, "isManual": None})
         assert nulled["is_active"] is True
         assert nulled["is_manual"] is False
+        _assert_valid(absent, "account")
+        _assert_valid(nulled, "account")
 
-    def test_owner_fields_nullable_and_null_safe(self):
-        """Owner fields exist for every shape and stay null without an owner object."""
-        complete = transform_account(
-            {**FULL_ACCOUNT_RAW, "ownedByUser": {"id": "user-1", "displayName": "Alex"}}
-        )
-        assert complete["owner_id"] == "user-1"
-        assert complete["owner_name"] == "Alex"
-
-        for raw in (
-            FULL_ACCOUNT_RAW,
-            {**FULL_ACCOUNT_RAW, "ownedByUser": None},
-            {**FULL_ACCOUNT_RAW, "ownedByUser": "not-an-object"},
-            {**FULL_ACCOUNT_RAW, "ownedByUser": {}},
-            {**FULL_ACCOUNT_RAW, "ownedByUser": {"id": "user-1"}},
-            {**FULL_ACCOUNT_RAW, "ownedByUser": {"displayName": "Alex"}},
-        ):
-            result = transform_account(raw)
-            assert "owner_id" in result and "owner_name" in result
-            assert result["owner_id"] is None or isinstance(result["owner_id"], str)
-            assert result["owner_name"] is None or isinstance(result["owner_name"], str)
-
-    def test_liability_fields_nullable_and_distinct(self):
-        """Liability fields exist for every shape and never merge or fabricate."""
-        credit = transform_account(
-            {
-                **FULL_ACCOUNT_RAW,
-                "isAsset": False,
-                "limit": 5000,
-                "dataProviderCreditLimit": 5100,
-                "apr": 0.2499,
-                "interestRate": 24.99,
-                "minimumPayment": 25.0,
-                "plannedPayment": 50.0,
-                "excludeFromDebtPaydown": False,
-            }
-        )
-        assert credit["credit_limit"] == 5000
-        assert credit["provider_credit_limit"] == 5100
-        assert credit["apr"] == 0.2499
-        assert credit["interest_rate"] == 24.99
-        assert credit["excluded_from_debt_paydown"] is False
-
-        for raw in (
-            FULL_ACCOUNT_RAW,
-            {**FULL_ACCOUNT_RAW, "limit": None, "apr": "24.9%", "isAsset": None},
-            {**FULL_ACCOUNT_RAW, "limit": 0, "minimumPayment": -1.5},
-        ):
-            result = transform_account(raw)
-            for field in (
-                "type_name",
-                "subtype_name",
-                "is_asset",
-                "credit_limit",
-                "provider_credit_limit",
-                "apr",
-                "interest_rate",
-                "minimum_payment",
-                "planned_payment",
-                "excluded_from_debt_paydown",
-            ):
-                assert field in result
-            assert result["is_asset"] is None or isinstance(result["is_asset"], bool)
-            assert result["credit_limit"] is None or isinstance(
-                result["credit_limit"], (int, float)
-            )
+    def test_nullable_owner_and_liability_fields(self):
+        raw = {
+            **FULL_ACCOUNT_RAW,
+            "ownedByUser": {"id": "user-1", "displayName": "Alex"},
+            "isAsset": False,
+            "limit": 5000,
+            "apr": 0.2499,
+            "interestRate": 24.99,
+            "minimumPayment": 25.0,
+            "excludedFromDebtPaydown": False,
+        }
+        result = transform_account(raw)
+        assert result["owner_id"] == "user-1"
+        assert result["is_asset"] is False
+        _assert_valid(result, "account")
 
     def test_malformed_root_raises_typed_error(self):
-        """Non-object account/transaction roots raise a typed APIError."""
-        from monarch_cli.core.exceptions import APIError
-
         with pytest.raises(APIError):
             transform_accounts(None)  # type: ignore[arg-type]
         with pytest.raises(APIError):
             transform_transactions(None)  # type: ignore[arg-type]
+
+    def test_snake_case_field_names(self):
+        for field_name in transform_account(FULL_ACCOUNT_RAW):
+            assert field_name == field_name.lower(), f"Field '{field_name}' not lowercase"
+            assert field_name.islower() or "_" in field_name
 
 
 # =============================================================================
@@ -333,288 +326,327 @@ class TestAccountSchemaContract:
 
 
 class TestTransactionSchemaContract:
-    """
-    Transaction Schema Contract v1
-    ------------------------------
-
-    AI agents can rely on these fields being present in all transaction output:
-
-    REQUIRED CORE FIELDS (agents should expect these):
-    - id: str | None - Unique transaction identifier
-    - date: str | None - Transaction date (YYYY-MM-DD format)
-    - amount: float | None - Transaction amount (negative = expense, positive = income)
-    - description: str | None - Merchant name or transaction description
-    - category: str | None - Category name for the transaction
-
-    ADDITIONAL STABLE FIELDS (also guaranteed):
-    - category_id: str | None - Category ID for programmatic use
-    - account: str | None - Account name this transaction belongs to
-    - account_id: str | None - Account ID for programmatic use
-    - is_pending: bool - Whether transaction is pending (True) or posted (False)
-    - needs_review: bool - Whether the transaction needs review
-    - review_status: str | None - Opaque upstream review status when supplied
-    - owner_id: str | None - Upstream ownedByUser.id when provided, else None
-    - owner_name: str | None - Upstream ownedByUser.name when provided
-    - ownership_overridden_at: str | None - Literal upstream override timestamp
-      when provided; never implies an actor, previous owner, or shared state
-    - notes: str | None - User-added notes
-
-    Example output:
-    ```json
-    {
-      "id": "txn-789012",
-      "date": "2024-01-15",
-      "amount": -42.50,
-      "description": "Coffee Shop",
-      "category": "Food & Drink",
-      "category_id": "cat-food",
-      "account": "Primary Checking",
-      "account_id": "acc-123456",
-      "is_pending": false,
-      "needs_review": false,
-      "review_status": null,
-      "notes": "Team lunch"
-    }
-    ```
-
-    Amount Sign Convention:
-    - Negative amounts (-) = money leaving account (expenses, transfers out)
-    - Positive amounts (+) = money entering account (income, transfers in)
-    """
-
-    # The core fields that AI agents absolutely depend on
-    CORE_REQUIRED_FIELDS = {"id", "date", "amount", "description", "category"}
-
-    # All fields in the transaction schema (core + additional)
-    ALL_SCHEMA_FIELDS = {
-        "id",
-        "date",
-        "amount",
-        "description",
-        "category",
-        "category_id",
-        "account",
-        "account_id",
-        "is_pending",
-        "needs_review",
-        "review_status",
-        "owner_id",
-        "owner_name",
-        "ownership_overridden_at",
-        "notes",
-    }
+    """Normalized transaction list output matches the published schema."""
 
     def test_core_fields_present(self):
-        """
-        CRITICAL: Core fields must always be present.
-
-        These are the minimum fields an AI agent needs to understand transactions.
-        Breaking this test means agents will crash or produce wrong results.
-        """
         result = transform_transaction(FULL_TRANSACTION_RAW)
+        for field in TRANSACTION_REQUIRED_FIELDS:
+            assert field in result, f"Missing required field: {field}"
 
-        for field in self.CORE_REQUIRED_FIELDS:
-            assert field in result, f"Missing core field: {field}"
-
-    def test_all_schema_fields_present(self):
-        """All documented schema fields must be present."""
-        result = transform_transaction(FULL_TRANSACTION_RAW)
-
-        for field in self.ALL_SCHEMA_FIELDS:
-            assert field in result, f"Missing schema field: {field}"
+    def test_matches_published_schema(self):
+        _assert_valid(transform_transaction(FULL_TRANSACTION_RAW), "transaction")
 
     def test_no_undocumented_fields(self):
-        """
-        No undocumented fields should appear.
-
-        Adding new fields requires:
-        1. Add to ALL_SCHEMA_FIELDS set
-        2. Document in class docstring
-        3. Note in CHANGELOG
-        """
         result = transform_transaction(FULL_TRANSACTION_RAW)
-        actual_fields = set(result.keys())
-        extra_fields = actual_fields - self.ALL_SCHEMA_FIELDS
-
-        assert extra_fields == set(), (
-            f"Undocumented fields found: {extra_fields}. "
-            "Add to ALL_SCHEMA_FIELDS and document in docstring."
-        )
-
-    def test_field_types_stable(self):
-        """Field types must remain stable."""
-        result = transform_transaction(FULL_TRANSACTION_RAW)
-
-        # String or None fields
-        assert result["id"] is None or isinstance(result["id"], str)
-        assert result["date"] is None or isinstance(result["date"], str)
-        assert result["description"] is None or isinstance(result["description"], str)
-        assert result["category"] is None or isinstance(result["category"], str)
-        assert result["category_id"] is None or isinstance(result["category_id"], str)
-        assert result["account"] is None or isinstance(result["account"], str)
-        assert result["account_id"] is None or isinstance(result["account_id"], str)
-        assert result["notes"] is None or isinstance(result["notes"], str)
-
-        # Numeric or None fields
-        assert result["amount"] is None or isinstance(result["amount"], (int, float))
-
-        # Boolean fields (never None)
-        assert isinstance(result["is_pending"], bool)
-        assert isinstance(result["needs_review"], bool)
-        assert result["review_status"] is None or isinstance(result["review_status"], str)
-
-    def test_snake_case_field_names(self):
-        """All field names must be snake_case for consistency."""
-        result = transform_transaction(FULL_TRANSACTION_RAW)
-
-        for field_name in result:
-            assert " " not in field_name, f"Field '{field_name}' contains space"
-            assert field_name == field_name.lower(), f"Field '{field_name}' not lowercase"
-            assert field_name.islower() or "_" in field_name, (
-                f"Field '{field_name}' may be camelCase"
-            )
+        assert set(result) == set(TRANSACTION_SCHEMA["properties"])
 
     def test_handles_minimal_input_gracefully(self):
-        """Schema works even with minimal API data (no crashes, predictable None values)."""
-        minimal_raw = {"id": "txn-minimal"}
-        result = transform_transaction(minimal_raw)
-
-        # Core fields present
-        for field in self.CORE_REQUIRED_FIELDS:
-            assert field in result
-
-        # None values for missing data (not KeyError)
+        result = transform_transaction({"id": "txn-minimal"})
         assert result["date"] is None
         assert result["amount"] is None
         assert result["description"] is None
-        assert result["category"] is None
+        _assert_valid(result, "transaction")
 
-    def test_boolean_fields_never_none_for_absent_or_null(self):
-        """is_pending stays a real bool when pending is absent or null."""
+    def test_boolean_fields_never_none(self):
         assert transform_transaction({"id": "t"})["is_pending"] is False
         assert transform_transaction({"id": "t", "pending": None})["is_pending"] is False
+        _assert_valid(transform_transaction({"id": "t", "pending": None}), "transaction")
 
-    def test_owner_fields_nullable_and_null_safe(self):
-        """Owner fields exist for every shape and stay null without an owner object."""
+    def test_owner_and_override_fields_nullable(self):
         complete = transform_transaction(
-            {**FULL_TRANSACTION_RAW, "ownedByUser": {"id": "user-1", "name": "Alex"}}
+            {
+                **FULL_TRANSACTION_RAW,
+                "ownedByUser": {"id": "user-1", "name": "Alex"},
+                "ownershipOverriddenAt": "2026-01-02T03:04:05Z",
+            }
         )
         assert complete["owner_id"] == "user-1"
-        assert complete["owner_name"] == "Alex"
-
-        for raw in (
-            FULL_TRANSACTION_RAW,
-            {**FULL_TRANSACTION_RAW, "ownedByUser": None},
-            {**FULL_TRANSACTION_RAW, "ownedByUser": "not-an-object"},
-            {**FULL_TRANSACTION_RAW, "ownedByUser": {}},
-        ):
-            result = transform_transaction(raw)
-            assert result["owner_id"] is None
-            assert result["owner_name"] is None
-
-    def test_ownership_overridden_at_is_literal_passthrough(self):
-        """The override timestamp passes through literally; nothing is derived."""
-        assert (
-            transform_transaction(
-                {**FULL_TRANSACTION_RAW, "ownershipOverriddenAt": "2026-01-02T03:04:05Z"}
-            )["ownership_overridden_at"]
-            == "2026-01-02T03:04:05Z"
-        )
-        result = transform_transaction(FULL_TRANSACTION_RAW)
-        assert result["ownership_overridden_at"] is None
-        assert "is_shared" not in result
-        assert "previous_owner" not in result
-        assert "overridden_by" not in result
-
-    def test_pending_reads_real_upstream_field(self):
-        """Contract reads upstream `pending`, not a fabricated always-false default."""
-        assert transform_transaction({"id": "t", "pending": True})["is_pending"] is True
+        assert complete["ownership_overridden_at"] == "2026-01-02T03:04:05Z"
+        _assert_valid(complete, "transaction")
 
     def test_date_format_consistent(self):
-        """Date field uses ISO format YYYY-MM-DD when present."""
+        import re
+
         result = transform_transaction(FULL_TRANSACTION_RAW)
+        assert re.match(r"^\d{4}-\d{2}-\d{2}$", result["date"])
 
-        if result["date"] is not None:
-            # Should match YYYY-MM-DD pattern
-            import re
+    def test_snake_case_field_names(self):
+        for field_name in transform_transaction(FULL_TRANSACTION_RAW):
+            assert field_name == field_name.lower(), f"Field '{field_name}' not lowercase"
+            assert field_name.islower() or "_" in field_name
 
-            assert re.match(r"^\d{4}-\d{2}-\d{2}$", result["date"]), (
-                f"Date '{result['date']}' doesn't match YYYY-MM-DD format"
-            )
+
+class TestTransactionDetailSchemaContract:
+    """Normalized single-transaction detail matches the detail schema."""
+
+    def test_matches_published_schema(self):
+        result = transform_transaction_detail(
+            FULL_TRANSACTION_DETAIL_RAW, requested_id="txn-789012"
+        )
+        _assert_valid(result, "transaction-detail")
+
+    def test_no_undocumented_fields(self):
+        result = transform_transaction_detail(
+            FULL_TRANSACTION_DETAIL_RAW, requested_id="txn-789012"
+        )
+        assert set(result) == set(TRANSACTION_DETAIL_SCHEMA["properties"])
+
+    def test_nested_collections_normalize_to_arrays(self):
+        raw = {
+            "getTransaction": {
+                "id": "txn-detail",
+                "attachments": None,
+                "tags": [],
+                "splitTransactions": None,
+                "originalTransaction": None,
+            }
+        }
+        result = transform_transaction_detail(raw, requested_id="txn-detail")
+        assert result["attachments"] == []
+        assert result["tags"] == []
+        assert result["split"]["splits"] == []
+        assert result["original_transaction"] is None
+        _assert_valid(result, "transaction-detail")
+
+    def test_redirected_is_boolean(self):
+        result = transform_transaction_detail(
+            {"getTransaction": {"id": "txn-new"}}, requested_id="txn-old"
+        )
+        assert result["redirected"] is True
 
 
 # =============================================================================
-# COLLECTION SCHEMA CONTRACT
+# STRUCTURED ERROR CONTRACT
+# =============================================================================
+
+
+class TestErrorSchemaContract:
+    """Structured errors conform to the published error schema."""
+
+    def test_validation_error_matches_schema(self):
+        error = ValidationError("Invalid input", field="transaction_id")
+        _assert_valid(error.to_dict(), "error")
+
+    def test_error_code_is_an_open_string(self):
+        document = ERROR_SCHEMA["properties"]["code"]
+        assert document["type"] == "string"
+        assert "enum" not in document
+
+
+# =============================================================================
+# MUTATION OUTCOME CONTRACT
+# =============================================================================
+
+
+class TestMutationOutcomeSchemaContract:
+    """The mutation-outcome.v1 envelope and attachment workflow fixtures."""
+
+    def test_single_effect_success(self):
+        outcome = build_mutation_outcome(
+            "transactions update",
+            [succeeded_item("transaction", "txn-1", {"changes": {"notes": "Review"}})],
+        )
+        assert outcome["status"] == "succeeded"
+        assert outcome["verification"] is None
+        _assert_mutation_outcome_contract(outcome)
+
+    def test_attachment_success_is_ordered_two_stage(self):
+        outcome = build_mutation_outcome(
+            "transactions attachments add",
+            [
+                succeeded_item(
+                    ATTACHMENT_MEDIA_ENTITY,
+                    "media-public-id",
+                    {
+                        "public_id": "media-public-id",
+                        "extension": "pdf",
+                        "size_bytes": 12345,
+                        "filename": "receipt.pdf",
+                    },
+                ),
+                succeeded_item(
+                    ATTACHMENT_ENTITY,
+                    "att-1",
+                    {
+                        "transaction_id": "txn-1",
+                        "attachment_id": "att-1",
+                        "public_id": "att-public-1",
+                        "filename": "receipt.pdf",
+                        "extension": "pdf",
+                        "size_bytes": 12345,
+                    },
+                ),
+            ],
+        )
+        assert outcome["operation"] == "transactions.attachments.add"
+        assert outcome["status"] == "succeeded"
+        assert [item["entity"] for item in outcome["items"]] == [
+            ATTACHMENT_MEDIA_ENTITY,
+            ATTACHMENT_ENTITY,
+        ]
+        _assert_mutation_outcome_contract(outcome)
+
+    def test_attachment_definitive_stage_failure(self):
+        outcome = build_mutation_outcome(
+            "transactions attachments add",
+            [
+                failed_item(
+                    ATTACHMENT_MEDIA_ENTITY,
+                    "receipt.pdf",
+                    "API_ERROR",
+                    "The media upload was rejected by the service.",
+                    {"stage": "upload_media"},
+                )
+            ],
+        )
+        assert outcome["status"] == "failed"
+        assert outcome["verification"] is None
+        _assert_mutation_outcome_contract(outcome)
+
+    def test_attachment_ambiguous_registration(self):
+        outcome = build_mutation_outcome(
+            "transactions attachments add",
+            [
+                succeeded_item(
+                    ATTACHMENT_MEDIA_ENTITY,
+                    "media-public-id",
+                    {"public_id": "media-public-id", "filename": "receipt.pdf"},
+                ),
+                ambiguous_item(
+                    ATTACHMENT_ENTITY,
+                    "receipt.pdf",
+                    "The attachment registration could not be confirmed.",
+                    {"remote_state": "unknown", "reason": "missing_identity"},
+                ),
+            ],
+            verification=verification_object(
+                "Read the transaction detail before retrying.",
+                command=["monarch", "transactions", "get", "txn-1"],
+            ),
+        )
+        assert outcome["status"] == "partial"
+        assert outcome["verification"]["required"] is True
+        _assert_mutation_outcome_contract(outcome)
+
+    def test_attachment_partial_orphaned_media(self):
+        outcome = build_mutation_outcome(
+            "transactions attachments add",
+            [
+                succeeded_item(
+                    ATTACHMENT_MEDIA_ENTITY,
+                    "media-public-id",
+                    {"public_id": "media-public-id", "filename": "receipt.pdf"},
+                ),
+                failed_item(
+                    ATTACHMENT_ENTITY,
+                    "receipt.pdf",
+                    "API_ERROR",
+                    "The attachment registration was rejected by the service.",
+                    {"stage": "register_attachment"},
+                ),
+            ],
+        )
+        assert outcome["status"] == "partial"
+        assert outcome["verification"] is None
+        _assert_mutation_outcome_contract(outcome)
+
+    def test_invalid_status_enum_is_rejected(self):
+        outcome = build_mutation_outcome(
+            "transactions update",
+            [succeeded_item("transaction", "txn-1", {"changes": {}})],
+        )
+        outcome["status"] = "ok"
+        with pytest.raises(AssertionError):
+            _assert_mutation_outcome_contract(outcome)
+
+    def test_impossible_summary_counts_are_rejected(self):
+        outcome = build_mutation_outcome(
+            "transactions update",
+            [succeeded_item("transaction", "txn-1", {"changes": {}})],
+        )
+        # Passes JSON Schema (non-negative integers) but violates the
+        # arithmetic invariant, which the contract validator must catch.
+        outcome["summary"]["total"] = 99
+        with pytest.raises(AssertionError):
+            _assert_mutation_outcome_contract(outcome)
+
+    def test_result_and_error_cannot_both_be_non_null(self):
+        outcome = build_mutation_outcome(
+            "transactions update",
+            [succeeded_item("transaction", "txn-1", {"changes": {}})],
+        )
+        outcome["items"][0]["error"] = {"code": "API_ERROR", "message": "x", "details": {}}
+        with pytest.raises(AssertionError):
+            _assert_mutation_outcome_contract(outcome)
+
+
+# =============================================================================
+# NEGATIVE FIXTURES (validation must fail; never pass vacuously)
+# =============================================================================
+
+
+class TestNegativeFixtures:
+    """Representative invalid payloads must fail schema validation."""
+
+    @staticmethod
+    def _account() -> dict[str, Any]:
+        return transform_account(FULL_ACCOUNT_RAW)
+
+    @staticmethod
+    def _transaction() -> dict[str, Any]:
+        return transform_transaction(FULL_TRANSACTION_RAW)
+
+    def test_missing_required_field_fails(self):
+        payload = self._account()
+        del payload["balance"]
+        with pytest.raises(AssertionError):
+            _assert_valid(payload, "account")
+
+    def test_wrong_type_fails(self):
+        payload = self._account()
+        payload["balance"] = "lots"
+        with pytest.raises(AssertionError):
+            _assert_valid(payload, "account")
+
+    def test_invalid_nullability_fails(self):
+        payload = self._transaction()
+        payload["is_pending"] = None
+        with pytest.raises(AssertionError):
+            _assert_valid(payload, "transaction")
+
+    def test_undocumented_field_fails(self):
+        payload = self._account()
+        payload["mystery_field"] = 1
+        with pytest.raises(AssertionError):
+            _assert_valid(payload, "account")
+
+    def test_error_wrong_type_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_valid({"error": True, "code": 5, "message": "x", "details": {}}, "error")
+
+
+# =============================================================================
+# COLLECTION SHAPES
 # =============================================================================
 
 
 class TestCollectionSchemaContract:
-    """
-    Collection Output Contract
-    --------------------------
-
-    When returning lists of entities (accounts, transactions), the output
-    is a JSON array where each element follows the individual schema.
-
-    Guarantees:
-    - Empty results return [] (empty array), never None or error
-    - Each element in array follows its entity schema exactly
-    - Order may vary (don't depend on sort order without explicit --sort flag)
-    """
+    """Collection output is a JSON array of records following the schema."""
 
     def test_accounts_returns_list(self):
-        """transform_accounts must return a list."""
-        raw = {"accounts": [FULL_ACCOUNT_RAW]}
-        result = transform_accounts(raw)
-
+        result = transform_accounts({"accounts": [FULL_ACCOUNT_RAW]})
         assert isinstance(result, list)
+        _assert_valid(result[0], "account")
 
     def test_accounts_empty_returns_empty_list(self):
-        """Empty accounts returns [], not None."""
-        result = transform_accounts({"accounts": []})
-        assert result == []
-
-        result = transform_accounts({})
-        assert result == []
+        assert transform_accounts({"accounts": []}) == []
+        assert transform_accounts({}) == []
 
     def test_transactions_returns_list(self):
-        """transform_transactions must return a list."""
-        raw = {"allTransactions": {"results": [FULL_TRANSACTION_RAW]}}
-        result = transform_transactions(raw)
-
+        result = transform_transactions({"allTransactions": {"results": [FULL_TRANSACTION_RAW]}})
         assert isinstance(result, list)
+        _assert_valid(result[0], "transaction")
 
     def test_transactions_empty_returns_empty_list(self):
-        """Empty transactions returns [], not None."""
-        result = transform_transactions({"allTransactions": {"results": []}})
-        assert result == []
-
-        result = transform_transactions({})
-        assert result == []
-
-
-# =============================================================================
-# DOCUMENTATION
-# =============================================================================
-
-
-class TestSchemaDocumentation:
-    """
-    Meta-tests ensuring schema documentation stays in sync.
-
-    These tests verify the test module itself is properly documented.
-    """
-
-    def test_account_docstring_lists_all_fields(self):
-        """Account contract docstring must mention all schema fields."""
-        docstring = TestAccountSchemaContract.__doc__
-
-        for field in TestAccountSchemaContract.ALL_SCHEMA_FIELDS:
-            assert field in docstring, f"Field '{field}' not documented in Account docstring"
-
-    def test_transaction_docstring_lists_all_fields(self):
-        """Transaction contract docstring must mention all schema fields."""
-        docstring = TestTransactionSchemaContract.__doc__
-
-        for field in TestTransactionSchemaContract.ALL_SCHEMA_FIELDS:
-            assert field in docstring, f"Field '{field}' not documented in Transaction docstring"
+        assert transform_transactions({"allTransactions": {"results": []}}) == []
+        assert transform_transactions({}) == []

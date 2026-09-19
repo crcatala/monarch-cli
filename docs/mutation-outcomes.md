@@ -7,7 +7,9 @@ automated callers get one envelope for single-step, batch, and multi-stage
 remote mutations; domain commands never invent incompatible response shapes.
 
 This document defines the runtime behavior adopted by the CLI. The formal
-machine-readable JSON schemas are published separately (see ticket `mc-cpzi`).
+machine-readable contract is published as JSON Schema
+`urn:monarch-cli:schema:mutation-outcome:v1` and packaged as a package
+resource; see [Machine-readable output schemas](schema-contracts.md).
 
 ## Scope
 

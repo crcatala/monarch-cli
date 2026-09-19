@@ -15,6 +15,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from jsonschema import Draft202012Validator
 from typer.testing import CliRunner
 
 from monarch_cli.commands import transaction_attachments as module
@@ -30,10 +31,12 @@ from monarch_cli.core.upload_transport import (
 from monarch_cli.core.upload_transport import (
     AttachmentUploadAdapter as RealAdapter,
 )
+from monarch_cli.schemas import load_schema
 
 runner = CliRunner()
 
 _PDF_BYTES = b"%PDF-1.4\n% test pdf content\n"
+_MUTATION_OUTCOME_VALIDATOR = Draft202012Validator(load_schema("mutation-outcome"))
 
 
 @pytest.fixture(autouse=True)
@@ -98,7 +101,23 @@ def _detail(attachments: list[dict[str, Any]] | None = None, txn_id: str = "txn-
 
 
 def _outcome(result: Any) -> dict[str, Any]:
-    return json.loads(result.stdout)
+    payload = json.loads(result.stdout)
+    # Every real mutation outcome emitted by this command must conform to the
+    # published schema and its arithmetic invariants. Dry-run previews
+    # (status: "dry_run") are deliberately outside the schema family.
+    if payload.get("schema_version") == "mutation-outcome.v1":
+        errors = sorted(
+            _MUTATION_OUTCOME_VALIDATOR.iter_errors(payload),
+            key=lambda error: list(error.absolute_path),
+        )
+        assert not errors, [error.message for error in errors]
+        summary = payload["summary"]
+        assert summary["total"] == len(payload["items"])
+        for status in ("succeeded", "failed", "ambiguous"):
+            assert summary[status] == sum(
+                1 for item in payload["items"] if item["status"] == status
+            )
+    return payload
 
 
 # --- Authorization and invocation shape ------------------------------------

@@ -247,7 +247,9 @@ The two forms are equivalent for commands that provide a local `--json`
 shortcut. `--ndjson` is available on account and transaction list commands.
 `--quiet` emits IDs only, which is useful for pipelines. See
 [Output contracts](docs/output-contracts.md) for normalization, raw output,
-field guarantees, and scripting behavior.
+field guarantees, and scripting behavior, and
+[Machine-readable output schemas](docs/schema-contracts.md) for the published
+JSON Schema contracts, stable URNs, validation, and compatibility policy.
 
 ## Configuration and authentication
 
