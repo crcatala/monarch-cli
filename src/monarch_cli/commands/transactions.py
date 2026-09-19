@@ -719,7 +719,11 @@ def update(
     """Update a transaction's properties.
 
     Modify amount, description, category, notes, or date for a transaction.
-    Use --dry-run to preview changes without applying them.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path (for example:
+    monarch --allow-mutations transactions update --transaction-id TXN123 ...).
+    Use --dry-run to preview the change without applying it.
 
     Examples:
         monarch transactions update --transaction-id TXN123 --amount 25.50
@@ -910,6 +914,12 @@ def batch_update(
     --transaction-id options, piped via stdin, or both. Repeatable option
     values are consumed first, then stdin lines; the combined list is
     deduplicated in first-seen order before any update is attempted.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path (for example:
+    monarch --allow-mutations transactions batch-update ...). Use --dry-run to
+    preview the changes without applying them; --dry-run --yes is accepted and
+    irrelevant.
 
     Examples:
         # Update specific transactions

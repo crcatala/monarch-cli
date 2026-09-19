@@ -199,7 +199,13 @@ def create_tag(
     name: Annotated[str | None, typer.Option("--name")] = None,
     color: Annotated[str | None, typer.Option("--color")] = None,
 ) -> None:
-    """Create a reusable transaction tag."""
+    """Create a reusable transaction tag.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path (for example:
+    monarch --allow-mutations transactions tags create --name Work --color '#112233').
+    Both --name and a six-digit --color are required.
+    """
     if name is None or not name.strip():
         raise ValidationError("Tag name must be non-empty after trimming.", field="name")
     if color is None or not _COLOR_RE.fullmatch(color):
@@ -483,6 +489,11 @@ def replace_tags(
 ) -> None:
     """Replace the complete tag set for one transaction.
 
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Destructive: prompts unless --yes is given after
+    --allow-mutations. Use --dry-run to preview the resolved set without
+    writing.
+
     Examples:
         monarch --allow-mutations transactions tags replace \\
             --transaction-id TXN123 --tag-id TAG1 --tag-name "Travel"
@@ -554,10 +565,12 @@ def add_tags(
 ) -> None:
     """Add tags to a transaction, preserving its existing tags.
 
-    Read-modify-write over the full-set endpoint; not atomic against concurrent
-    tag changes. Already-present tags are skipped; an already-satisfied request
-    is a deterministic no-op. Existing tags not present in household discovery
-    are preserved verbatim.
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Read-modify-write over the full-set endpoint; not
+    atomic against concurrent tag changes. Already-present tags are skipped; an
+    already-satisfied request is a deterministic no-op. Existing tags not
+    present in household discovery are preserved verbatim. Use --dry-run to
+    preview the additive result without writing.
 
     Examples:
         monarch --allow-mutations transactions tags add \\
@@ -634,7 +647,12 @@ def clear_tags(
         typer.Option("--dry-run", help="Preview the clear without writing"),
     ] = False,
 ) -> None:
-    """Explicitly clear every tag from one transaction."""
+    """Explicitly clear every tag from one transaction.
+
+    This remote mutation requires the global --allow-mutations option, placed
+    before the command path. Destructive: prompts unless --yes is given after
+    --allow-mutations. Use --dry-run to preview the clear without writing.
+    """
     _reject_positional_targets(ctx.args)
     _validate_transaction_id(transaction_id)
     operation, client = _start_tag_mutation("transactions tags clear", dry_run=dry_run)
