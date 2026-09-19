@@ -1277,7 +1277,7 @@ def _create_mismatch(
         return None
     return {
         "mismatched_fields": mismatched,
-        "observed": _created_result(normalized.get("transaction_id", "unknown"), detail),
+        "observed": _created_result(normalized["transaction_id"], detail),
     }
 
 
