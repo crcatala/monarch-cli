@@ -1,6 +1,6 @@
 ---
 id: mc-7lm1
-status: in_progress
+status: closed
 deps: [mc-46gq, mc-s6s6]
 links: []
 created: 2026-09-19T01:19:38Z
