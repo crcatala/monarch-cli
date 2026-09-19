@@ -83,6 +83,13 @@ Review the current budget:
 monarch budgets list --format table
 ```
 
+Set one category's monthly budget for one explicitly identified month:
+
+```bash
+monarch --allow-mutations budgets set \
+  --category-id CAT_ID --amount 500.00 --start 2026-09-01
+```
+
 ## Common workflows
 
 ### Accounts and net worth
@@ -205,6 +212,11 @@ monarch --allow-mutations transactions create \
   --category-id CAT_ID
 monarch --allow-mutations --yes transactions delete \
   --transaction-id TXN_ID
+
+# Set one category's monthly budget for one month (never future months,
+# category groups, flexible budgets, or rollovers)
+monarch --allow-mutations budgets set \
+  --category-id CAT_ID --amount 500.00 --start 2026-09-01
 ```
 
 `--yes` skips a destructive confirmation; it never authorizes a write.

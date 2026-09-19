@@ -333,6 +333,7 @@ class TestRetryClassifications:
             "transactions attachments add",
             "transactions review mark",
             "transactions review return",
+            "budgets set",
         }
 
     def test_classifications_require_a_named_mechanism_to_change(self) -> None:

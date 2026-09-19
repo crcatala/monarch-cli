@@ -58,6 +58,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--dry-run` is fully offline and reports only target ID, sanitized basename, size, and inferred type; the local path and file contents never appear in output or diagnostics
 - The workflow consumes only the reviewed `mc-sr92` upload adapter, makes one attempt per media/registration stage, verifies registration by returned identity through transaction detail, and reports orphaned-asset partial completion honestly with no rollback claim
 
+#### Guarded monthly category budget updates
+- Added `budgets set --category-id CATEGORY_ID --amount AMOUNT --start YYYY-MM-DD` (mc-9u99): sets the monthly amount for exactly one category in one explicitly identified month; `--start` must be the first day of a month
+- All local validation (identifier, strict date, finite/non-negative amount, cent precision) precedes authentication, authorization, and every API call; the exact category is validated against bounded read-only discovery before the write
+- The write uses the released `set_budget_amount` capability with exactly the category target, amount, `timeframe="month"`, the requested start date, and `apply_to_future=False`; no category-group target or future-month flag is sent
+- After the write, the exact category/month planned amount is read back and compared using exact cent-normalized equality; a rejection, transport ambiguity, malformed response, unavailable readback, or mismatch is never reported as success and is never blindly retried
+- Emits `mutation-outcome.v1` with stable operation `budgets.set` and entity `budget`; `--dry-run` validates and previews without writing; a zero amount is a deliberate reset-to-zero
+- Out of scope and not exposed: future-month propagation, category groups, flexible budgets, whole-budget reset, rollover settings, and bulk updates
+
 #### Explicit transaction review-state mutations
 - Added intent-oriented `transactions review mark` (`reviewed=True`, omits `needsReview`) and `transactions review return` (`needsReview=True`, omits `reviewed`); both require `--transaction-id` and never accept positional arguments (mc-e49c)
 - `reviewed=False`, `needsReview=False`, and contradictory review-state combinations are not accepted by this surface
