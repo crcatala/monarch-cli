@@ -44,6 +44,11 @@ third-party media host. It:
 Commands and services consume only this adapter boundary. They never call the
 upstream client's private stage methods or `MonarchMoney.upload_attachment()`.
 
+The consuming attachment workflow is `transactions attachments add` (mc-2v9a).
+It owns file policy, exact target verification, and the staged mutation outcome;
+it calls `acquire_upload_params`, `upload_media`, and `register_attachment`
+individually and never treats the three stages as an atomic operation.
+
 ## Outcome classification
 
 The media stage performs exactly **one** attempt and never retries (a retry

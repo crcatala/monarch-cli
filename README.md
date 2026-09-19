@@ -175,6 +175,15 @@ monarch --allow-mutations transactions tags add \
   --transaction-id TXN_ID \
   --tag-name "Travel"
 
+# Attach a receipt (preview offline, then upload)
+monarch transactions attachments add \
+  --transaction-id TXN_ID \
+  --file ./receipt.pdf \
+  --dry-run
+monarch --allow-mutations transactions attachments add \
+  --transaction-id TXN_ID \
+  --file ./receipt.pdf
+
 # Replace a transaction's complete split set
 monarch --allow-mutations --yes transactions splits replace \
   --transaction-id TXN_ID \

@@ -710,6 +710,64 @@ monarch --allow-mutations --yes transactions tags clear \
   --transaction-id TXN_ID
 ```
 
+## Transaction attachments
+
+### `transactions attachments add`
+
+Attaches one supported local file to one explicitly identified transaction as a
+three-stage remote workflow: acquire transaction-specific signed upload
+parameters, upload the file through the credential-safe media transport
+(`mc-sr92`), then register the attachment. The command never calls the upstream
+`upload_attachment` helper or any upstream private upload method; it consumes
+only the reviewed adapter boundary.
+
+Options:
+
+- Required `--transaction-id TXN_ID`
+- Required `--file PATH`
+- `--filename NAME` — optional remote filename override, validated by the same
+  policy as the derived basename
+- `--dry-run`
+
+Local file policy (v1): supported extensions are `.pdf`, `.jpg`, `.jpeg`,
+`.png`, `.gif`, and `.webp`; the maximum size is 10 MiB; filenames are limited
+to 255 characters and reject path separators and control characters. Execution
+opens the file once with `O_NOFOLLOW`, validates the open descriptor as a
+regular, readable, non-empty file under the size cap, and reads from that same
+descriptor. Symbolic links, directories, empty files, over-limit files, and
+unsupported or content-mismatched files are rejected before authentication or
+any remote operation. Extension/MIME checks are local policy only and do not
+guarantee that the remote service accepts the file.
+
+The dry-run preview is fully offline: it validates local metadata (existence,
+regular file, filename policy, size) without reading file contents and performs
+no authentication lookup, transaction read, signed-parameter request, or upload.
+It reports only the target transaction ID, the sanitized remote basename, the
+local size, and the locally inferred content type.
+
+The requested transaction is verified by an exact, non-redirecting detail read
+before any upload. The media and registration stages are each attempted exactly
+once. A media upload that succeeds but whose registration fails or is
+unconfirmed is reported as a partial `mutation-outcome.v1` result (exit `4`)
+with the orphaned media asset acknowledged; no cleanup or rollback is claimed,
+and filename/size matching is never used to identify or deduplicate
+attachments.
+
+```bash
+monarch transactions attachments add \
+  --transaction-id TXN_ID \
+  --file ./receipt.pdf \
+  --dry-run
+
+monarch --allow-mutations transactions attachments add \
+  --transaction-id TXN_ID \
+  --file /path/to/scan.png \
+  --filename "receipt.png"
+```
+
+Receipt-inbox upload and follow-up transaction edits (including `--notes`
+convenience updates) are out of scope.
+
 ## Mutation behavior
 
 Remote mutations are:
@@ -719,6 +777,7 @@ Remote mutations are:
 - `transactions batch-update`
 - `transactions tags create`, `replace`, `add`, and `clear`
 - `transactions splits replace` and `clear`
+- `transactions attachments add`
 
 All require `--allow-mutations` after validation, except dry-run previews.
 `--yes` is needed only to skip confirmation for destructive tag and split

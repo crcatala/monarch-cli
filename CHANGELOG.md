@@ -52,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added read-only `transactions splits show` and guarded complete-set `replace`/`clear` operations
 - Split JSON is bounded and validated against the parent transaction total; writes are read back for verification and ambiguous results include safe inspection guidance
 
+#### Transaction attachment upload
+- Added `transactions attachments add` (mc-2v9a): attach one supported local file to an explicitly identified transaction via a three-stage workflow (signed-parameter acquisition, credential-safe media upload, registration)
+- Requires `--transaction-id` and `--file` (with an optional validated `--filename` override) and never accepts positional arguments; local file policy is documented (`.pdf`/`.jpg`/`.jpeg`/`.png`/`.gif`/`.webp`, 10 MiB cap, single `O_NOFOLLOW` descriptor, symlink/directory/empty/content-mismatch rejection)
+- `--dry-run` is fully offline and reports only target ID, sanitized basename, size, and inferred type; the local path and file contents never appear in output or diagnostics
+- The workflow consumes only the reviewed `mc-sr92` upload adapter, makes one attempt per media/registration stage, verifies registration by returned identity through transaction detail, and reports orphaned-asset partial completion honestly with no rollback claim
+
 #### Account history and refresh visibility
 - Added `accounts history`, `recent-balances`, `snapshots`, and `snapshots-by-type` for normalized balance and net-worth history
 - Added read-only `accounts refresh-status`, including explicit unknown-account results rather than treating them as complete
