@@ -10,6 +10,14 @@ import asyncio
 import concurrent.futures
 from collections.abc import Awaitable, Callable, Coroutine
 
+from gql.transport.exceptions import (
+    TransportAlreadyConnected,
+    TransportClosed,
+    TransportError,
+    TransportQueryError,
+    TransportServerError,
+)
+
 from .config import get_config
 from .exceptions import ErrorCode, MonarchCLIError, MutationAmbiguousError, NetworkError
 from .retry import RETRYABLE_EXCEPTIONS, MutationRetryPolicy
@@ -218,11 +226,35 @@ def run_api_call[T](
 #: Exceptions that leave the outcome of an already-dispatched request unknown.
 #: For a remote mutation, any of these after the request has been invoked
 #: means the service may have received and processed it: the result is
-#: ambiguous, not merely failed.
+#: ambiguous, not merely failed. Alongside the stdlib/aiohttp types this
+#: includes the gql transport wrapper (``TransportConnectionFailed``) that the
+#: upstream client's ``gql_call`` raises for every connection-level failure.
 AMBIGUOUS_TRANSPORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
     *RETRYABLE_EXCEPTIONS,
     asyncio.CancelledError,
 )
+
+#: gql transport exceptions that are *definitive*: the service explicitly
+#: rejected the request (a GraphQL ``errors`` payload) or the client never
+#: dispatched it (transport already connected/closed). These must stay on the
+#: normal failure path rather than being reported as ambiguous.
+DEFINITIVE_TRANSPORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    TransportQueryError,
+    TransportAlreadyConnected,
+    TransportClosed,
+)
+
+
+def _definitive_transport_server_error(exc: TransportServerError) -> bool:
+    """Return True when a server status is a definitive service rejection.
+
+    gql raises ``TransportServerError`` for any HTTP status at or above 400.
+    A 4xx response is the service explicitly rejecting the request, so the
+    mutation did not apply. A 5xx (or unknown) response may have been emitted
+    after the write was committed, so it must be treated as ambiguous.
+    """
+    code = exc.code
+    return code is not None and 400 <= code < 500
 
 
 def _classify_ambiguity(exc: BaseException) -> str:
@@ -357,7 +389,31 @@ async def run_mutation_api_call_async[T](
     try:
         async with asyncio.timeout(effective_timeout):
             return await coro_factory()
+    except MonarchCLIError:
+        # Structured CLI errors (definitive API rejections, validation
+        # failures, policy violations, and already-classified ambiguity) keep
+        # their established contract.
+        raise
+    except DEFINITIVE_TRANSPORT_EXCEPTIONS:
+        raise
     except AMBIGUOUS_TRANSPORT_EXCEPTIONS as e:
+        raise _mutation_ambiguous_error(
+            operation=operation,
+            entity_ids=ids,
+            verification=verification,
+            cause=e,
+            timeout_seconds=effective_timeout,
+        ) from e
+    except TransportError as e:
+        # Defensive catch-all for the gql transport hierarchy: any transport
+        # failure not explicitly recognised above occurred while the request
+        # was in flight, so its outcome is unknown. Classifying by the gql
+        # base type rather than an exhaustive allowlist keeps a future gql
+        # transport exception from silently downgrading a dispatched write to
+        # a definitive failure. Genuine 4xx service rejections are the one
+        # exception and stay on the normal failure path.
+        if isinstance(e, TransportServerError) and _definitive_transport_server_error(e):
+            raise
         raise _mutation_ambiguous_error(
             operation=operation,
             entity_ids=ids,

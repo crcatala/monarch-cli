@@ -196,6 +196,14 @@ otherwise:
   retries, regardless of the configured `max_retries` (which applies to reads
   only). A timed-out, disconnected, or interrupted request may already have
   been applied.
+- Every upstream call goes through the `gql` transport, which wraps
+  connection-level failures (timeouts, disconnects, malformed/incomplete
+  responses, and 5xx server errors) as `gql` transport exceptions. Those
+  exceptions are classified as transport failures too, so a real
+  `TransportConnectionFailed` after dispatch is reported `ambiguous`, never as
+  a definitive `failed`. A definitive service rejection — a GraphQL `errors`
+  payload (regardless of any partial `data` it carries) or a 4xx HTTP
+  response — stays on the normal `failed` path.
 - When the outcome is unknown, affected items are reported `ambiguous`, the
   envelope's `verification` object is required, and the process exits `4`.
   The verification message tells you how to check remote state safely (read

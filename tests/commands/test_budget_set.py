@@ -351,6 +351,54 @@ def test_malformed_write_response_is_ambiguous(payload: dict[str, Any]) -> None:
     mock.get_budgets.assert_not_awaited()
 
 
+def test_gql_transport_failure_is_ambiguous_with_verification() -> None:
+    """The real gql-wrapped transport failure reaches the ambiguous contract (mc-ic7w).
+
+    The client method raises the production exception type
+    (``TransportConnectionFailed``), not an aiohttp/stdlib type, so the
+    command's mutation boundary must still classify it as ambiguous.
+    """
+    from gql.transport.exceptions import TransportConnectionFailed
+
+    mock = client()
+    mock.set_budget_amount.side_effect = TransportConnectionFailed("simulated disconnect")
+    result = invoke(mock, BASE)
+    assert result.exit_code == 4
+    output = json.loads(result.stdout)
+    assert output["status"] == "ambiguous"
+    assert output["verification"]["required"] is True
+    details = output["items"][0]["error"]["details"]
+    assert details["remote_state"] == "unknown"
+    assert details["reason"] == "transport_failure"
+    assert output["items"][0]["error"]["code"] == "MUTATION_AMBIGUOUS"
+    mock.set_budget_amount.assert_awaited_once()
+    mock.get_budgets.assert_not_awaited()
+
+
+def test_raised_graphql_errors_payload_is_definitive_failure() -> None:
+    """A raised TransportQueryError is a definitive failure, not ambiguous.
+
+    The real gql transport raises ``TransportQueryError`` for a GraphQL
+    ``errors`` payload; it must stay on the normal failed path rather than
+    being reported as an unverified write (mc-ic7w acceptance).
+    """
+    from gql.transport.exceptions import TransportQueryError
+
+    mock = client()
+    mock.set_budget_amount.side_effect = TransportQueryError(
+        "rejected", errors=[{"message": "rejected"}]
+    )
+    result = invoke(mock, BASE)
+    assert result.exit_code == 1
+    output = json.loads(result.stdout)
+    assert output["status"] == "failed"
+    assert output["verification"] is None
+    assert output["items"][0]["status"] == "failed"
+    assert output["items"][0]["error"]["details"]["exception_class"] == "TransportQueryError"
+    mock.set_budget_amount.assert_awaited_once()
+    mock.get_budgets.assert_not_awaited()
+
+
 def test_transport_ambiguity_is_not_retried() -> None:
     from monarch_cli.core.exceptions import MutationAmbiguousError
 
