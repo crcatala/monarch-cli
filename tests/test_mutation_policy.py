@@ -44,6 +44,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 #: The complete reviewed command inventory with declared effects. A new or
 #: renamed command must update this mapping (and its declarations) explicitly.
 EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
+    "capabilities": frozenset({Effect.READ_ONLY}),
     "accounts list": frozenset({Effect.READ_ONLY}),
     "accounts types": frozenset({Effect.READ_ONLY}),
     "accounts history": frozenset({Effect.READ_ONLY}),

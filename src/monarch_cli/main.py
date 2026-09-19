@@ -7,6 +7,7 @@ from monarch_cli.commands import (
     accounts,
     auth,
     budgets,
+    capabilities,
     cashflow,
     categories,
     institutions,
@@ -33,6 +34,9 @@ app.add_typer(categories.app, name="categories")
 app.add_typer(institutions.app, name="institutions")
 app.add_typer(investments.app, name="investments")
 app.add_typer(subscription.app, name="subscription")
+
+# Root-level commands (no group)
+app.command("capabilities")(capabilities.capabilities)
 
 
 def version_callback(value: bool) -> None:

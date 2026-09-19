@@ -10,6 +10,18 @@ Placeholders used below:
 - `CAT_ID` — category ID
 - `TAG_ID` — transaction-tag ID
 
+## Capabilities discovery
+
+`monarch capabilities` prints a versioned, machine-readable JSON manifest of
+the installed CLI: every command path, argument, option, required input,
+default, output support, safety requirement, interactivity, and published
+contract version. It is side-effect free (no authentication, network, prompt,
+or config/session write). See [Capabilities manifest](capabilities.md).
+
+```bash
+monarch capabilities | jq '.commands[] | select(.safety.requires_authorization)'
+```
+
 ## Global options
 
 Global options appear before the command path:
