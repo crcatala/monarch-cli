@@ -79,11 +79,19 @@ import pathlib
 import sys
 
 import monarch_cli
+from monarch_cli.schemas import SCHEMA_ARTIFACTS
 
 location = pathlib.Path(monarch_cli.__file__).resolve()
 print(f"monarch_cli imported from {location}")
 if "site-packages" not in location.parts:
     raise SystemExit(f"monarch_cli resolved outside site-packages: {location}")
+
+# Packaged schema artifacts must ship in the wheel and stay loadable.
+for artifact in SCHEMA_ARTIFACTS.values():
+    document = artifact.load()
+    if document.get("$id") != artifact.urn:
+        raise SystemExit(f"schema {artifact.resource} has an unexpected $id")
+print(f"loaded {len(SCHEMA_ARTIFACTS)} packaged schema artifacts")
 PY
 
 # 6. Both console entry points must run from the installed wheel.

@@ -50,6 +50,12 @@ upstream fields, and preserves unavailable values as `null` rather than
 inventing financial values. `--raw` returns the upstream structure, including
 unknown fields and null containers, where the command supports it.
 
+The stable normalized records below are also published as checked-in JSON
+Schema Draft 2020-12 artifacts packaged with the CLI. See
+[Machine-readable output schemas](schema-contracts.md) for the contract URNs,
+the module-level mapping that resolves them, validation examples, and the
+compatibility policy. Raw passthrough is explicitly unschematized and unstable.
+
 Raw mode is not identical for every command:
 
 - Most commands return the upstream response directly.

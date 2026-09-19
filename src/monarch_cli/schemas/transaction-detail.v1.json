@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:monarch-cli:schema:transaction-detail:v1",
+  "title": "Monarch CLI normalized transaction detail (v1)",
+  "description": "Normative contract for single-transaction detail output (`monarch transactions get`). Extends the list record shape with requested/returned identity, redirect state, the original transaction, and nested attachment/tag/split collections. Fields are always present; unavailable values are null. Additive-only: removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "requested_id",
+    "redirected",
+    "original_transaction",
+    "date",
+    "amount",
+    "description",
+    "category",
+    "category_id",
+    "account",
+    "account_id",
+    "is_pending",
+    "needs_review",
+    "review_status",
+    "owner_id",
+    "owner_name",
+    "ownership_overridden_at",
+    "notes",
+    "is_recurring",
+    "hidden_from_reports",
+    "is_manual",
+    "attachments",
+    "tags",
+    "split"
+  ],
+  "properties": {
+    "id": {
+      "type": ["string", "null"],
+      "description": "Returned transaction identifier."
+    },
+    "requested_id": {
+      "type": ["string", "null"],
+      "description": "The transaction ID the caller requested; echoed for requested-versus-returned observability."
+    },
+    "redirected": {
+      "type": "boolean",
+      "description": "True when the returned transaction ID differs from the requested ID."
+    },
+    "original_transaction": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/original_transaction"}
+      ],
+      "description": "Normalized upstream originalTransaction object, or null when not provided."
+    },
+    "date": {
+      "type": ["string", "null"],
+      "description": "Transaction date, normally YYYY-MM-DD."
+    },
+    "amount": {
+      "type": ["number", "null"],
+      "description": "Transaction amount; negative is an expense, positive is income."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Deterministic description: merchant.name, then plaidName, else null."
+    },
+    "category": {
+      "type": ["string", "null"],
+      "description": "Category display name."
+    },
+    "category_id": {
+      "type": ["string", "null"],
+      "description": "Category identifier for programmatic use."
+    },
+    "account": {
+      "type": ["string", "null"],
+      "description": "Account display name."
+    },
+    "account_id": {
+      "type": ["string", "null"],
+      "description": "Account identifier for programmatic use."
+    },
+    "is_pending": {
+      "type": "boolean",
+      "description": "True while the upstream transaction is pending."
+    },
+    "needs_review": {
+      "type": "boolean",
+      "description": "Whether the transaction needs review."
+    },
+    "review_status": {
+      "type": ["string", "null"],
+      "description": "Opaque upstream review status; null when omitted by the selected endpoint."
+    },
+    "owner_id": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.id, or null when no owner relationship was provided."
+    },
+    "owner_name": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.name, or null when no owner relationship was provided."
+    },
+    "ownership_overridden_at": {
+      "type": ["string", "null"],
+      "description": "Literal upstream ownershipOverriddenAt timestamp."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "User-added notes."
+    },
+    "is_recurring": {
+      "type": "boolean",
+      "description": "Upstream isRecurring flag; absent or null defaults to false."
+    },
+    "hidden_from_reports": {
+      "type": "boolean",
+      "description": "Upstream hideFromReports flag; absent or null defaults to false."
+    },
+    "is_manual": {
+      "type": "boolean",
+      "description": "Upstream isManual flag; absent or null defaults to false."
+    },
+    "attachments": {
+      "type": "array",
+      "description": "Normalized attachments; absent or null upstream containers normalize to [].",
+      "items": {"$ref": "#/$defs/attachment"}
+    },
+    "tags": {
+      "type": "array",
+      "description": "Normalized tags; absent or null upstream containers normalize to [].",
+      "items": {"$ref": "#/$defs/tag"}
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_split", "has_split_transactions", "splits"],
+      "description": "Split state and normalized split records; nested split-transaction containers never include unknown fields.",
+      "properties": {
+        "is_split": {
+          "type": "boolean",
+          "description": "Upstream isSplitTransaction flag; absent or null defaults to false."
+        },
+        "has_split_transactions": {
+          "type": "boolean",
+          "description": "Upstream hasSplitTransactions flag; absent or null defaults to false."
+        },
+        "splits": {
+          "type": "array",
+          "description": "Normalized split records; absent or null upstream containers normalize to [].",
+          "items": {"$ref": "#/$defs/split"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "original_transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "date", "amount", "merchant_name"],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "date": {"type": ["string", "null"]},
+        "amount": {"type": ["number", "null"]},
+        "merchant_name": {"type": ["string", "null"]}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "filename", "extension", "size_bytes"],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "filename": {"type": ["string", "null"]},
+        "extension": {"type": ["string", "null"]},
+        "size_bytes": {"type": ["number", "null"]}
+      }
+    },
+    "tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "color"],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "name": {"type": ["string", "null"]},
+        "color": {"type": ["string", "null"]}
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "amount", "merchant", "category"],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "amount": {"type": ["number", "null"]},
+        "merchant": {"type": ["string", "null"]},
+        "category": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

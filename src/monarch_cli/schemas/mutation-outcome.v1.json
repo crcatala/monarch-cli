@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:monarch-cli:schema:mutation-outcome:v1",
+  "title": "Monarch CLI mutation outcome (v1)",
+  "description": "Normative contract for the mutation-outcome.v1 envelope emitted on stdout after every remote mutation is attempted. One envelope covers atomic, batch, and multi-stage operations; multi-stage workflows use one ordered item per attempted or observable remote effect and never add command-specific top-level fields. Dry-run previews (status: dry_run) are deliberately NOT part of this schema family. Cross-field arithmetic invariants (summary.total == len(items) and the per-status counts matching items) cannot be expressed in JSON Schema Draft 2020-12 and are enforced by the CLI contract validator used in tests. Additive-only for optional properties; removing or changing required fields, status values, or their semantics requires mutation-outcome.v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operation", "status", "summary", "items", "verification"],
+  "properties": {
+    "schema_version": {
+      "const": "mutation-outcome.v1",
+      "description": "Envelope version stamp."
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable namespaced operation identifier (for example transactions.attachments.add). Never inferred from an upstream method or GraphQL name."
+    },
+    "status": {
+      "enum": ["succeeded", "failed", "ambiguous", "partial"],
+      "description": "Aggregated top-level outcome status."
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "succeeded", "failed", "ambiguous"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "succeeded": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "ambiguous": {"type": "integer", "minimum": 0}
+      },
+      "description": "Per-status counts. Counts must match items and total must equal len(items); that arithmetic invariant is enforced by the contract validator."
+    },
+    "items": {
+      "type": "array",
+      "description": "Ordered item outcomes. Atomic operations use exactly one item; batches preserve normalized input order; multi-stage workflows preserve remote-effect order.",
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "verification": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/verification"}
+      ],
+      "description": "Follow-up verification guidance; null when no item is ambiguous."
+    }
+  },
+  "$defs": {
+    "status": {
+      "enum": ["succeeded", "failed", "ambiguous"]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "details"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable error code. Open set; MUTATION_AMBIGUOUS is reserved for ambiguous items."
+        },
+        "message": {
+          "type": "string",
+          "description": "Sanitized, actionable message; never raw upstream exception text."
+        },
+        "details": {
+          "type": "object",
+          "description": "Object-valued structured details."
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "id", "status", "result", "error"],
+      "properties": {
+        "entity": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable effect-specific entity identifier (for example transaction, attachment_media, attachment)."
+        },
+        "id": {
+          "type": "string",
+          "description": "Best available remote identity for the effect."
+        },
+        "status": {"$ref": "#/$defs/status"},
+        "result": {
+          "anyOf": [{"type": "null"}, {"type": "object"}],
+          "description": "Normalized JSON object on success; null otherwise."
+        },
+        "error": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/error"}
+          ],
+          "description": "Null on success; the stable error object otherwise."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "succeeded"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "result": {"type": "object"},
+              "error": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"status": {"enum": ["failed", "ambiguous"]}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "result": {"type": "null"},
+              "error": {"$ref": "#/$defs/error"}
+            }
+          }
+        }
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "message", "command"],
+      "properties": {
+        "required": {
+          "const": true,
+          "description": "Always true: an ambiguous outcome requires follow-up verification."
+        },
+        "message": {
+          "type": "string",
+          "description": "Actionable guidance for confirming remote state safely."
+        },
+        "command": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "array", "items": {"type": "string"}}
+          ],
+          "description": "Tokenized safe read-only verification command when the CLI can provide one."
+        }
+      }
+    }
+  }
+}

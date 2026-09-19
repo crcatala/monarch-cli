@@ -77,6 +77,7 @@ from ..core.upload_transport import (
     MediaUploadResult,
 )
 from ..output import emit_mutation_outcome, validate_mutation_output
+from ..schemas import ATTACHMENT_ENTITY, ATTACHMENT_MEDIA_ENTITY
 from .mutation_helpers import (
     build_preview,
 )
@@ -383,7 +384,7 @@ def _confirm_registration(
 
 def _media_succeeded_item(media: MediaUploadResult, metadata: _FileMetadata) -> dict[str, Any]:
     return succeeded_item(
-        "attachment_media",
+        ATTACHMENT_MEDIA_ENTITY,
         media.public_id,
         {
             "public_id": media.public_id,
@@ -507,7 +508,7 @@ def add_attachment(
                 operation.command,
                 [
                     failed_item(
-                        "attachment_media",
+                        ATTACHMENT_MEDIA_ENTITY,
                         metadata.filename,
                         error["code"],
                         error["message"],
@@ -523,7 +524,7 @@ def add_attachment(
                 operation.command,
                 [
                     ambiguous_item(
-                        "attachment_media",
+                        ATTACHMENT_MEDIA_ENTITY,
                         metadata.filename,
                         exc.message,
                         {"remote_state": "unknown", "reason": exc.details.get("reason")},
@@ -558,7 +559,7 @@ def add_attachment(
                 [
                     media_item,
                     ambiguous_item(
-                        "attachment",
+                        ATTACHMENT_ENTITY,
                         metadata.filename,
                         exc.message,
                         {"remote_state": "unknown", "reason": exc.details.get("reason")},
@@ -579,7 +580,7 @@ def add_attachment(
                 [
                     media_item,
                     failed_item(
-                        "attachment",
+                        ATTACHMENT_ENTITY,
                         metadata.filename,
                         error["code"],
                         error["message"],
@@ -597,7 +598,7 @@ def add_attachment(
                 [
                     media_item,
                     failed_item(
-                        "attachment",
+                        ATTACHMENT_ENTITY,
                         metadata.filename,
                         "API_ERROR",
                         "The attachment registration was rejected by the service.",
@@ -621,7 +622,7 @@ def add_attachment(
                 [
                     media_item,
                     ambiguous_item(
-                        "attachment",
+                        ATTACHMENT_ENTITY,
                         best_known_id,
                         "The attachment registration returned no usable attachment "
                         "identity; the attachment may exist. Remote state is unknown.",
@@ -643,7 +644,7 @@ def add_attachment(
                 [
                     media_item,
                     ambiguous_item(
-                        "attachment",
+                        ATTACHMENT_ENTITY,
                         best_known_id,
                         "The registered attachment could not be confirmed in the "
                         "transaction detail; remote state is unknown.",
@@ -666,7 +667,7 @@ def add_attachment(
             [
                 media_item,
                 succeeded_item(
-                    "attachment",
+                    ATTACHMENT_ENTITY,
                     best_known_id,
                     {
                         "transaction_id": transaction_id,

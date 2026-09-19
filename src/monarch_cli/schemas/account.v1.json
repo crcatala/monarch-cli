@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:monarch-cli:schema:account:v1",
+  "title": "Monarch CLI normalized account (v1)",
+  "description": "Normative contract for one normalized account record emitted by `monarch accounts list` (and the same record shape inside account collections). Fields are always present; unavailable values are null. Unknown additive upstream fields never appear here because normalization discards them. This schema is additive-only: new optional properties may be added without a version change, but removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "type",
+    "subtype",
+    "balance",
+    "institution",
+    "is_active",
+    "is_manual",
+    "owner_id",
+    "owner_name",
+    "type_name",
+    "subtype_name",
+    "is_asset",
+    "credit_limit",
+    "provider_credit_limit",
+    "apr",
+    "interest_rate",
+    "minimum_payment",
+    "planned_payment",
+    "excluded_from_debt_paydown",
+    "last_updated"
+  ],
+  "properties": {
+    "id": {
+      "type": ["string", "null"],
+      "description": "Upstream account identifier, or null when unavailable."
+    },
+    "name": {
+      "type": ["string", "null"],
+      "description": "Human-readable account name (upstream displayName)."
+    },
+    "type": {
+      "type": ["string", "null"],
+      "description": "Human account type display label."
+    },
+    "subtype": {
+      "type": ["string", "null"],
+      "description": "Human account subtype display label."
+    },
+    "balance": {
+      "type": ["number", "null"],
+      "description": "Current balance in upstream numeric units; null when unavailable, never fabricated as 0."
+    },
+    "institution": {
+      "type": ["string", "null"],
+      "description": "Financial institution name."
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "False when the account is hidden. Absent or null upstream values default to true."
+    },
+    "is_manual": {
+      "type": "boolean",
+      "description": "True for manually tracked accounts. Absent or null upstream values default to false."
+    },
+    "owner_id": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.id, or null when no owner relationship was provided."
+    },
+    "owner_name": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.displayName, or null when no owner relationship was provided."
+    },
+    "type_name": {
+      "type": ["string", "null"],
+      "description": "Stable upstream type.name identifier."
+    },
+    "subtype_name": {
+      "type": ["string", "null"],
+      "description": "Stable upstream subtype.name identifier."
+    },
+    "is_asset": {
+      "type": ["boolean", "null"],
+      "description": "Direct upstream isAsset classification; null when absent or non-boolean. Never inferred from display labels."
+    },
+    "credit_limit": {
+      "type": ["number", "null"],
+      "description": "Upstream limit (user-facing credit limit)."
+    },
+    "provider_credit_limit": {
+      "type": ["number", "null"],
+      "description": "Upstream dataProviderCreditLimit."
+    },
+    "apr": {
+      "type": ["number", "null"],
+      "description": "Upstream apr in upstream numeric units."
+    },
+    "interest_rate": {
+      "type": ["number", "null"],
+      "description": "Upstream interestRate in upstream numeric units."
+    },
+    "minimum_payment": {
+      "type": ["number", "null"],
+      "description": "Upstream minimumPayment."
+    },
+    "planned_payment": {
+      "type": ["number", "null"],
+      "description": "Upstream plannedPayment."
+    },
+    "excluded_from_debt_paydown": {
+      "type": ["boolean", "null"],
+      "description": "Upstream excludeFromDebtPaydown; null when absent or non-boolean."
+    },
+    "last_updated": {
+      "type": ["string", "null"],
+      "description": "Upstream updatedAt timestamp, passed through literally."
+    }
+  }
+}

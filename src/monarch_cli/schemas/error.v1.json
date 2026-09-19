@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:monarch-cli:schema:error:v1",
+  "title": "Monarch CLI structured error (v1)",
+  "description": "Normative contract for the structured error object emitted on stderr for pre-execution validation, authorization, and read failures (MonarchCLIError.to_dict()). It is also the stderr contract for blocked mutations and invalid input. `code` is an open set: new error codes may be added additively, so it is intentionally not a closed enum. `details` is an open object whose keys vary by error code. Additive-only: new optional properties may be added; removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error", "code", "message", "details"],
+  "properties": {
+    "error": {
+      "const": true,
+      "description": "Always true; distinguishes a structured error object from normalized data."
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable machine-readable error classification. Open set; current values include AUTH_REQUIRED, AUTH_EXPIRED, AUTH_FAILED, MUTATION_BLOCKED, MUTATION_AMBIGUOUS, PROMPT_BLOCKED, POLICY_VIOLATION, NOT_FOUND, INVALID_INPUT, API_ERROR, RATE_LIMITED, NETWORK_ERROR, TIMEOUT, UPSTREAM_UNAVAILABLE, and UNKNOWN. New codes may be added without a version change."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable, sanitized error message. Never contains credentials or raw request bodies."
+    },
+    "details": {
+      "type": "object",
+      "description": "Structured, error-code-specific context. Keys vary by code; object-valued in all cases."
+    }
+  }
+}

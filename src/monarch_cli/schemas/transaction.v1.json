@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:monarch-cli:schema:transaction:v1",
+  "title": "Monarch CLI normalized transaction (v1)",
+  "description": "Normative contract for one normalized transaction record in list output (`monarch transactions list`) and other transaction collections. The richer single-transaction detail shape is published as urn:monarch-cli:schema:transaction-detail:v1. Fields are always present; unavailable values are null; is_pending and needs_review are always booleans. Additive-only: new optional properties may be added without a version change, but removing or renaming a property, narrowing nullability, tightening a type, or adding a required property requires a new schema version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "date",
+    "amount",
+    "description",
+    "category",
+    "category_id",
+    "account",
+    "account_id",
+    "is_pending",
+    "needs_review",
+    "review_status",
+    "owner_id",
+    "owner_name",
+    "ownership_overridden_at",
+    "notes"
+  ],
+  "properties": {
+    "id": {
+      "type": ["string", "null"],
+      "description": "Upstream transaction identifier."
+    },
+    "date": {
+      "type": ["string", "null"],
+      "description": "Transaction date, normally YYYY-MM-DD."
+    },
+    "amount": {
+      "type": ["number", "null"],
+      "description": "Transaction amount; negative is an expense, positive is income. Never fabricated as 0."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Deterministic description: merchant.name, then plaidName, else null."
+    },
+    "category": {
+      "type": ["string", "null"],
+      "description": "Category display name."
+    },
+    "category_id": {
+      "type": ["string", "null"],
+      "description": "Category identifier for programmatic use."
+    },
+    "account": {
+      "type": ["string", "null"],
+      "description": "Account display name."
+    },
+    "account_id": {
+      "type": ["string", "null"],
+      "description": "Account identifier for programmatic use."
+    },
+    "is_pending": {
+      "type": "boolean",
+      "description": "True while the upstream transaction is pending. Absent or null upstream values default to false."
+    },
+    "needs_review": {
+      "type": "boolean",
+      "description": "Whether the transaction needs review. Absent or null upstream values default to false."
+    },
+    "review_status": {
+      "type": ["string", "null"],
+      "description": "Opaque upstream review status; null when omitted by the selected endpoint."
+    },
+    "owner_id": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.id, or null when no owner relationship was provided."
+    },
+    "owner_name": {
+      "type": ["string", "null"],
+      "description": "Upstream ownedByUser.name, or null when no owner relationship was provided."
+    },
+    "ownership_overridden_at": {
+      "type": ["string", "null"],
+      "description": "Literal upstream ownershipOverriddenAt timestamp; proves only that an override occurred."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "User-added notes."
+    }
+  }
+}
