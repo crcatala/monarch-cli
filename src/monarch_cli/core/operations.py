@@ -135,6 +135,16 @@ MUTATION_RETRY_CLASSIFICATIONS: dict[str, str] = {
         "asset or a duplicate attachment, so an uncertain stage must be "
         "verified before repeating."
     ),
+    "transactions review mark": (
+        "no_retry: upstream documents no idempotency key or conditional-write "
+        "mechanism for review-state updates; a timed-out request may already "
+        "have changed the review state, so it must be verified before repeating."
+    ),
+    "transactions review return": (
+        "no_retry: upstream documents no idempotency key or conditional-write "
+        "mechanism for review-state updates; a timed-out request may already "
+        "have changed the review state, so it must be verified before repeating."
+    ),
 }
 
 

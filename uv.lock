@@ -965,6 +965,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "gql" },
     { name = "keyring" },
     { name = "monarchmoneycommunity" },
     { name = "platformdirs" },
@@ -986,6 +987,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.3" },
+    { name = "gql", specifier = ">=4.0,<5" },
     { name = "keyring", specifier = ">=24.0.0" },
     { name = "monarchmoneycommunity", specifier = ">=1.5.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },

@@ -58,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--dry-run` is fully offline and reports only target ID, sanitized basename, size, and inferred type; the local path and file contents never appear in output or diagnostics
 - The workflow consumes only the reviewed `mc-sr92` upload adapter, makes one attempt per media/registration stage, verifies registration by returned identity through transaction detail, and reports orphaned-asset partial completion honestly with no rollback claim
 
+#### Explicit transaction review-state mutations
+- Added intent-oriented `transactions review mark` (`reviewed=True`, omits `needsReview`) and `transactions review return` (`needsReview=True`, omits `reviewed`); both require `--transaction-id` and never accept positional arguments (mc-e49c)
+- `reviewed=False`, `needsReview=False`, and contradictory review-state combinations are not accepted by this surface
+- The serialized mutation input contains only the transaction ID and the one intended review-state field; a narrow local GraphQL adapter (resolution option 3, documented maintenance ownership) avoids the released upstream helper's unrelated `category: null` / `name: null` inputs
+- A pre-read (no pending redirect) verifies exact identity and returns a deterministic no-op when the requested state is already observed; a post-read confirms the intended review state and that category and merchant identity were unchanged
+- Successful output reports observed `needs_review`, `reviewed_at`, and `reviewed_by_user` and never invents a `reviewed` boolean; uncertain writes use the retry-safe mutation executor and report ambiguity (exit 4) with a tokenized `monarch transactions get TXN_ID` verification command
+
 #### Account history and refresh visibility
 - Added `accounts history`, `recent-balances`, `snapshots`, and `snapshots-by-type` for normalized balance and net-worth history
 - Added read-only `accounts refresh-status`, including explicit unknown-account results rather than treating them as complete

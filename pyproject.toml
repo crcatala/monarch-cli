@@ -35,6 +35,10 @@ dependencies = [
     # pulled in transitively by monarchmoneycommunity. Floor matches the
     # verified resolution (monarchmoneycommunity 1.5.2 requires aiohttp>=3.14.3).
     "aiohttp>=3.14.3",
+    # Imported directly by monarch_cli.core.review_mutation to build the narrow
+    # review-mutation document; not relied on transitively through
+    # monarchmoneycommunity. Bounded major because the gql document API is used.
+    "gql>=4.0,<5",
     "keyring>=24.0.0",
     "rich>=13.0.0",
     "platformdirs>=4.0.0",

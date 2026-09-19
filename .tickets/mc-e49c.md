@@ -1,6 +1,6 @@
 ---
 id: mc-e49c
-status: open
+status: in_progress
 deps: [mc-k48z, mc-ik8o, mc-hszv]
 links: []
 created: 2026-09-11T01:36:40Z
@@ -54,3 +54,9 @@ Use centralized mutation authorization, retry-safe remote execution, and `mutati
 - [ ] Unit/CLI tests cover authorization, both exact mappings, pre/post reads, no-op behavior, invalid input, output modes, no automatic retries, and all negative paths.
 - [ ] Any controlled live semantic probe is separately opt-in, uses explicit mutation authorization and a restorable test record, and is not part of the default suite.
 - [ ] User-facing workflow/recovery documentation is complete and repository verification passes.
+
+## Notes
+
+**2026-09-19T16:21:32Z**
+
+Payload-shape resolution (option 3): No released monarchmoneycommunity version newer than 1.5.2 exists, and 1.5.2's update_transaction unconditionally serializes category: null and name: null, so ordered option 1 (upstream fix) is unavailable and option 2 cannot satisfy the acceptance criterion that the serialized input contain only transaction identity plus the one intended review-state field. Implemented the last-resort narrow local GraphQL adapter in src/monarch_cli/core/review_mutation.py, which calls the public MonarchMoney.gql_call transport with an explicit minimal document and only {id, reviewed} or {id, needsReview} input variables. Query-shape compatibility tests live in tests/core/test_review_mutation.py; monarch-cli maintainers own the adapter and must update those tests deliberately for any document/variable change. No monkeypatch or interception of gql_call is used.

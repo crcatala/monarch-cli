@@ -24,6 +24,8 @@ execution is attempted**:
 - `transactions splits replace`
 - `transactions splits clear`
 - `transactions attachments add`
+- `transactions review mark`
+- `transactions review return`
 
 Pre-execution authorization and input-validation failures do **not** use this
 envelope. Blocked mutations (missing `--allow-mutations`) and input-validation
@@ -55,8 +57,9 @@ a preview carries `status: "dry_run"` and is explicitly distinct from
 ## Dry-run previews
 
 `transactions update`, `transactions batch-update`, `transactions tags
-replace`/`add`/`clear`, `transactions splits replace`/`clear`, and
-`transactions attachments add` accept `--dry-run`. A preview may authenticate
+replace`/`add`/`clear`, `transactions splits replace`/`clear`,
+`transactions attachments add`, and `transactions review mark`/`return` accept
+`--dry-run`. A preview may authenticate
 and perform read-only validation/discovery (including reading the current
 assignment or a split parent amount) but **never calls a mutation endpoint,
 never requires `--allow-mutations`, and never prompts for confirmation**.
@@ -123,8 +126,9 @@ Per-item statuses are `succeeded`, `failed`, or `ambiguous`.
   `transactions.update`, `transactions.batch-update`,
   `transactions.tags.create`, `transactions.tags.replace`,
   `transactions.tags.add`, `transactions.tags.clear`,
-  `transactions.splits.replace`, `transactions.splits.clear`, and
-  `transactions.attachments.add`) supplied by
+  `transactions.splits.replace`, `transactions.splits.clear`,
+  `transactions.attachments.add`, `transactions.review.mark`, and
+  `transactions.review.return`) supplied by
   the shared operation descriptor registry — never inferred from an upstream
   method or GraphQL operation name.
 - Atomic single-effect operations use an `items` array containing exactly one
