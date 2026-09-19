@@ -492,6 +492,51 @@ def test_repeated_explicit_uploads_upload_each_time(tmp_path: Path) -> None:
     assert adapter.upload_media.await_count == 2
 
 
+def test_output_modes_incompatible_with_mutations_are_rejected(tmp_path: Path) -> None:
+    from monarch_cli.output import (
+        OutputFormat,
+        set_default_format,
+        set_quiet,
+    )
+
+    path = _pdf(tmp_path)
+    try:
+        set_quiet(True)
+        quiet = _invoke(
+            _client(), _adapter(), ["add", "--transaction-id", "txn-1", "--file", str(path)]
+        )
+        assert quiet.exit_code == 2
+        assert json.loads(quiet.stderr)["code"] == "INVALID_INPUT"
+
+        set_quiet(False)
+        set_default_format(OutputFormat.PLAIN)
+        plain = _invoke(
+            _client(), _adapter(), ["add", "--transaction-id", "txn-1", "--file", str(path)]
+        )
+        assert plain.exit_code == 2
+        assert json.loads(plain.stderr)["code"] == "INVALID_INPUT"
+    finally:
+        set_quiet(False)
+        set_default_format(None)
+
+
+def test_media_item_reports_public_upload_identity(tmp_path: Path) -> None:
+    client = _client([_detail(), _detail([{"id": "att-1"}])])
+    media = MediaUploadResult(public_id="pub-abc", extension="pdf", size_bytes=10)
+    registration = AttachmentRegistration(attachment={"id": "att-1"}, errors=())
+    adapter = _adapter(media=media, registration=registration)
+    result = _invoke(
+        client, adapter, ["add", "--transaction-id", "txn-1", "--file", str(_pdf(tmp_path))]
+    )
+    assert result.exit_code == 0
+    payload = _outcome(result)
+    assert payload["items"][0]["id"] == "pub-abc"
+    # server omitted extension/sizeBytes: fall back to the media result
+    attachment = payload["items"][1]["result"]
+    assert attachment["extension"] == "pdf"
+    assert attachment["size_bytes"] == 10
+
+
 def test_adapter_boundary_is_the_reviewed_public_class() -> None:
     """The command consumes the reviewed adapter, never the raw client method."""
     source = Path(module.__file__).read_text()
