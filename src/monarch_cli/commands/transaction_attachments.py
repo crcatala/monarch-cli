@@ -124,11 +124,10 @@ _REGISTRATION_VERIFICATION_MESSAGE = (
 class _FileMetadata:
     """Validated local file metadata and its sanitized remote name.
 
-    ``path`` is the local path and is deliberately never emitted, logged, or
-    sent to the remote service.
+    Deliberately excludes the local filesystem path so it can never be emitted,
+    logged, or sent to the remote service.
     """
 
-    path: str
     filename: str
     content_type: str
     extension: str
@@ -217,7 +216,6 @@ def _inspect_metadata(file_path: str, filename_override: str | None) -> _FileMet
         raise ValidationError("Attachment path is not a regular file.", field="file")
     _check_size(info.st_size)
     return _FileMetadata(
-        path=file_path,
         filename=filename,
         content_type=content_type,
         extension=extension,
@@ -262,7 +260,6 @@ def _open_and_read(file_path: str, filename_override: str | None) -> tuple[_File
         )
     return (
         _FileMetadata(
-            path=file_path,
             filename=filename,
             content_type=content_type,
             extension=extension,
@@ -291,12 +288,12 @@ def _read_all(descriptor: int) -> bytes:
     return b"".join(chunks)
 
 
-def _require_exact_target(client: Any, transaction_id: str) -> None:
-    """Verify the exact transaction exists before any upload.
+def _read_transaction_detail(client: Any, transaction_id: str) -> Any:
+    """Read one transaction detail without a pending-ID redirect.
 
-    The read does not redirect a pending identifier, and a returned identity
-    that differs from the requested one is a definitive refusal rather than a
-    silent change of target.
+    Returns the raw ``getTransaction`` container (which may be ``None`` for a
+    missing transaction or a non-object for a malformed detail). A malformed
+    outer payload and any read failure raise on the structured error path.
     """
     payload = run_read_call(
         lambda: client.get_transaction_details(
@@ -309,7 +306,17 @@ def _require_exact_target(client: Any, transaction_id: str) -> None:
             message="The transaction detail response was not in the expected shape.",
             details={"stage": "verify_target"},
         )
-    detail = payload.get("getTransaction")
+    return payload.get("getTransaction")
+
+
+def _require_exact_target(client: Any, transaction_id: str) -> None:
+    """Verify the exact transaction exists before any upload.
+
+    The read does not redirect a pending identifier, and a returned identity
+    that differs from the requested one is a definitive refusal rather than a
+    silent change of target.
+    """
+    detail = _read_transaction_detail(client, transaction_id)
     if detail is None:
         raise NotFoundError(
             message="Transaction not found.",
@@ -355,17 +362,9 @@ def _confirm_registration(
     success.
     """
     try:
-        payload = run_read_call(
-            lambda: client.get_transaction_details(
-                transaction_id=transaction_id, redirect_posted=False
-            ),
-            Operation(command="transactions attachments add verify", effects=_READ_EFFECTS),
-        )
+        detail = _read_transaction_detail(client, transaction_id)
     except Exception:  # noqa: BLE001 - unverified registration is ambiguous
         return False
-    if not isinstance(payload, dict):
-        return False
-    detail = payload.get("getTransaction")
     if not isinstance(detail, dict):
         return False
     attachments = detail.get("attachments")
