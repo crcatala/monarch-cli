@@ -2,7 +2,7 @@
 id: mc-61tf
 status: in_progress
 deps: []
-links: []
+links: [mc-ks6s]
 created: 2026-09-19T17:51:42Z
 type: task
 priority: 3
@@ -55,3 +55,7 @@ Chose Option A, detail-only. `transform_transaction_detail` now emits `reviewed_
 review_status retained (removal would be breaking) and documented in the schema/docs as a placeholder the public detail endpoint has not been observed to populate; needs_review remains the queue-state field.
 
 Tests: normalization, malformed reviewedByUser tolerance (null/string/list/empty-object), the detail-only boundary (list output must not grow fields), plus schema conformance and exact key-set equality against a detail fixture. Verified: ruff format/lint clean, mypy clean, `uv run pytest -m "not live"` -> 1448 passed, 21 deselected. No schema version bump.
+
+**2026-09-19T19:11:04Z**
+
+Review follow-ups after PR #90: (1) corrected the review_status documentation to state the real cause — the released detail query does not select reviewStatus (the list query does), rather than "endpoint omits it"; (2) added a schema-contracts.md note that additive optional properties do not bump the version, so consumers must refresh vendored transaction-detail:v1 copies. Filed mc-ks6s (P3) for the remaining items: unify and type review-attribution normalization across read/write paths (duplication and untyped passthrough).

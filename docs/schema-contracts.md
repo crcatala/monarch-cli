@@ -136,6 +136,15 @@ changes require a new schema version.**
   so a version bump is the reliable signal that a consumer must re-read the
   schema and adjust.
 
+Because additive optional properties intentionally **do not** bump the version,
+a version bump alone is not sufficient notice. Resolving a pinned URN (or
+contract name + version) through `monarch_cli.schemas` always returns the
+**current** artifact, which already includes newly added optional properties.
+Consumers who vendor or copy the JSON into their own repository must refresh
+that copy: normalized records use `additionalProperties: false`, so an older
+vendored artifact rejects fields added after it was copied even when the change
+was additive.
+
 ## Relationship to runtime contracts
 
 The runtime behavior is documented in

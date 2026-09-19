@@ -517,12 +517,13 @@ monarch transactions get TXN_ID --strict --json
 The normalized detail exposes review attribution directly: `reviewed_at` is the
 literal upstream `reviewedAt` timestamp and `reviewed_by_user` is the normalized
 `reviewedByUser` relationship (`{id, name}`), each `null` when unavailable. These
-fields are detail-only; `transactions list` records do not carry them because the
-list endpoint's population of review attribution is not established. The
-separate `review_status` field is an opaque upstream value that the public detail
-endpoint has not been observed to populate and should be treated as a
-placeholder; use `reviewed_at`/`reviewed_by_user` for review attribution and
-`needs_review` for queue state.
+fields are detail-only: the upstream detail query selects
+`reviewedAt`/`reviewedByUser` while the list query does not, so `transactions
+list` records cannot carry them. The separate `review_status` field is an opaque
+upstream value that the detail query does not request (the list query does), so
+it is always `null` in normalized detail and should be treated as a placeholder;
+use `reviewed_at`/`reviewed_by_user` for review attribution and `needs_review`
+for queue state.
 
 ### `transactions summary`
 

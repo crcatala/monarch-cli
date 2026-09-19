@@ -112,9 +112,11 @@ Transaction detail additionally exposes requested/returned identity, redirect
 state, original transaction information, recurring/report visibility flags,
 manual state, attachments, tags, split information, and review attribution
 (`reviewed_at` and `reviewed_by_user`, detail-only optional additive fields
-always emitted by the CLI). The opaque `review_status` field is retained but has
-not been observed populated by the public detail endpoint; it is a placeholder,
-and `reviewed_at`/`reviewed_by_user` are the review-attribution fields.
+always emitted by the CLI). The opaque `review_status` field is retained but is
+not requested by the detail read (the released detail query selects
+`reviewedAt`/`reviewedByUser` instead), so it is always `null` in normalized
+detail; treat it as a placeholder. `reviewed_at`/`reviewed_by_user` are the
+review-attribution fields.
 
 `transactions summary` is an all-time aggregate with:
 

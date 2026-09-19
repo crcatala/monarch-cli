@@ -15,8 +15,9 @@ Normalization rules (v1 contract):
   field. Absent or ``null`` values default to ``False``.
 - ``needs_review`` and opaque ``review_status`` are exposed independently when
   supplied by the selected upstream endpoint. ``review_status`` is nullable;
-  detail responses from the released public client may omit it, and it has not
-  been observed populated by the public detail endpoint (placeholder).
+  the released detail query does not select it (it selects
+  ``reviewedAt``/``reviewedByUser`` instead), so it is always ``null`` in detail
+  output and is a documented placeholder. The list query does select it.
 - Transaction detail additionally exposes ``reviewed_at`` (literal upstream
   ``reviewedAt``) and ``reviewed_by_user`` (normalized ``reviewedByUser``
   ``{id, name}``, or ``null``). These are the fields that actually carry review
@@ -221,8 +222,9 @@ def transform_transaction_detail(raw: Any, requested_id: str | None = None) -> d
         Normalized transaction detail dict with stable field names. Pending
         state (``is_pending``, from the upstream ``pending`` field), review
         state (``needs_review``), and the opaque upstream ``review_status``
-        are exposed as distinct concepts. ``review_status`` remains ``None``
-        when the public detail response omits it. Review attribution is
+        are exposed as distinct concepts. ``review_status`` is not selected by
+        the released detail query and is therefore ``None`` in CLI detail
+        output (a supplied value is still passed through). Review attribution is
         carried by ``reviewed_at`` (literal upstream ``reviewedAt``) and
         ``reviewed_by_user`` (normalized ``reviewedByUser`` ``{id, name}`` or
         ``null``); both are detail-only and never fabricated.

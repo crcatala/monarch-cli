@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded `transactions list` with repeatable account/category/tag filters, tri-state status filters, visibility controls, and bounded pagination
 - Added read-only `transactions get TXN_ID` with normalized detail; pending IDs redirect by default, while `--strict` disables that redirect
 - Normalized transaction detail now exposes review attribution `reviewed_at` (literal upstream `reviewedAt`) and `reviewed_by_user` (normalized `reviewedByUser` `{id, name}`, or `null`), matching the review commands' output shape (mc-61tf); both are optional additive properties on `transaction-detail:v1` (no version bump) and detail-only
-- Documented the opaque `review_status` field as a placeholder the public detail endpoint has not been observed to populate; `reviewed_at`/`reviewed_by_user` are the review-attribution fields
+- Documented that the opaque `review_status` field is not selected by the released detail read and is therefore always `null` in normalized detail (a placeholder); `reviewed_at`/`reviewed_by_user` carry review attribution, while the list read is the surface that requests `reviewStatus`
 
 #### Transaction tag workflows
 - Added read-only tag discovery and assignment inspection through `transactions tags list` and `transactions tags show`

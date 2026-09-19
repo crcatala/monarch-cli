@@ -89,7 +89,7 @@
     },
     "review_status": {
       "type": ["string", "null"],
-      "description": "Opaque upstream review status; null when omitted by the selected endpoint. The public detail endpoint has not been observed to populate it, so treat it as a placeholder; use reviewed_at/reviewed_by_user for review attribution."
+      "description": "Opaque upstream review status. The released detail query does not select this field (it selects reviewedAt/reviewedByUser instead), so it is always null in normalized detail and must be treated as a placeholder; use reviewed_at/reviewed_by_user for review attribution. The list query does select reviewStatus, so transaction:v1 list records may carry a value."
     },
     "reviewed_at": {
       "type": ["string", "null"],
