@@ -49,13 +49,26 @@ chmod 600 ~/.pypirc
 
 ### Step 2: Verify & Build
 
-Run the prepublish target to verify everything and build the package:
+Before building, remove any artifacts left over from a previous release:
+
+```bash
+rm -f dist/*.whl dist/*.tar.gz
+```
+
+Then run the prepublish target to verify everything and build the package:
 
 ```bash
 make prepublish
 ```
 
 This runs all quality checks (format, lint, typecheck, test), builds the package, validates metadata with twine, and confirms the README renders correctly.
+
+> **Important:** `make prepublish` (via `make smoke-install` / `uv build`) *adds* the
+> newly built wheel and sdist to `dist/` but **never deletes old files**. If `dist/`
+> still contains artifacts from a previous version, they will be picked up by the
+> `dist/*` glob during `twine upload` and rejected by both TestPyPI and PyPI with a
+> confusing `400 Bad Request` (`File already exists`), because published versions are
+> immutable. Always clear `dist/` before building a new release.
 
 ### Step 3: Test on TestPyPI
 
@@ -114,6 +127,7 @@ Verify at: `https://pypi.org/project/monarch-cli/`
 
 | Action | Command |
 |--------|---------|
+| Remove stale `dist/` artifacts | `rm -f dist/*.whl dist/*.tar.gz` |
 | Verify + build + validate | `make prepublish` |
 | Upload to TestPyPI | `uv run twine upload --repository testpypi dist/*` |
 | Upload to PyPI | `uv run twine upload dist/*` |
@@ -122,9 +136,31 @@ Verify at: `https://pypi.org/project/monarch-cli/`
 
 ## Troubleshooting
 
-### "File already exists" error
+### "File already exists" error / `400 Bad Request`
 
-PyPI doesn't allow re-uploading the same version. You must bump the version number for any new upload.
+PyPI doesn't allow re-uploading the same version, and this applies to **both TestPyPI and PyPI**. You must bump the version number for any new upload.
+
+The most common cause is a **stale `dist/` directory**. `uv build` (used by `make smoke-install` and `make prepublish`) adds the new artifacts but never removes old ones, so `dist/*` can contain a mix of versions. Twine's error is misleadingly terse by default:
+
+```
+ERROR    HTTPError: 400 Bad Request from https://test.pypi.org/legacy/
+         Bad Request
+```
+
+Re-run with `--verbose` **after** `upload` to see the real reason:
+
+```bash
+uv run twine upload --verbose --repository testpypi dist/*
+# 400 File already exists ('monarch_cli-0.1.0-py3-none-any.whl', ...)
+```
+
+Fix it by clearing `dist/` and rebuilding the current version:
+
+```bash
+rm -f dist/*.whl dist/*.tar.gz
+make smoke-install   # or: make prepublish
+ls dist/             # confirm only the intended version is present
+```
 
 ### Token not working
 
