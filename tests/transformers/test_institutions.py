@@ -16,6 +16,7 @@ RAW_INSTITUTIONS = {
             "institution": {
                 "id": "inst-1",
                 "name": "Example Bank",
+                "status": "DEGRADED",
                 "hasIssuesReported": True,
                 "hasIssuesReportedMessage": "Reconnect required",
                 "balanceStatus": "OK",
@@ -52,6 +53,7 @@ def test_groups_active_accounts_by_credential_and_omits_deleted() -> None:
     assert result[0]["provider"] == "PLAID"
     assert result[0]["institution_id"] == "inst-1"
     assert result[0]["institution_name"] == "Example Bank"
+    assert result[0]["institution_status"] == "DEGRADED"
     assert result[0]["disconnected"] is None
     assert result[0]["issue"] == {"reported": True, "message": "Reconnect required"}
     assert result[0]["accounts"] == [
@@ -90,6 +92,7 @@ def test_null_and_partial_containers_are_safe() -> None:
             "provider": None,
             "institution_id": None,
             "institution_name": None,
+            "institution_status": None,
             "update_required": None,
             "disconnected": None,
             "disconnected_at": None,

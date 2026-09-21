@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Normalized institution status
+- `institutions list` now exposes the upstream overall institution status as `institution_status`, alongside credential, issue, balance, and transaction status fields.
+
 ## [0.2.0] - 2026-09-19
 
 ### Changed

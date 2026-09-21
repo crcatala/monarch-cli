@@ -159,9 +159,13 @@ Institution records contain credential and connection fields:
 
 ```text
 credential_id, provider, institution_id, institution_name,
-update_required, disconnected, disconnected_at, last_updated,
-issue, balance_status, transaction_status, accounts
+institution_status, update_required, disconnected, disconnected_at,
+last_updated, issue, balance_status, transaction_status, accounts
 ```
+
+`institution_status` mirrors the upstream institution-level `status` value and
+remains `null` when unavailable; it does not represent per-account connection
+state.
 
 Associated accounts contain `id`, `name`, `subtype`, `mask`, `is_deleted`, and
 `deleted_at`.
