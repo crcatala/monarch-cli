@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-21
+
 ### Added
 
 #### Normalized institution status
@@ -265,6 +267,7 @@ Initial release of Monarch CLI - a command-line interface for Monarch Money.
 - No credentials stored after authentication
 - Token refresh handled automatically
 
-[Unreleased]: https://github.com/crcatala/monarch-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/crcatala/monarch-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/crcatala/monarch-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/crcatala/monarch-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/crcatala/monarch-cli/releases/tag/v0.1.0

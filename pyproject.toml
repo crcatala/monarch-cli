@@ -1,6 +1,6 @@
 [project]
 name = "monarch-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "CLI wrapper around monarchmoneycommunity for AI agent integration with Monarch Money"
 readme = "README.md"
 license = { text = "MIT" }
