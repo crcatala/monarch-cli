@@ -20,6 +20,7 @@ INSTITUTION_RECORD_FIELDS: tuple[str, ...] = (
     "provider",
     "institution_id",
     "institution_name",
+    "institution_status",
     "update_required",
     "disconnected",
     "disconnected_at",
@@ -54,6 +55,13 @@ def _mapping(value: Any) -> Mapping[str, Any] | None:
 def _optional_bool(value: Any) -> bool | None:
     """Accept only real upstream booleans; preserve unavailable as ``null``."""
     if isinstance(value, bool):
+        return value
+    return None
+
+
+def _optional_string(value: Any) -> str | None:
+    """Accept only real upstream strings; preserve unavailable as ``null``."""
+    if isinstance(value, str):
         return value
     return None
 
@@ -120,6 +128,7 @@ def transform_institutions(raw: Any, *, include_deleted: bool = False) -> list[d
                 "provider": credential.get("dataProvider"),
                 "institution_id": nested_get(institution, "id"),
                 "institution_name": nested_get(institution, "name"),
+                "institution_status": _optional_string(nested_get(institution, "status")),
                 "update_required": _optional_bool(credential.get("updateRequired")),
                 # A missing/null timestamp is unknown, not a healthy False.
                 "disconnected": None if disconnected_at is None else True,

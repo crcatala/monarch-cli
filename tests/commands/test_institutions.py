@@ -19,6 +19,7 @@ def test_institutions_json_excludes_deleted_by_default() -> None:
             "provider": "PLAID",
             "institution_id": "inst-1",
             "institution_name": "Bank",
+            "institution_status": "HEALTHY",
             "update_required": None,
             "disconnected": None,
             "disconnected_at": None,
