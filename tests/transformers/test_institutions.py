@@ -3,7 +3,11 @@
 import pytest
 
 from monarch_cli.core.exceptions import APIError
-from monarch_cli.transformers.institutions import transform_institutions, transform_subscription
+from monarch_cli.transformers.institutions import (
+    INSTITUTION_RECORD_FIELDS,
+    transform_institutions,
+    transform_subscription,
+)
 
 RAW_INSTITUTIONS = {
     "credentials": [
@@ -49,6 +53,7 @@ RAW_INSTITUTIONS = {
 def test_groups_active_accounts_by_credential_and_omits_deleted() -> None:
     result = transform_institutions(RAW_INSTITUTIONS)
 
+    assert tuple(result[0]) == INSTITUTION_RECORD_FIELDS
     assert result[0]["credential_id"] == "cred-1"
     assert result[0]["provider"] == "PLAID"
     assert result[0]["institution_id"] == "inst-1"
@@ -79,6 +84,27 @@ def test_include_deleted_preserves_deletion_state() -> None:
     assert len(accounts) == 2
     assert accounts[1]["is_deleted"] is True
     assert accounts[1]["deleted_at"] == "2026-01-01T00:00:00Z"
+
+
+def test_institution_status_normalizes_string_and_unavailable_values() -> None:
+    raw = {
+        "credentials": [
+            {"id": "healthy", "institution": {"status": "HEALTHY"}},
+            {"id": "null", "institution": {"status": None}},
+            {"id": "missing", "institution": {}},
+            {"id": "drifted", "institution": {"status": {"code": "DEGRADED"}}},
+        ],
+        "accounts": [],
+    }
+
+    result = transform_institutions(raw)
+
+    assert [record["institution_status"] for record in result] == [
+        "HEALTHY",
+        None,
+        None,
+        None,
+    ]
 
 
 def test_null_and_partial_containers_are_safe() -> None:
