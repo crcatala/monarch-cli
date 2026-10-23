@@ -1,4 +1,4 @@
-# Monarch CLI
+<h1><img src="assets/icon.png" width="40" height="40" align="top" alt="" /> Monarch CLI</h1>
 
 [![PyPI version](https://badge.fury.io/py/monarch-cli.svg)](https://badge.fury.io/py/monarch-cli)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
