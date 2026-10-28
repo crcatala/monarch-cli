@@ -5,7 +5,7 @@ from ``monarch_cli.__version__`` while the built wheel and sdist take their
 version from ``pyproject.toml`` (and ``uv.lock`` mirrors it). If these disagree,
 a release would tag one version while publishing another.
 
-Keep them in sync when bumping (see ``docs/RELEASING.md``, Step 1).
+Keep them in sync when bumping (see ``RELEASING.md`` and ``make bump``).
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def test_pyproject_version_matches_package_version() -> None:
         "pyproject.toml [project].version "
         f"({pyproject_version!r}) must match monarch_cli.__version__ "
         f"({__version__!r}); the git tag comes from __init__.py but the built "
-        "wheel/sdist version comes from pyproject.toml. See docs/RELEASING.md "
+        "wheel/sdist version comes from pyproject.toml. See RELEASING.md "
         "Step 1."
     )
 
@@ -50,5 +50,5 @@ def test_uv_lock_version_matches_package_version() -> None:
     assert lock_version == __version__, (
         "uv.lock monarch-cli version "
         f"({lock_version!r}) must match monarch_cli.__version__ ({__version__!r}); "
-        "run 'uv lock' after bumping pyproject.toml (see docs/RELEASING.md Step 1)."
+        "run 'uv lock' after bumping pyproject.toml (RELEASING.md)."
     )

@@ -1,308 +1,178 @@
 # Releasing
 
-This is the single source of truth for releasing monarch-cli. Follow the steps
-in order. Every command below is safe to run from the repository root.
+Releases are cut by hand from a clean `main`. `make release` creates the tag
+and the GitHub Release; the PyPI upload is a separate, last step from the
+tagged commit, so a failed upload never leaves a half-made tag.
 
-The release has two independent destinations:
+TestPyPI is a rehearsal for the PyPI upload. Publishing versions are immutable
+on both indexes.
 
-- **GitHub Releases** — tag + changelog + wheel/sdist assets (created by `make release`).
-- **PyPI** — the published package (uploaded manually; `make release` never publishes to PyPI).
-
-TestPyPI is a dry run for the PyPI upload. **Always test on TestPyPI first.**
-
-## TL;DR (happy path)
-
-```bash
-# 1. Bump the version in three places + CHANGELOG (see Step 1)
-# 2. Verify, build, and validate — wipes and rebuilds dist/
-make prepublish
-
-# 3. Upload to TestPyPI and verify a clean install
-uv run twine upload --repository testpypi dist/*
-
-# 4. Create the git tag + GitHub release (does NOT touch PyPI)
-make release-dry   # preview
-make release       # for real
-
-# 5. Publish to PyPI
-uv run twine upload dist/*
-```
-
-If any step fails, jump to [Failure recovery](#failure-recovery). Every guard
-prints an exact cause and the next action.
+`scripts/prep-release.sh`, `scripts/check-changelog.sh`, and
+`scripts/build_info.py` are canonical release-standard files; do not edit them
+in place. Project specifics live in `scripts/release.sh`,
+`scripts/smoke_install.sh`, `scripts/bump.sh`, and this file.
 
 ## Prerequisites
 
-### 1. Create PyPI accounts
+- Push access to `main`; `gh auth status` succeeds.
+- PyPI and TestPyPI API tokens. `twine` reads `~/.pypirc`:
 
-You need accounts on both TestPyPI (for testing) and PyPI (for production):
+  ```ini
+  [testpypi]
+    username = __token__
+    password = pypi-YOUR_TEST_PYPI_TOKEN
 
-- **TestPyPI:** https://test.pypi.org/account/register/
-- **PyPI:** https://pypi.org/account/register/
+  [pypi]
+    username = __token__
+    password = pypi-YOUR_PYPI_TOKEN
+  ```
 
-### 2. Create API tokens
+  `chmod 600 ~/.pypirc`. Tokens are secrets: never paste the file into a
+  shell, issue tracker, or chat; rotate a token immediately if it is exposed.
 
-- **TestPyPI:** https://test.pypi.org/manage/account/token/
-- **PyPI:** https://pypi.org/manage/account/token/
+## Before releasing
 
-Select "Entire account" scope for first-time uploads. After publishing, you can
-create project-scoped tokens for tighter security.
+1. `git checkout main && git pull --ff-only`
+2. `bash scripts/prep-release.sh`. Paste the output into an LLM, review the
+   result, and put the user-facing entries under `## [Unreleased]` in
+   `CHANGELOG.md` (Keep a Changelog groups: Added, Changed, Fixed, Removed,
+   Security). Commit the changelog to `main`.
 
-### 3. Configure `~/.pypirc`
-
-```ini
-[testpypi]
-  username = __token__
-  password = pypi-YOUR_TEST_PYPI_TOKEN
-
-[pypi]
-  username = __token__
-  password = pypi-YOUR_PYPI_TOKEN
-```
-
-Secure the file and sanity-check it:
+## Release
 
 ```bash
-chmod 600 ~/.pypirc
-uv run twine upload --repository testpypi --help >/dev/null && echo "twine available"
+make bump VERSION=X.Y.Z   # version metadata + changelog section,
+                          # commit "chore: release vX.Y.Z"
+git push                  # the release commit must be on origin/main before tagging
+make prepublish           # verify, stamp, build, isolated install, --version check
+make release-dry          # preview the tag and GitHub Release
+make release              # tag vX.Y.Z (annotated "Release X.Y.Z"), push,
+                          # GitHub Release with the changelog and dist/ attached
+uv run twine upload --repository testpypi dist/*   # optional rehearsal
+uv run twine upload dist/*                         # last: publish the tagged build
 ```
 
-> Tokens are secrets. Never paste `~/.pypirc` contents into a shell, issue
-> tracker, or chat. Rotate a token immediately if it is exposed.
+### `make bump VERSION=X.Y.Z`
 
-## Release workflow
-
-### Step 1: Update version and changelog
-
-The version lives in three files and they **must all agree**. `make prepublish`
-and `scripts/release.sh` both verify this and fail with a clear message if they
-drift.
+Writes the version in every place it is declared and commits the release:
 
 | File | Field | Why it matters |
 |------|-------|----------------|
-| `src/monarch_cli/__init__.py` | `__version__` | Source of the git tag (`v<version>`) and `monarch --version` |
+| `src/monarch_cli/__init__.py` | `__version__` | Source of the git tag (`v<version>`) |
 | `pyproject.toml` | `[project].version` | Version embedded in the built wheel/sdist |
-| `uv.lock` | `monarch-cli` package version | Keeps the locked editable install consistent |
+| `uv.lock` | `monarch-cli` package version | Keeps the locked install consistent (`uv lock`) |
+| `CHANGELOG.md` | Unreleased → `## [X.Y.Z] - YYYY-MM-DD` | GitHub Release notes |
 
-Update all three, then refresh the lock:
-
-```bash
-# 1. edit src/monarch_cli/__init__.py        -> __version__ = "X.Y.Z"
-# 2. edit pyproject.toml                     -> version = "X.Y.Z"
-uv lock                                      # syncs uv.lock
-```
-
-Update `CHANGELOG.md`:
-
-1. Move the `## [Unreleased]` content under a new header
-   `## [X.Y.Z] - YYYY-MM-DD`.
-2. Add a fresh empty `## [Unreleased]` section at the top.
-3. Update the comparison links at the bottom:
-
-   ```markdown
-   [Unreleased]: https://github.com/crcatala/monarch-cli/compare/vX.Y.Z...HEAD
-   [X.Y.Z]: https://github.com/crcatala/monarch-cli/compare/vPREV...vX.Y.Z
-   ```
+It refuses a dirty tree, a branch other than `main`, an existing tag, or an
+empty Unreleased section (`bash scripts/check-changelog.sh`). `make prepublish`
+and `scripts/release.sh` re-check that the source and `pyproject.toml`
+versions agree.
 
 No capabilities-fixture regeneration is needed for a version bump: the
 canonical capabilities fixture (`tests/fixtures/capabilities.manifest.json`)
-stores a fixed placeholder CLI version and is decoupled from `__version__`. Only
-after an *intentional* capabilities manifest change (a new command, option,
-effect, or schema reference) run `make update-capabilities-fixture` and review
-the diff. See `docs/capabilities.md`.
+stores a fixed placeholder CLI version and is decoupled from `__version__`.
+Only after an *intentional* capabilities manifest change (a new command,
+option, effect, or schema reference) run `make update-capabilities-fixture` and
+review the diff. See `docs/capabilities.md`.
 
-Commit everything before continuing — the release script refuses to run with a
-dirty working tree.
+### `make prepublish`
 
-### Step 2: Verify, build, and validate
-
-```bash
-make prepublish
-```
-
-This is the one command that proves the release is publishable. It runs, in order:
+The one command that proves the release is publishable. It runs, in order:
 
 1. `format-check`, `lint`, `typecheck`, `test` (`verify`) — includes the
    version-parity and capabilities-fixture contract tests.
-2. `smoke-install` — **wipes `dist/`**, rebuilds the wheel and sdist with
-   `uv build`, installs the wheel into a throwaway environment outside the
-   source tree, and runs both `monarch` and `monarch-cli` entry points.
+2. `smoke-install` — stamps `src/monarch_cli/_build_info.json` from `HEAD`,
+   **wipes `dist/`**, rebuilds the wheel and sdist with `uv build`, checks that
+   both artifacts ship the stamp, installs the wheel into a throwaway
+   environment outside the source tree, and checks that `monarch` and
+   `monarch-cli` print exactly
+   `monarch X.Y.Z (sha7 YYYY-MM-DD)` (with `-dirty` only when the stamp's tree
+   was dirty).
 3. `twine check dist/*` — validates distribution metadata.
 4. `readme_renderer` — confirms the README renders on PyPI.
 
-Success ends with all tests passing, followed by `smoke-install OK`,
-`✓ Package metadata valid`, and `✓ README renders correctly`.
-
 > **`dist/` is not a cache.** `make prepublish`, `make smoke-install`, and
 > `make release` each wipe and rebuild `dist/`, so the artifacts always match
-> the current metadata. Do **not** run a bare `uv build` and then upload — it
+> the current commit. Do **not** run a bare `uv build` and then upload — it
 > *adds* files without removing old ones, leaving a mixed-version `dist/` that
-> PyPI rejects. Let the smoke-install target manage `dist/`.
+> PyPI rejects.
 
-### Step 3: Test on TestPyPI
+### `make release-dry` and `make release`
 
-Upload the freshly built artifacts:
-
-```bash
-uv run twine upload --repository testpypi dist/*
-```
-
-Then verify a clean install in a throwaway virtualenv (the
-`--extra-index-url` is required because TestPyPI does not host the runtime
-dependencies):
-
-```bash
-python -m venv /tmp/test-monarch
-source /tmp/test-monarch/bin/activate
-pip install --index-url https://test.pypi.org/simple/ \
-    --extra-index-url https://pypi.org/simple/ monarch-cli==X.Y.Z
-monarch --version    # should print: monarch-cli X.Y.Z
-monarch --help
-deactivate
-rm -rf /tmp/test-monarch
-```
-
-Confirm the page renders correctly: `https://test.pypi.org/project/monarch-cli/`.
-
-TestPyPI versions are immutable, just like PyPI. If you need to fix and re-test,
-bump to a new version (for example `X.Y.Zrc2`) — you cannot overwrite.
-
-### Step 4: Create the GitHub release
-
-Once TestPyPI looks good:
-
-```bash
-make release-dry   # preview every action and the changelog that will be used
-make release       # create tag + GitHub release (does NOT publish to PyPI)
-```
+`make release-dry` previews every action and the changelog that will be used.
+It warns (rather than refuses) when the branch is not `main`, `HEAD` is not
+`origin/main`, or the version's tag already exists, so it can be run on an
+unreleased branch. It never creates a tag or a release.
 
 `make release` verifies, in order:
 
 - `__init__.py` and `pyproject.toml` versions match;
+- the working tree is clean and the branch is `main`;
+- `HEAD` equals `origin/main` (the release commit was pushed);
 - the tag `vX.Y.Z` does not already exist;
-- the working tree is clean;
 - a `## [X.Y.Z]` changelog section exists;
-- it is on `main` (warns and prompts otherwise);
-- after building, `dist/monarch_cli-X.Y.Z-*.whl` exists.
+- `smoke-install` rebuilt `dist/` and the stamp in
+  `src/monarch_cli/_build_info.json` is `HEAD`;
+- `dist/monarch_cli-X.Y.Z-*.whl` exists.
 
-It then builds via `make smoke-install`, prompts for confirmation, creates and
-pushes the annotated tag `vX.Y.Z`, and creates the GitHub release with the
-changelog as notes and `dist/*` as assets.
+It then prompts for confirmation, creates and pushes the annotated tag
+`vX.Y.Z` (`Release X.Y.Z`), and creates the GitHub Release with the changelog
+as notes and `dist/*` as assets. It never publishes to PyPI.
 
-### Step 5: Publish to PyPI
+### Publish last
+
+Upload from the same `dist/` built from the tagged commit:
 
 ```bash
 uv run twine upload dist/*
 ```
 
-Verify at `https://pypi.org/project/monarch-cli/`.
-
-## Command reference
-
-| Action | Command |
-|--------|---------|
-| Bump lockfile after version edit | `uv lock` |
-| Verify + build + validate (wipes `dist/`) | `make prepublish` |
-| Rebuild + isolated install only | `make smoke-install` |
-| Regenerate capabilities fixture (intentional manifest change only) | `make update-capabilities-fixture` |
-| Upload to TestPyPI | `uv run twine upload --repository testpypi dist/*` |
-| Verbose upload (shows the real server error) | `uv run twine upload --verbose --repository testpypi dist/*` |
-| Preview GitHub release | `make release-dry` |
-| Create GitHub release | `make release` |
-| Upload to PyPI | `uv run twine upload dist/*` |
-
-## Failure recovery
-
-Each guard is designed to stop you *before* an irreversible action and tell you
-exactly what to do. Find your symptom below.
-
-### `400 Bad Request` / `HTTPError` from `twine upload`
-
-Twine hides the server's reason by default. Re-run with `--verbose` (after
-`upload`) to see it:
+Optionally rehearse on TestPyPI first:
 
 ```bash
-uv run twine upload --verbose --repository testpypi dist/*
-```
-
-The overwhelmingly common reason is:
-
-```
-400 File already exists ('monarch_cli-X.Y.Z-...whl', ...)
-```
-
-**Cause:** you are uploading a version that already exists (published versions
-are immutable), usually because `dist/` is stale or was built before the version
-bump.
-
-**Fix:** rebuild so `dist/` matches the intended version, then re-upload:
-
-```bash
-make smoke-install   # wipes and rebuilds dist/
-ls dist/             # confirm only monarch_cli-X.Y.Z-* files are present
 uv run twine upload --repository testpypi dist/*
-```
-
-If the version genuinely already exists on the index and you need changes, bump
-the version (Step 1) and start again. Never delete/re-upload a published version.
-
-### `❌ Version mismatch` (from `make release`)
-
-`src/monarch_cli/__init__.py` and `pyproject.toml` disagree. Set both to the
-same version and run `uv lock`, then retry. The same invariant is enforced by
-`make prepublish` via `tests/test_version_parity.py`.
-
-### `❌ Tag vX.Y.Z already exists`
-
-The tag was already created (a previous release, or you re-ran `make release`).
-Either delete the tag if it was a mistake (`git tag -d vX.Y.Z && git push origin
-:refs/tags/vX.Y.Z`) or bump the version and release that instead.
-
-### `❌ Uncommitted changes detected`
-
-Commit or stash your changes first. The release must correspond to a commit.
-`git status --short` is printed for you.
-
-### `❌ No changelog entry found for version X.Y.Z`
-
-Add a `## [X.Y.Z]` section to `CHANGELOG.md` (Step 1), commit it, and retry.
-
-### `capabilities manifest drifted from the canonical fixture`
-
-Only legitimate after an *intentional* capabilities manifest change. Regenerate
-and review the diff:
-
-```bash
-make update-capabilities-fixture
-git diff tests/fixtures/capabilities.manifest.json
-```
-
-This is **not** needed for a version bump — the fixture is version-independent.
-
-### Token not working
-
-- Ensure there is no extra whitespace in `~/.pypirc`.
-- The token must start with `pypi-`.
-- Confirm the token is not expired or revoked, and that the username is exactly
-  `__token__`.
-
-### Package not installable from TestPyPI
-
-TestPyPI does not host all dependencies. Always pass the production index as a
-fallback:
-
-```bash
+python -m venv /tmp/test-monarch
+source /tmp/test-monarch/bin/activate
 pip install --index-url https://test.pypi.org/simple/ \
     --extra-index-url https://pypi.org/simple/ monarch-cli==X.Y.Z
+monarch --version    # monarch X.Y.Z (sha7 YYYY-MM-DD)
+deactivate && rm -rf /tmp/test-monarch
 ```
 
-### "File already exists" on PyPI but you have not published this version
+TestPyPI does not host the runtime dependencies, so the production index
+fallback is required. TestPyPI versions are immutable too: to re-test, bump to
+a new version (for example `X.Y.Zrc2`).
 
-This means the version is already on the index (possibly from a teammate's
-upload or an earlier attempt). Confirm with:
+## When a step fails
+
+- **Before `git push`**: nothing is on the remote yet. Fix and repeat;
+  `git reset --hard origin/main` drops a local bump commit.
+- **After `git push`, before `make release`**: the bump commit is on `main` but
+  untagged. Fix the cause and continue from `make prepublish`; do not bump
+  again.
+- **`tag vX.Y.Z already exists`**: either delete the mistaken tag
+  (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`) or bump to the
+  next version.
+- **`HEAD is not origin/main`**: push the release commit first.
+- **`No changelog entry found for version X.Y.Z`**: add the section (or use
+  `make bump`) and commit it.
+- **`dist/ was built from ... not HEAD`**: rebuild with `make prepublish`
+  before tagging.
+- **GitHub Release**: the tag is pushed. Create it with
+  `gh release create vX.Y.Z dist/* --title vX.Y.Z --notes-file <section>`.
+- **Upload `400 Bad Request` / `HTTPError`**: twine hides the reason. Re-run
+  with `--verbose`; the usual cause is `File already exists`, meaning the
+  version is already published. Never delete or re-upload a published version;
+  bump instead. Files already on PyPI can be skipped with
+  `uv publish --check-url https://pypi.org/simple/` (or just re-run twine).
+- **Token not working**: no extra whitespace in `~/.pypirc`, the token starts
+  with `pypi-`, the username is exactly `__token__`, and the token is not
+  expired or revoked.
+
+## Verify
 
 ```bash
-curl -s https://pypi.org/pypi/monarch-cli/json | python3 -c "import sys,json;print(list(json.load(sys.stdin)['releases']))"
+monarch --version          # monarch X.Y.Z (sha7 YYYY-MM-DD)
+monarch update --check     # 0 up to date, 1 update available, 2 unknown
+uvx monarch-cli@latest --version
 ```
-
-If the version is present, you cannot re-upload it — bump the version.
