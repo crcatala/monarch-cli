@@ -22,6 +22,28 @@ or config/session write). See [Capabilities manifest](capabilities.md).
 monarch capabilities | jq '.commands[] | select(.safety.requires_authorization)'
 ```
 
+## Updating
+
+`monarch update` replaces the installed copy using the method it was installed
+with. A source checkout updates from `origin/main` (`git pull --ff-only` plus a
+reinstall) and refuses a dirty tree or a branch other than `main`. `uv tool`,
+`pipx`, `pip`, and `mise` installs run the matching upgrade command. An `npx`
+run has nothing to update; `npx monarch-cli@latest` always runs the latest.
+
+### `update`
+
+```text
+monarch update [--check] [--force]
+```
+
+| Option | Purpose |
+|---|---|
+| `--check` | Report only: exit `0` up to date, `1` update available, `2` unknown |
+| `--force` | Update even when the install already looks current |
+
+`monarch update` prints each command before running it in the foreground, so
+package-manager prompts reach the terminal. See `monarch update --help`.
+
 ## Global options
 
 Global options appear before the command path:
@@ -32,7 +54,7 @@ monarch [GLOBAL OPTIONS] GROUP COMMAND [COMMAND OPTIONS]
 
 | Option | Purpose |
 |---|---|
-| `-v, --version` | Show the version and exit |
+| `-v, --version` | Print `monarch X.Y.Z (sha7 YYYY-MM-DD)` and exit |
 | `-V, --verbose` | Show operational progress |
 | `--debug` | Show stack traces; implies verbose |
 | `--json` | Set JSON as the output default |

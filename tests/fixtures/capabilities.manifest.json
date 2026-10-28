@@ -3350,6 +3350,55 @@
         "requires_destructive_confirmation": false,
         "supports_preview": true
       }
+    },
+    {
+      "arguments": [],
+      "effects": [
+        "local_install_change"
+      ],
+      "name": "update",
+      "options": [
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--check"
+          ],
+          "kind": "option",
+          "name": "check",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "choices": [],
+          "default": false,
+          "flags": [
+            "--force"
+          ],
+          "kind": "option",
+          "name": "force",
+          "repeatable": false,
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "output": {
+        "ndjson": false,
+        "quiet": false,
+        "raw": false,
+        "schemas": [],
+        "stable_normalized": false
+      },
+      "path": [
+        "update"
+      ],
+      "safety": {
+        "interactive": false,
+        "requires_authorization": false,
+        "requires_destructive_confirmation": false,
+        "supports_preview": false
+      }
     }
   ],
   "global": {
@@ -3723,6 +3772,7 @@
   "taxonomy": {
     "effects": [
       "local_credential_change",
+      "local_install_change",
       "preview",
       "read_only",
       "remote_authentication",

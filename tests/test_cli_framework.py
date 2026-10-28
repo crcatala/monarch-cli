@@ -78,6 +78,11 @@ def isolated_config_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 ANSI_ESCAPE_RE = re.compile(rb"\x1b\[[0-9;]*m")
 
+#: The release-standard version line: ``monarch X.Y.Z (sha7[-dirty] YYYY-MM-DD)``.
+VERSION_LINE_RE = re.compile(
+    r"^monarch \d+\.\d+\.\d+ \([0-9a-f]{7}(?:-dirty)? \d{4}-\d{2}-\d{2}\)$"
+)
+
 
 @pytest.fixture(autouse=True)
 def reset_output_state() -> None:
@@ -190,7 +195,7 @@ class TestGlobalOptionParsing:
 
             assert result.exit_code == 0, result.output
             assert_parsed_cleanly(result, caught)
-            assert "monarch-cli" in result.output
+            assert VERSION_LINE_RE.match(result.output.strip()), result.output
 
     def test_global_options_parse_before_subcommand(self) -> None:
         storage_info = {

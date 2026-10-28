@@ -45,6 +45,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 #: renamed command must update this mapping (and its declarations) explicitly.
 EXPECTED_INVENTORY: dict[str, frozenset[Effect]] = {
     "capabilities": frozenset({Effect.READ_ONLY}),
+    "update": frozenset({Effect.LOCAL_INSTALL_CHANGE}),
     "accounts list": frozenset({Effect.READ_ONLY}),
     "accounts types": frozenset({Effect.READ_ONLY}),
     "accounts history": frozenset({Effect.READ_ONLY}),
