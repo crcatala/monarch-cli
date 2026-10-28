@@ -57,8 +57,8 @@ Each entry under `commands` contains:
 - `path` / `name` — the command path, for example `["transactions", "tags", "add"]`.
 - `effects` — the explicit shared effect vocabulary for the command. Current
   values are `read_only`, `preview`, `remote_authentication`,
-  `remote_mutation`, and `local_credential_change`. New effect members extend
-  the taxonomy additively.
+  `remote_mutation`, `local_credential_change`, and `local_install_change`
+  (`monarch update`). New effect members extend the taxonomy additively.
 - `safety` — the explicit safety profile (never inferred):
   - `requires_authorization` — the command is a remote mutation and requires
     the global `--allow-mutations` option for this invocation.

@@ -67,6 +67,9 @@ class Effect(StrEnum):
     REMOTE_MUTATION = "remote_mutation"
     #: Writes or removes local authentication state.
     LOCAL_CREDENTIAL_CHANGE = "local_credential_change"
+    #: Replaces the installed copy of the CLI itself (``monarch update``); it
+    #: never touches remote financial data or credentials.
+    LOCAL_INSTALL_CHANGE = "local_install_change"
 
 
 #: Attribute used to attach declared effects to a command callback. Because

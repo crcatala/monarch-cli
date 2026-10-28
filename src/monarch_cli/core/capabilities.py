@@ -374,6 +374,11 @@ COMMAND_CAPABILITIES: dict[str, CommandCapability] = {
         frozenset({Effect.READ_ONLY}),
         output=OutputCapability(quiet=False),
     ),
+    "update": CommandCapability(
+        "update",
+        frozenset({Effect.LOCAL_INSTALL_CHANGE}),
+        output=OutputCapability(quiet=False, stable_normalized=False),
+    ),
 }
 
 #: The public command that emits this manifest. It is self-describing: the

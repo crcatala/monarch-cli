@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `monarch update` replaces the installed copy using the method it was
+  installed with (source checkout, `uv tool`, `pipx`, `pip`, or `mise`).
+  `monarch update --check` reports whether an update is available without
+  changing anything (exit 0 up to date, 1 update available, 2 unknown). A
+  source checkout pulls `origin/main` and reinstalls; it refuses a dirty tree
+  or a branch other than `main`.
+- `--version` and `-v` now include the commit and date: `monarch 0.2.1
+  (1a2b3c4 2026-06-01)`, with `-dirty` for a build from an uncommitted tree.
+  Built wheels and sdists carry a `_build_info.json` stamp so an installed copy
+  prints the same line as the checkout it came from.
+
+### Changed
+
+- Release tooling follows the release standard: `make bump VERSION=X.Y.Z`
+  updates the version metadata and changelog and commits `chore: release
+  vX.Y.Z`; `scripts/check-changelog.sh` refuses an empty Unreleased section;
+  `scripts/release.sh` requires a clean `main` at `HEAD == origin/main` and
+  refuses to tag when the build stamp does not match `HEAD`.
+- Smoke-test/CI builds (`make smoke-install`) stamp the build and verify the
+  exact `--version` line of both console entry points.
+
 ## [0.2.1] - 2026-09-21
 
 ### Added

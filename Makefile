@@ -1,4 +1,4 @@
-.PHONY: setup verify format format-check lint lint-fix typecheck test test-live test-live-mutation smoke-install release release-dry prepublish update-capabilities-fixture
+.PHONY: setup verify format format-check lint lint-fix typecheck test test-live test-live-mutation smoke-install release release-dry prepublish bump update-capabilities-fixture
 
 # Python version used by the isolated wheel smoke-install environment.
 SMOKE_PYTHON ?= 3.13
@@ -45,6 +45,13 @@ test-live:
 # plus an explicit approved household ID. It is never run in CI or by `make test`.
 test-live-mutation:
 	MONARCH_LIVE_MUTATION_TESTS=1 uv run pytest tests/live/ -m live_mutation -v
+
+# Bump the version (src/monarch_cli/__init__.py, pyproject.toml, uv.lock), move
+# the Unreleased changelog entries into a dated section, and commit
+# "chore: release vX.Y.Z". Refuses a dirty tree, a branch other than main, an
+# existing tag, or an empty Unreleased section. See RELEASING.md.
+bump:
+	./scripts/bump.sh "$(VERSION)"
 
 # Create GitHub release with tag and changelog
 release:

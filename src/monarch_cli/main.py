@@ -2,7 +2,7 @@
 
 import typer
 
-from monarch_cli import __version__
+from monarch_cli import cli_meta
 from monarch_cli.commands import (
     accounts,
     auth,
@@ -14,6 +14,7 @@ from monarch_cli.commands import (
     investments,
     subscription,
     transactions,
+    update,
 )
 from monarch_cli.core.config import get_config, set_config
 from monarch_cli.core.error_handler import handle_errors
@@ -37,12 +38,18 @@ app.add_typer(subscription.app, name="subscription")
 
 # Root-level commands (no group)
 app.command("capabilities")(capabilities.capabilities)
+app.command("update")(update.update)
 
 
 def version_callback(value: bool) -> None:
-    """Print version and exit."""
+    """Print the release-standard version line and exit.
+
+    The line is ``monarch X.Y.Z (sha7 YYYY-MM-DD)``, with ``-dirty`` when the
+    build came from an uncommitted tree. A checkout reads git; an installed
+    wheel reads the ``_build_info.json`` stamp written before it was built.
+    """
     if value:
-        typer.echo(f"monarch-cli {__version__}")
+        typer.echo(cli_meta.version_line("monarch", "monarch-cli"))
         raise typer.Exit()
 
 

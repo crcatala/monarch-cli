@@ -25,31 +25,55 @@ net worth.
 - Side-effect-free `monarch capabilities` manifest for agent/integration
   discovery of commands, options, safety policy, and contract versions
 
-## Installation
+## Install
 
-### pip
+Requires Python 3.12 or newer.
+
+### pip, uv, or pipx
 
 ```bash
 pip install monarch-cli
-```
-
-### uv (recommended)
-
-```bash
-uv tool install monarch-cli
-```
-
-### pipx
-
-```bash
+uv tool install monarch-cli   # recommended: isolated, on your PATH
 pipx install monarch-cli
 ```
 
-Verify the installation:
+Run it without installing:
+
+```bash
+uvx monarch-cli --help
+```
+
+### From source
+
+```bash
+git clone https://github.com/crcatala/monarch-cli.git
+cd monarch-cli
+uv tool install --editable .   # puts `monarch` on PATH, running this clone's code
+monarch --version              # monarch X.Y.Z (sha7 YYYY-MM-DD): the commit you are on
+```
+
+Code changes take effect on the next run; reinstall (`uv tool install
+--editable . --reinstall`) after dependencies change. For a full development
+environment instead, see [Development](#development) (`make setup` and
+`uv run monarch`).
+
+Verify the install with:
 
 ```bash
 monarch --version
+monarch --help
 ```
+
+### Updating
+
+```bash
+monarch update --check   # exit 0: up to date, 1: update available, 2: unknown
+monarch update           # updates the way it was installed
+```
+
+A source checkout updates with `git pull --ff-only` plus a reinstall, and
+refuses a dirty tree or a branch other than `main`. Package-manager installs
+use the matching `uv tool`, `pipx`, `pip`, or `mise` upgrade command.
 
 ## Upgrading
 
@@ -344,7 +368,7 @@ make verify
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and
 [docs/testing.md](docs/testing.md) for live-test safeguards. Release
-instructions are in [docs/RELEASING.md](docs/RELEASING.md).
+instructions are in [RELEASING.md](RELEASING.md).
 
 ## Contributing
 

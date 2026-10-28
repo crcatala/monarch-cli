@@ -74,6 +74,9 @@ build-backend = "uv_build"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# Canonical release-standard copy: kept byte-identical to its template, so
+# it is not reformatted or linted here.
+extend-exclude = ["scripts/build_info.py"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM"]
