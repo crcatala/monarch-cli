@@ -29,7 +29,7 @@ dependencies = [
     # bounded because Typer upgrades can change command registration, help
     # rendering, and option parsing. Widening the range requires the same
     # framework-sensitive suite (tests/test_cli_framework.py) to be re-run.
-    "typer>=0.27.1,<0.28",
+    "typer>=0.28,<0.29",
     "monarchmoneycommunity>=1.5.2",
     # Imported directly by monarch_cli.core.retry; it must not rely on being
     # pulled in transitively by monarchmoneycommunity. Floor matches the
@@ -68,7 +68,7 @@ Issues = "https://github.com/crcatala/monarch-cli/issues"
 Changelog = "https://github.com/crcatala/monarch-cli/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["uv_build>=0.12.1,<0.13.0"]
+requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
