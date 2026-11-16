@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scanned receipt inbox and detail commands with processing status, server-side filters, and pagination.
+- Explicit scanned receipt matching with target validation, preview, conflict checks, no automatic retries, and verified link readback.
+- Receipt command group: upload with preview, list transaction attachments, and find transactions without attachments.
+- Active linked-account refresh scope shared by `accounts refresh` and `accounts refresh-status`, excluding manual and inactive accounts and rejecting empty scopes.
+- Local installer that uses the tested checkout Python and locked dependency constraints.
 - Offline balance CSV validator migrated from the legacy exporter, with malformed-row regression coverage.
 - Optional MCP server, holdings mutations, and filtered account cloning.
 
 ### Fixed
 
+- Transaction update previews without category resolution no longer require authentication.
 - **Transaction amount preservation** - Metadata-only transaction updates now include and verify the current amount so note, attachment-note, category, and batch updates do not revert corrected amounts.
 
 ## [0.2.0] - 2026-08-27

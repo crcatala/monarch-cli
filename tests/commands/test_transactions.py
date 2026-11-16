@@ -766,8 +766,12 @@ class TestTransactionsUpdate:
 
     def test_update_dry_run(self) -> None:
         """Update with --dry-run shows changes without applying."""
-        with patch("monarch_cli.output.progress.is_interactive", return_value=False):
+        with (
+            patch("monarch_cli.output.progress.is_interactive", return_value=False),
+            patch("monarch_cli.commands.transactions.get_authenticated_client") as get_client,
+        ):
             result = runner.invoke(app, ["update", "txn_123", "--amount", "25.50", "--dry-run"])
+            get_client.assert_not_called()
 
             assert result.exit_code == 0
             output = json.loads(result.stdout)

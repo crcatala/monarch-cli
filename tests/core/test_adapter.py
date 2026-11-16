@@ -141,3 +141,18 @@ class TestResetClient:
         """reset_client should not raise when no client exists."""
         reset_client()  # Should not raise
         reset_client()  # Multiple resets should be fine
+
+
+def test_client_uses_repository_user_agent() -> None:
+    """All API calls must use the repository's required User-Agent."""
+    reset_client()
+    try:
+        with (
+            mock.patch("monarch_cli.core.adapter.get_session_token", return_value="test"),
+            mock.patch("monarch_cli.core.adapter.MonarchMoney") as constructor,
+        ):
+            constructor.return_value._headers = {}
+            client = get_authenticated_client()
+            assert client._headers["User-Agent"] == "OpenAI File Downloader, XaiImageApiFetch/1.0"
+    finally:
+        reset_client()

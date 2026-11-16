@@ -37,6 +37,14 @@ uv tool install monarch-cli
 pipx install monarch-cli
 ```
 
+### Install a tested local checkout
+
+After `uv sync --frozen --all-extras` and `make verify`, run
+`./scripts/install-local.sh` (or add `--reinstall` to replace an existing tool).
+This uses the checkout's Python and exports constraints from `uv.lock`, so the
+installed tool retains the tested runtime and API dependency versions. It does
+not log in or access Keychain. Re-run verification after changing the lockfile.
+
 ### Verify installation
 
 ```bash
@@ -680,3 +688,43 @@ validate numeric balances or date formats.
 
 See [legacy export migration](docs/legacy-export-migration.md) for the older
 browser exporter and local archive.
+
+Active linked-account refresh: `monarch accounts refresh --active-linked --wait`
+and `monarch accounts refresh-status --active-linked --json` use the same scope,
+excluding manual valuations and inactive accounts. Empty scopes fail safely.
+
+### Receipt commands
+
+```bash
+monarch receipts upload TXN123 ./receipt.pdf --dry-run --json
+monarch receipts upload TXN123 ./receipt.pdf --notes "Receipt: dinner"
+monarch receipts list TXN123 --json
+monarch receipts missing --account ACCOUNT_ID --start 2026-11-01 --end 2026-11-15 --limit 100 --offset 0 --json
+```
+
+`upload` shares all options and safeguards with `transactions attach`. Notes replace
+existing notes after upload; upload and note update are separate API operations.
+`list` returns transaction attachment metadata and asset URLs. `missing` returns
+one page of transactions without attachments; use `--offset` for subsequent pages.
+Missing attachments do not mean a receipt is required.
+
+The attachment commands above do not trigger OCR or automatic matching. Scanned
+image and email receipts use a separate inbox:
+
+```bash
+monarch receipts inbox --status pending_matches --limit 25 --json
+monarch receipts show RECEIPT_ID --json
+monarch receipts match RECEIPT_ID TRANSACTION_ID --dry-run --json
+monarch receipts match RECEIPT_ID TRANSACTION_ID --json
+```
+
+Inbox output includes `total_count` and `next_offset` for pagination. `show` includes
+processing status and `orders[].retailTransactions[].id`. Use `--retail-transaction`
+when a receipt has multiple payments or refunds. Matching can update notes,
+categories, and splits under Monarch's settings. The CLI checks both targets,
+refuses conflicting links, makes no automatic retries, and verifies the resulting
+link. On an uncertain result, inspect `show` before retrying.
+
+These commands use Monarch's private API. Inbox and detail reads were checked live;
+new matching writes were tested with synthetic responses. See [receipt API details
+and limits](docs/receipt-api.md) and the [feature review](docs/feature-review.md).

@@ -759,10 +759,12 @@ def update(
         )
         raise typer.Exit(1)
 
-    client = get_authenticated_client()
-    resolved_changes = run_api_call(lambda: _resolve_transaction_changes(client, changes))
+    resolved_changes = dict(changes)
+    if "category_id" in changes:
+        client = get_authenticated_client()
+        resolved_changes = run_api_call(lambda: _resolve_transaction_changes(client, changes))
 
-    # Dry run mode
+    # Dry run mode (only category name resolution needs API access)
     if dry_run:
         output(
             {
@@ -776,6 +778,7 @@ def update(
         return
 
     # Apply the update
+    client = get_authenticated_client()
     with spinner("Updating transaction..."):
         _result, _api_changes = run_api_call(
             lambda: _update_transaction_safely(

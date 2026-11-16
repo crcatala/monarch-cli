@@ -37,8 +37,10 @@ def get_authenticated_client() -> MonarchMoney:
     if token is None:
         raise AuthenticationError()
 
-    # Use constructor parameter, never manipulate private attributes
+    # Pass authentication through the public constructor.
     _client = MonarchMoney(token=token)
+    # Upstream has no public header setter; keep this compatibility detail here.
+    _client._headers["User-Agent"] = "OpenAI File Downloader, XaiImageApiFetch/1.0"
     return _client
 
 

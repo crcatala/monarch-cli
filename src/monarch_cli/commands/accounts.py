@@ -256,6 +256,22 @@ def _find_account(accounts: list[dict[str, Any]], account_id: str) -> dict[str, 
     return next((account for account in accounts if str(account.get("id")) == account_id), None)
 
 
+def _refresh_account_scope(account: list[str] | None, active_linked: bool) -> list[str] | None:
+    """Resolve refresh scope without treating an empty selection as all accounts."""
+    if not active_linked:
+        return list(account) if account else None
+    if account:
+        raise typer.BadParameter("Use either --account or --active-linked, not both")
+    ids = [
+        str(row["id"])
+        for row in list_accounts()
+        if row.get("id") and row.get("is_active") and row.get("is_manual") is False
+    ]
+    if not ids:
+        raise typer.BadParameter("No active linked accounts available to refresh")
+    return ids
+
+
 def _wait_refresh_result(
     *,
     client: Any,
@@ -733,6 +749,10 @@ def refresh(
             help="Polling delay in seconds when --wait is used.",
         ),
     ] = 10,
+    active_linked: Annotated[
+        bool,
+        typer.Option("--active-linked", help="Only active, non-manual linked accounts."),
+    ] = False,
     format: Annotated[
         OutputFormat | None,
         typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
@@ -753,7 +773,7 @@ def refresh(
         monarch accounts refresh -a ACC123 -a ACC456    # Refresh multiple
     """
     # Convert None to None (not empty list) for the service
-    account_ids = list(account) if account else None
+    account_ids = _refresh_account_scope(account, active_linked)
 
     with spinner("Requesting account refresh..."):
         if wait:
@@ -791,6 +811,10 @@ def refresh_status(
             help="Specific account ID(s) to check (repeatable). Checks all if not provided.",
         ),
     ] = None,
+    active_linked: Annotated[
+        bool,
+        typer.Option("--active-linked", help="Only active, non-manual linked accounts."),
+    ] = False,
     format: Annotated[
         OutputFormat | None,
         typer.Option("-f", "--format", help="Output format (plain, json, table, csv, compact)"),
@@ -798,7 +822,7 @@ def refresh_status(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Check whether account refresh is complete."""
-    account_ids = list(account) if account else None
+    account_ids = _refresh_account_scope(account, active_linked)
     with spinner("Checking account refresh status..."):
         client = get_authenticated_client()
         complete: bool = run_api_call(

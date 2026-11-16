@@ -79,3 +79,6 @@ asyncio_mode = "auto"
 markers = [
     "live: marks tests that hit the real Monarch Money API (excluded in CI)",
 ]
+
+[tool.uv]
+exclude-newer-package = { certifi = "2026-10-22" }
