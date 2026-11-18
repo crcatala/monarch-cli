@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Saved report management: list/show, create from a report URL or JSON configuration, rename, and guarded deletion. Includes previews, validated filters, no automatic write retries, and verified readback.
+
 - Scanned receipt inbox and detail commands with processing status, server-side filters, and pagination.
 - Explicit scanned receipt matching with target validation, preview, conflict checks, no automatic retries, and verified link readback.
 - Receipt command group: upload with preview, list transaction attachments, and find transactions without attachments.

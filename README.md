@@ -728,3 +728,27 @@ link. On an uncertain result, inspect `show` before retrying.
 These commands use Monarch's private API. Inbox and detail reads were checked live;
 new matching writes were tested with synthetic responses. See [receipt API details
 and limits](docs/receipt-api.md) and the [feature review](docs/feature-review.md).
+
+### Saved reports
+
+```bash
+monarch report list --json
+monarch report show REPORT_ID --json
+monarch report create --name "Tagged cash flow" \
+  --url 'https://app.monarch.com/reports/cash-flow?tags=253277239843441604' \
+  --dry-run --json
+monarch report rename REPORT_ID --name "New name" --dry-run --json
+monarch report delete REPORT_ID --dry-run --json
+monarch report delete REPORT_ID --yes --json
+```
+
+Create, rename, and delete saved Monarch report configurations. Remove `--dry-run`
+to apply create/rename. Create supports cash-flow, spending, and income URLs, or
+`--filters-file`/`--view-file` JSON objects. Unknown URL settings are rejected;
+create preview validates offline. Writes have no automatic retries and require
+verified readback. Delete requires `--yes` when not previewing.
+
+These commands save views; they do not export report data or change transactions.
+The observed update operation renames reports; changing an existing view's filters
+in place is not exposed. See [saved-report API details](docs/report-api.md) for
+supported input, private API evidence, and validation limits.

@@ -14,6 +14,7 @@ from monarch_cli.commands import (
     investments,
     mcp,
     receipts,
+    report,
     transactions,
 )
 from monarch_cli.core.capabilities import build_capabilities
@@ -38,6 +39,7 @@ app.command("api")(api.api_cmd)
 app.add_typer(investments.app, name="investments")
 app.add_typer(mcp.app, name="mcp")
 app.add_typer(receipts.app, name="receipts")
+app.add_typer(report.app, name="report")
 
 
 def version_callback(value: bool) -> None:
